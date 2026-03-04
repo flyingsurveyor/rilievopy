@@ -20,6 +20,17 @@ label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; fo
 .btn-misura { background: #27ae60; font-size: 18px; font-weight: 700; padding: 18px; width: 100%; margin-top: 20px; border-radius: 8px; letter-spacing: 1px; }
 .btn-misura:hover { background: #1e8449; }
 .hint { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
+.flash-error { background: #e74c3c; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 15px; font-weight: 600; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+.modal-content { background: white; padding: 24px; border-radius: 12px; max-width: 480px; width: 90%; color: #333; }
+.modal-content h3 { margin-top: 0; color: #e67e22; }
+.modal-content ul { margin: 12px 0 16px; padding-left: 20px; }
+.modal-content li { margin-bottom: 6px; }
+.modal-buttons { display: flex; gap: 12px; margin-top: 8px; }
+.btn-cancel { background: #e74c3c; }
+.btn-cancel:hover { background: #c0392b; }
+.btn-force { background: #e67e22; }
+.btn-force:hover { background: #d35400; }
 @media screen and (max-width: 768px) {
   body { font-size: 14px; padding: 0; margin: 0; }
   .container { padding: 5px; margin: 0; }
@@ -48,6 +59,20 @@ label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; fo
   ✅ Punto {{ saved }}{% if savedname %} ({{ savedname }}){% endif %}{% if savedcodice %} — {{ savedcodice }}{% endif %} salvato!
 </div>
 {% endif %}
+
+<div id="flash-error" class="flash-error" style="display:none;"></div>
+
+<!-- Quality warning modal -->
+<div id="quality-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-content">
+    <h3>⚠️ Attenzione — Qualità GNSS</h3>
+    <ul id="quality-warnings-list"></ul>
+    <div class="modal-buttons">
+      <button class="btn btn-cancel" id="modal-cancel">🚫 Annulla</button>
+      <button class="btn btn-force" id="modal-force">⚠️ Misura comunque</button>
+    </div>
+  </div>
+</div>
 
 <div class="card">
 <form method="POST" action="/survey/{{ sid }}/point" id="point-form">
@@ -82,6 +107,7 @@ label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; fo
   </select>
 
   <button class="btn btn-misura" type="submit">🎯 MISURA</button>
+  <input type="hidden" name="force" id="force-field" value="0">
 </form>
 </div>
 </div>
@@ -149,6 +175,80 @@ label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; fo
   if (flash) {
     setTimeout(() => { flash.style.display = 'none'; }, 3000);
   }
+
+  // ---- Form submit via fetch to handle quality gate responses ----
+  const form = document.getElementById('point-form');
+  const forceField = document.getElementById('force-field');
+  const flashError = document.getElementById('flash-error');
+  const qualityModal = document.getElementById('quality-modal');
+  const warningsList = document.getElementById('quality-warnings-list');
+
+  function showError(msg) {
+    flashError.textContent = msg;
+    flashError.style.display = 'block';
+    window.scrollTo(0, 0);
+  }
+
+  async function submitForm() {
+    const fd = new FormData(form);
+    flashError.style.display = 'none';
+
+    let resp;
+    try {
+      resp = await fetch(form.action, {method: 'POST', body: fd});
+    } catch(e) {
+      showError('Errore di rete: ' + e);
+      return;
+    }
+
+    // If redirected (302 followed by fetch), check content-type
+    const ct = resp.headers.get('content-type') || '';
+    if (ct.includes('application/json') || ct.includes('text/json')) {
+      const data = await resp.json();
+      if (data.error === 'no_gnss_data') {
+        showError('❌ ' + (data.message || 'Nessun dato GNSS. Verificare la connessione.'));
+        return;
+      }
+      if (data.quality_warning) {
+        warningsList.innerHTML = '';
+        (data.warnings || []).forEach(w => {
+          const li = document.createElement('li');
+          li.textContent = w;
+          warningsList.appendChild(li);
+        });
+        qualityModal.style.display = 'flex';
+        return;
+      }
+      if (!data.ok) {
+        showError('❌ Errore: ' + (data.message || JSON.stringify(data)));
+        return;
+      }
+    }
+
+    // Success: follow the redirect URL from response
+    if (resp.redirected) {
+      window.location.href = resp.url;
+    } else {
+      window.location.href = resp.url || form.action;
+    }
+  }
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    forceField.value = '0';
+    submitForm();
+  });
+
+  document.getElementById('modal-cancel').addEventListener('click', () => {
+    qualityModal.style.display = 'none';
+    forceField.value = '0';
+  });
+
+  document.getElementById('modal-force').addEventListener('click', () => {
+    qualityModal.style.display = 'none';
+    forceField.value = '1';
+    submitForm();
+  });
 })();
 </script>
 {% endblock %}

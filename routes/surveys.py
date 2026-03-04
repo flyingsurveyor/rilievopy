@@ -12,25 +12,46 @@ from datetime import datetime
 from flask import Blueprint, abort, make_response, render_template, request, send_from_directory
 
 from modules.state import STATE
-from modules.utils import sanitize_point_name, robust_avg
+from modules.utils import sanitize_point_name, robust_avg, robust_avg_stats
 from modules.survey import (
     list_survey_ids, load_survey, save_survey, create_survey,
     delete_survey_file, next_point_id, point_feature,
-    flatten_point_for_csv, SURVEY_DIR, survey_path, point_from_feature
+    flatten_point_for_csv, CSV_HEADER, SURVEY_DIR, survey_path, point_from_feature,
+    backup_survey
 )
 from modules.exports import (
     build_dxf_advanced, export_geopackage, format_point_txt
 )
 from modules.active_survey import get_active_survey_id, set_active_survey_id
 from modules.codici_punto import load_codici
+from modules import settings as _settings
+from modules.session_log import log_event, read_log
+from modules.geodesy import WGS84_A
 
 bp = Blueprint('surveys', __name__)
+
+# GNSS data freshness thresholds (seconds)
+_GNSS_STALE_WARN_S = 5.0   # age below this → run quality gate checks
+_GNSS_STALE_ERROR_S = 10.0  # age above this → reject measurement entirely
 
 
 def _redirect(url: str):
     r = make_response("", 302)
     r.headers["Location"] = url
     return r
+
+
+def _tpv_age_seconds(snap: dict):
+    """Return age of TPV data in seconds, or None if no timestamp."""
+    tpv = snap.get("TPV", {})
+    ts_str = tpv.get("time")
+    if not ts_str:
+        return None
+    try:
+        ts = datetime.fromisoformat(ts_str)
+        return (datetime.now() - ts).total_seconds()
+    except Exception:
+        return None
 
 
 # ---------- List ----------
@@ -129,6 +150,14 @@ def survey_view(sid):
         codice = p.get('codice', '')
         points_for_json.append({"id": point_id, "name": point_name})
 
+        samp = p.get("sampling", {})
+        sigma_N = samp.get("sigma_N")
+        sigma_E = samp.get("sigma_E")
+        sigma_U = samp.get("sigma_U")
+
+        def fsig(x):
+            return f"±{x:.3f} m" if x is not None else "-"
+
         rows.append(
             "<tr>"
             f"<td><input type='checkbox' class='area-cb' value='{point_id}'/></td>"
@@ -145,12 +174,15 @@ def survey_view(sid):
             f"<td>{fnum(rp.get('E'), '{:.4f}')}</td>"
             f"<td>{fnum(rp.get('D'), '{:.4f}')}</td>"
             f"<td>{fnum(rp.get('baseline'), '{:.4f}')}</td>"
+            f"<td>{fsig(sigma_N)}</td>"
+            f"<td>{fsig(sigma_E)}</td>"
+            f"<td>{fsig(sigma_U)}</td>"
             f"<td><a class='btn' href='/survey/{sid}/point/{point_id}.txt'>TXT</a></td>"
             f"<td><button class='btn-delete-point' onclick=\"confirmDeletePoint('{sid}', {idx}, '{point_name}')\">🗑️</button></td>"
             "</tr>"
         )
     num_points = len(rows)
-    num_columns = 16
+    num_columns = 19
     return render_template('rtk_survey_view.html',
                            sid=props.get("id", sid),
                            title=props.get("title", sid),
@@ -203,6 +235,7 @@ def survey_point(sid):
     desc = (request.form.get("desc", "") or "").strip()[:300]
     codice = (request.form.get("codice", "") or "").strip()[:20]
     dur_form = request.form.get("dur", "").strip()
+    force = request.form.get("force", "0") == "1"
     duration = None
     if dur_form:
         try:
@@ -218,6 +251,60 @@ def survey_point(sid):
         interval = float(request.args.get("step", 0.5))
     except Exception:
         interval = 0.5
+
+    # ---------- Pre-sampling GNSS checks ----------
+    if not force:
+        pre_snap = STATE.snapshot()
+        age = _tpv_age_seconds(pre_snap)
+
+        # Check for stale or missing GNSS data (>_GNSS_STALE_ERROR_S seconds)
+        if age is None or age > _GNSS_STALE_ERROR_S:
+            try:
+                log_event("point_failed", sid, {"reason": "no_gnss_data"})
+            except Exception:
+                pass
+            return make_response(json.dumps({
+                "ok": False,
+                "error": "no_gnss_data",
+                "message": "Nessun dato GNSS ricevuto. Verificare la connessione."
+            }), 200, {"Content-Type": "application/json"})
+
+        # Quality gate checks (only when GNSS data is fresh, i.e., age < _GNSS_STALE_WARN_S)
+        if age < _GNSS_STALE_WARN_S:
+            cfg = _settings.load_settings()
+            if cfg.get("rtk_quality_gate", True):
+                tpv_pre = pre_snap.get("TPV", {})
+                hp_pre = pre_snap.get("HPPOSLLH", {})
+                dop_pre = pre_snap.get("DOP", {})
+                warnings = []
+
+                rtk_val = tpv_pre.get("rtk", "none")
+                if rtk_val == "none":
+                    warnings.append(f"Nessun fix RTK (stato: {rtk_val})")
+
+                hacc = hp_pre.get("hAcc")
+                max_hacc = cfg.get("max_hacc", 0.05)
+                if hacc is not None and hacc > max_hacc:
+                    warnings.append(
+                        f"Precisione orizzontale elevata: {hacc:.3f} m (soglia: {max_hacc} m)"
+                    )
+
+                pdop = dop_pre.get("pdop")
+                max_pdop = cfg.get("max_pdop", 3.0)
+                if pdop is not None and pdop > max_pdop:
+                    warnings.append(f"PDOP elevato: {pdop:.2f} (soglia: {max_pdop})")
+
+                numsv = tpv_pre.get("numSV")
+                min_sv = cfg.get("min_sv", 8)
+                if numsv is not None and numsv < min_sv:
+                    warnings.append(f"Pochi satelliti: {numsv} (minimo: {min_sv})")
+
+                if warnings:
+                    return make_response(json.dumps({
+                        "ok": False,
+                        "quality_warning": True,
+                        "warnings": warnings
+                    }), 200, {"Content-Type": "application/json"})
 
     start_ts = datetime.now()
     samples = []
@@ -273,6 +360,32 @@ def survey_point(sid):
         bearing = bearing + 360 if bearing < 0 else bearing
         slope = math.degrees(math.atan2(-relD, horiz)) if horiz else 0.0
 
+    # ---------- Sigma (std dev) of position samples ----------
+    def collect_vals(group, key):
+        vals = []
+        for s in samples:
+            g = s.get(group, {})
+            v = g.get(key, None)
+            if isinstance(v, (int, float)):
+                vals.append(v)
+        return vals
+
+    _lat_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lat"))
+    _lon_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lon"))
+    _alt_stats = robust_avg_stats(collect_vals("HPPOSLLH", "altHAE"))
+
+    _mean_lat_rad = math.radians(lat or 0.0)
+    sigma_N = None
+    sigma_E = None
+    sigma_U = None
+    n_kept = _alt_stats.get("n_kept", 0)
+    if _lat_stats.get("sigma") is not None:
+        sigma_N = _lat_stats["sigma"] * math.radians(1.0) * WGS84_A
+    if _lon_stats.get("sigma") is not None:
+        sigma_E = _lon_stats["sigma"] * math.radians(1.0) * WGS84_A * math.cos(_mean_lat_rad)
+    if _alt_stats.get("sigma") is not None:
+        sigma_U = _alt_stats["sigma"]
+
     stats = {
         "mode": mode, "rtk": rtk, "numSV": numSV,
         "hAcc": hAcc, "vAcc": vAcc, "pAcc": pAcc,
@@ -282,7 +395,8 @@ def survey_point(sid):
         "covNE": covNE, "covND": covND, "covED": covED,
         "relN": relN, "relE": relE, "relD": relD,
         "relsN": relsN, "relsE": relsE, "relsD": relsD,
-        "baseline": baseline, "horiz": horiz, "bearing": bearing, "slope": slope
+        "baseline": baseline, "horiz": horiz, "bearing": bearing, "slope": slope,
+        "sigma_N": sigma_N, "sigma_E": sigma_E, "sigma_U": sigma_U, "n_kept": n_kept,
     }
 
     try:
@@ -300,7 +414,13 @@ def survey_point(sid):
          "start": start_iso, "end": end_iso}
     )
     svy.setdefault("features", []).append(feat)
+    backup_survey(sid)
     save_survey(sid, svy)
+
+    try:
+        log_event("point_saved", sid, {"pid": pid, "codice": codice, "rtk": rtk})
+    except Exception:
+        pass
 
     return _redirect(f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}")
 
@@ -322,7 +442,7 @@ def survey_download_csv(sid):
     except FileNotFoundError:
         abort(404)
     buf = io.StringIO()
-    buf.write("id,name,lat,lon,altHAE,altMSL,X,Y,Z,mode,rtk,numSV,gdop,pdop,hdop,vdop,ndop,edop,tdop,hAcc,vAcc,pAcc,NN,EE,DD,NE,ND,ED,relN,relE,relD,relsN,relsE,relsD,baseline,bearingDeg,slopeDeg\n")
+    buf.write("id," + ",".join(CSV_HEADER) + "\n")
     for f in svy.get("features", []):
         row = [f.get("id", "")] + flatten_point_for_csv(f)
         buf.write(",".join(row) + "\n")
@@ -465,7 +585,7 @@ def survey_calc_area(sid):
     data = request.get_json()
     if not data:
         return make_response({"error": "No data"}, 400)
-    point_ids = data.get("point_ids", [])
+    point_ids = data.get("point_ids") or data.get("points", [])
     if len(point_ids) < 3:
         return make_response({"error": "Servono almeno 3 punti"}, 400)
 
@@ -522,3 +642,15 @@ def files_route(filename):
     if not os.path.isfile(path):
         abort(404)
     return send_from_directory(SURVEY_DIR, filename, as_attachment=True)
+
+
+# ---------- Session log ----------
+@bp.route("/api/session_log")
+def api_session_log():
+    try:
+        limit = int(request.args.get("limit", 200))
+    except (ValueError, TypeError):
+        limit = 200
+    events = read_log(limit=limit)
+    return make_response(json.dumps(events, ensure_ascii=False),
+                         200, {"Content-Type": "application/json"})

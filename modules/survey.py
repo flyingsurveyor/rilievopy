@@ -5,6 +5,7 @@ Survey storage — GeoJSON-based multi-point survey management.
 import os
 import re
 import json
+import shutil
 import threading
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -91,6 +92,14 @@ def delete_survey_file(sid: str) -> bool:
     return False
 
 
+def backup_survey(sid: str):
+    """Create a .bak copy of the survey file before modification."""
+    src = survey_path(sid)
+    bak = src + ".bak"
+    if os.path.exists(src):
+        shutil.copy2(src, bak)
+
+
 def next_point_id(svy: Dict[str, Any]) -> str:
     n = 1 + len(svy.get("features", []))
     return f"P{n:03d}"
@@ -134,7 +143,11 @@ def point_feature(pid: str,
                 "end_iso": meta.get("end"),
                 "duration_s": meta.get("duration", 10.0),
                 "interval_s": meta.get("interval", 0.5),
-                "n_samples": meta.get("n_samples", 0)
+                "n_samples": meta.get("n_samples", 0),
+                "sigma_N": stats.get("sigma_N"),
+                "sigma_E": stats.get("sigma_E"),
+                "sigma_U": stats.get("sigma_U"),
+                "n_kept": stats.get("n_kept"),
             }
         }
     }
@@ -142,13 +155,14 @@ def point_feature(pid: str,
 
 # ---------- CSV flatten ----------
 CSV_HEADER = [
-    "name", "lat", "lon", "altHAE", "altMSL",
+    "name", "codice", "lat", "lon", "altHAE", "altMSL",
     "X", "Y", "Z", "mode", "rtk", "numSV",
     "gdop", "pdop", "hdop", "vdop", "ndop", "edop", "tdop",
     "hAcc", "vAcc", "pAcc",
     "covNN", "covEE", "covDD", "covNE", "covND", "covED",
     "relN", "relE", "relD", "relsN", "relsE", "relsD",
-    "baseline", "bearing", "slope"
+    "baseline", "bearing", "slope",
+    "sigma_N", "sigma_E", "sigma_U", "n_kept"
 ]
 
 
@@ -159,6 +173,7 @@ def flatten_point_for_csv(feat: Dict[str, Any]) -> List[str]:
     dop = p.get("DOP", {})
     cov = p.get("COV", {})
     rp = p.get("RELPOSNED", {})
+    samp = p.get("sampling", {})
 
     def f(x, fmt):
         try:
@@ -168,6 +183,7 @@ def flatten_point_for_csv(feat: Dict[str, Any]) -> List[str]:
 
     return [
         p.get("name", ""),
+        p.get("codice", ""),
         f(hp.get("lat"), "{:.9f}"),
         f(hp.get("lon"), "{:.9f}"),
         f(hp.get("altHAE"), "{:.3f}"),
@@ -203,6 +219,10 @@ def flatten_point_for_csv(feat: Dict[str, Any]) -> List[str]:
         f(rp.get("baseline"), "{:.4f}"),
         f(rp.get("bearingDeg"), "{:.2f}"),
         f(rp.get("slopeDeg"), "{:.2f}"),
+        f(samp.get("sigma_N"), "{:.4f}"),
+        f(samp.get("sigma_E"), "{:.4f}"),
+        f(samp.get("sigma_U"), "{:.4f}"),
+        f(samp.get("n_kept"), "{}"),
     ]
 
 

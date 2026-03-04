@@ -40,6 +40,12 @@ DEFAULTS: Dict[str, Any] = {
     # UI
     "language": "it",
     "theme": "light",
+
+    # RTK quality gate
+    "max_hacc": 0.05,       # m
+    "max_pdop": 3.0,
+    "min_sv": 8,
+    "rtk_quality_gate": True,  # se False, disabilita tutti i check
 }
 
 # ---------- File path ----------
