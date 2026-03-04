@@ -33,14 +33,21 @@ def _feature_to_llh(feat: Dict[str, Any]) -> Optional[Tuple[float, float, float]
     return float(lat), float(lon), float(alt)
 
 
+def _point_layer_name(p: Dict[str, Any]) -> str:
+    """Return the layer name for a point based on its codice (or 'PUNTI' as fallback)."""
+    return (p.get("codice") or "").strip() or "PUNTI"
+
+
 def build_dxf_advanced(svy: Dict[str, Any], mode: str = "3d",
                        text_height: float = 0.1,
                        show_precision: bool = False,
-                       quota_decimals: int = 3) -> str:
+                       quota_decimals: int = 3,
+                       layer_by_code: bool = True) -> str:
     """
     Generate DXF with local ENU coordinates.
     mode: "2d" or "3d"
     First point = (0, 0, altitude) for 3D, (0, 0, 0) for 2D.
+    layer_by_code: if True, each point goes on a layer named after its codice.
     """
     feats = svy.get("features", [])
     if not feats:
@@ -52,6 +59,19 @@ def build_dxf_advanced(svy: Dict[str, Any], mode: str = "3d",
     lat0, lon0, alt0 = first_llh
     X0, Y0, Z0 = geodetic_to_ecef(lat0, lon0, alt0)
 
+    # Collect unique point-layer codes when layer_by_code is enabled
+    ACI_PALETTE = [7, 1, 2, 3, 4, 5, 6]  # white, red, yellow, green, cyan, blue, magenta
+    if layer_by_code:
+        unique_codes: List[str] = []
+        for f in feats:
+            cod = _point_layer_name(f.get("properties", {}))
+            if cod not in unique_codes:
+                unique_codes.append(cod)
+        if "PUNTI" not in unique_codes:
+            unique_codes.insert(0, "PUNTI")
+    else:
+        unique_codes = ["PUNTI"]
+
     out = []
     def w(code, value):
         out.append(f"{code}\n{value}")
@@ -62,12 +82,21 @@ def build_dxf_advanced(svy: Dict[str, Any], mode: str = "3d",
     w(0, "ENDSEC")
 
     # Layers
+    fixed_layers = ["ETICHETTE", "QUOTE", "PRECISIONE"]
+    fixed_colors = [3, 5, 1]
+    all_layers = list(unique_codes) + fixed_layers
+    total_layers = len(all_layers)
+
     w(0, "SECTION"); w(2, "TABLES")
-    w(0, "TABLE"); w(2, "LAYER"); w(70, "4")
-    w(0, "LAYER"); w(2, "PUNTI"); w(70, "0"); w(62, "7")
-    w(0, "LAYER"); w(2, "ETICHETTE"); w(70, "0"); w(62, "3")
-    w(0, "LAYER"); w(2, "QUOTE"); w(70, "0"); w(62, "5")
-    w(0, "LAYER"); w(2, "PRECISIONE"); w(70, "0"); w(62, "1")
+    w(0, "TABLE"); w(2, "LAYER"); w(70, str(total_layers))
+
+    for idx, lname in enumerate(unique_codes):
+        color = ACI_PALETTE[idx % len(ACI_PALETTE)]
+        w(0, "LAYER"); w(2, lname); w(70, "0"); w(62, str(color))
+
+    for lname, color in zip(fixed_layers, fixed_colors):
+        w(0, "LAYER"); w(2, lname); w(70, "0"); w(62, str(color))
+
     w(0, "ENDTAB")
     w(0, "ENDSEC")
 
@@ -93,8 +122,14 @@ def build_dxf_advanced(svy: Dict[str, Any], mode: str = "3d",
         name = _dxf_escape_text(p.get("name", f.get("id", "")))
         text_offset_x = 0.5
 
+        # Determine point layer
+        if layer_by_code:
+            pt_layer = _point_layer_name(p)
+        else:
+            pt_layer = "PUNTI"
+
         # POINT
-        w(0, "POINT"); w(8, "PUNTI"); w(62, "7")
+        w(0, "POINT"); w(8, pt_layer); w(62, "7")
         w(10, f"{x_local:.4f}"); w(20, f"{y_local:.4f}"); w(30, f"{z_local:.4f}")
 
         # Label

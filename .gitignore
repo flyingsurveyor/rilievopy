@@ -9,3 +9,5 @@ data/rinex/
 data/uploads/
 surveys/
 *.tmp
+surveys/*.bak
+data/session_log.jsonl

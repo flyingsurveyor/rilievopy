@@ -8,7 +8,7 @@ import time
 
 from flask import Blueprint, Response, render_template, make_response, request
 
-from modules.state import STATE, STAKEOUT_CURRENT, STAKEOUT_LOCK
+import modules.state as state_mod
 from modules.geodesy import geodetic_to_ecef, ecef_delta_to_enu
 from modules.survey import list_all_points_options, load_survey, point_from_feature
 
@@ -24,8 +24,6 @@ def stakeout_page():
 
 @bp.route("/stakeout/target", methods=["POST"])
 def stakeout_set_target():
-    import modules.state as state_mod
-
     data = request.get_json()
     if not data:
         return make_response({"error": "No data"}, 400)
@@ -64,7 +62,7 @@ def stakeout_set_target():
         except Exception as e:
             return make_response({"error": str(e)}, 500)
 
-    with STAKEOUT_LOCK:
+    with state_mod.STAKEOUT_LOCK:
         state_mod.STAKEOUT_CURRENT = target
 
     return make_response({"ok": True}, 200)
@@ -72,11 +70,9 @@ def stakeout_set_target():
 
 @bp.route("/stakeout/events")
 def stakeout_events():
-    import modules.state as state_mod
-
     def gen():
         while True:
-            with STAKEOUT_LOCK:
+            with state_mod.STAKEOUT_LOCK:
                 target = state_mod.STAKEOUT_CURRENT
 
             if not target:
@@ -84,7 +80,7 @@ def stakeout_events():
                 time.sleep(1.0)
                 continue
 
-            snap = STATE.snapshot()
+            snap = state_mod.STATE.snapshot()
             tpv = snap.get("TPV", {})
             hp = snap.get("HPPOSLLH", {})
             lat = hp.get("lat") or tpv.get("lat")
