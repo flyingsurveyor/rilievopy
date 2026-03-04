@@ -21,6 +21,8 @@ from modules.survey import (
 from modules.exports import (
     build_dxf_advanced, export_geopackage, format_point_txt
 )
+from modules.active_survey import get_active_survey_id, set_active_survey_id
+from modules.codici_punto import load_codici
 
 bp = Blueprint('surveys', __name__)
 
@@ -35,6 +37,8 @@ def _redirect(url: str):
 @bp.route("/surveys")
 def surveys_list():
     ids = list_survey_ids()
+    active_sid = get_active_survey_id()
+    active_title = None
     items = []
     if not ids:
         items.append('<div class="card">Nessun rilievo. <a class="btn" href="/survey/new">Crea il primo</a></div>')
@@ -44,14 +48,25 @@ def surveys_list():
             title = svy.get("properties", {}).get("title", sid)
             desc = svy.get("properties", {}).get("desc", "")
             npt = len(svy.get("features", []))
+            if sid == active_sid:
+                active_title = title
+            is_active = (sid == active_sid)
+            set_btn = (
+                f'<button class="btn btn-set-active" data-sid="{sid}">📌 Imposta attivo</button>'
+                if not is_active else
+                '<span class="active-badge">✅ Attivo</span>'
+            )
             items.append(
                 f'<div class="card"><div class="kv"><span><b>{title}</b> ({sid})</span><span>{npt} punti</span></div>'
                 f'<div class="kv"><span>{desc or "-"}</span>'
-                f'<span><a class="btn" href="/survey/{sid}">Apri</a></span></div></div>'
+                f'<span><a class="btn" href="/survey/{sid}">Apri</a> {set_btn}</span></div></div>'
             )
         except Exception as e:
             items.append(f'<div class="card">Errore con {sid}: {e}</div>')
-    return render_template('rtk_surveys_list.html', items="\n".join(items))
+    return render_template('rtk_surveys_list.html',
+                           items="\n".join(items),
+                           active_sid=active_sid,
+                           active_title=active_title)
 
 
 
@@ -64,10 +79,32 @@ def survey_new():
     title = (request.form.get("title") or "").strip()[:40]
     desc = (request.form.get("desc") or "").strip()[:1000]
     sid = create_survey(title, desc)
+    set_active_survey_id(sid)
     return _redirect(f"/survey/{sid}")
 
 
-# ---------- View survey ----------
+# ---------- Active survey ----------
+@bp.route("/api/survey/<sid>/set_active", methods=["POST"])
+def survey_set_active(sid):
+    try:
+        load_survey(sid)
+    except FileNotFoundError:
+        return make_response(json.dumps({"ok": False, "error": "not found"}), 404,
+                             {"Content-Type": "application/json"})
+    set_active_survey_id(sid)
+    return make_response(json.dumps({"ok": True, "sid": sid}), 200,
+                         {"Content-Type": "application/json"})
+
+
+@bp.route("/survey/active/point")
+def survey_active_point():
+    active_sid = get_active_survey_id()
+    if not active_sid:
+        return _redirect("/surveys")
+    return _redirect(f"/survey/{active_sid}/point")
+
+
+
 @bp.route("/survey/<sid>")
 def survey_view(sid):
     try:
@@ -75,6 +112,7 @@ def survey_view(sid):
     except FileNotFoundError:
         abort(404)
     props = svy.get("properties", {})
+    active_sid = get_active_survey_id()
     rows = []
     points_for_json = []
     for idx, f in enumerate(svy.get("features", [])):
@@ -88,6 +126,7 @@ def survey_view(sid):
 
         point_id = f.get('id', '')
         point_name = p.get('name', '')
+        codice = p.get('codice', '')
         points_for_json.append({"id": point_id, "name": point_name})
 
         rows.append(
@@ -95,6 +134,7 @@ def survey_view(sid):
             f"<td><input type='checkbox' class='area-cb' value='{point_id}'/></td>"
             f"<td>{point_id}</td>"
             f"<td>{point_name}</td>"
+            f"<td>{codice}</td>"
             f"<td>{fnum(hp.get('lat'), '{:.9f}')}</td>"
             f"<td>{fnum(hp.get('lon'), '{:.9f}')}</td>"
             f"<td>{fnum(hp.get('altHAE'), '{:.3f}')}</td>"
@@ -110,14 +150,15 @@ def survey_view(sid):
             "</tr>"
         )
     num_points = len(rows)
-    num_columns = 15
+    num_columns = 16
     return render_template('rtk_survey_view.html',
                            sid=props.get("id", sid),
                            title=props.get("title", sid),
                            notes=props.get("desc", ""),
                            rows="\n".join(rows) or f"<tr><td colspan='{num_columns}'>(nessun punto)</td></tr>",
                            points_json=json.dumps(points_for_json),
-                           num_points=str(num_points))
+                           num_points=str(num_points),
+                           active_sid=active_sid)
 
 
 # ---------- Update notes ----------
@@ -137,10 +178,30 @@ def survey_update_notes(sid):
 @bp.route("/survey/<sid>/point", methods=["GET", "POST"])
 def survey_point(sid):
     if request.method == "GET":
-        return render_template('rtk_survey_point_form.html', sid=sid)
+        try:
+            svy = load_survey(sid)
+        except FileNotFoundError:
+            abort(404)
+        next_pid = next_point_id(svy)
+        codici_data = load_codici()
+        active_title = svy.get("properties", {}).get("title", sid)
+        num_points = len(svy.get("features", []))
+        saved = request.args.get("saved", "")
+        savedname = request.args.get("savedname", "")
+        savedcodice = request.args.get("savedcodice", "")
+        return render_template('rtk_survey_point_form.html',
+                               sid=sid,
+                               next_pid=next_pid,
+                               active_title=active_title,
+                               num_points=num_points,
+                               codici_json=json.dumps(codici_data),
+                               saved=saved,
+                               savedname=savedname,
+                               savedcodice=savedcodice)
 
     name = sanitize_point_name(request.form.get("name", ""))
     desc = (request.form.get("desc", "") or "").strip()[:300]
+    codice = (request.form.get("codice", "") or "").strip()[:20]
     dur_form = request.form.get("dur", "").strip()
     duration = None
     if dur_form:
@@ -234,20 +295,14 @@ def survey_point(sid):
 
     feat = point_feature(
         pid, lat, lon, altHAE, altMSL, X, Y, Z, stats,
-        {"name": name, "desc": desc, "duration": duration, "interval": interval,
-         "n_samples": len(samples), "start": start_iso, "end": end_iso}
+        {"name": name, "codice": codice, "desc": desc, "duration": duration,
+         "interval": interval, "n_samples": len(samples),
+         "start": start_iso, "end": end_iso}
     )
     svy.setdefault("features", []).append(feat)
     save_survey(sid, svy)
 
-    # Build summary text
-    summary = format_point_txt(feat, sid)
-
-    return render_template('rtk_survey_done.html',
-                           txthref=f"/survey/{sid}/point/{pid}.txt",
-                           viewhref=f"/survey/{sid}",
-                           fname=f"{sid}-{pid}.txt",
-                           summary=summary)
+    return _redirect(f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}")
 
 
 # ---------- Downloads ----------

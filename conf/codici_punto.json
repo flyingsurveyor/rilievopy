@@ -1,0 +1,97 @@
+{
+  "categorie": [
+    {
+      "id": "fabbricati",
+      "label": "Fabbricati",
+      "codici": [
+        {"cod": "SPIG_FAB", "label": "Spigolo fabbricato"},
+        {"cod": "ANG_MUR",  "label": "Angolo muro"},
+        {"cod": "SPIG_MUR", "label": "Spigolo muro"},
+        {"cod": "PORTA",    "label": "Porta / ingresso"},
+        {"cod": "FINESTRA", "label": "Finestra"},
+        {"cod": "COLONNA",  "label": "Colonna / pilastro"},
+        {"cod": "GRADINO",  "label": "Gradino / soglia"},
+        {"cod": "FAB_GEN",  "label": "Fabbricato (generico)"}
+      ]
+    },
+    {
+      "id": "recinzioni",
+      "label": "Recinzioni e confini",
+      "codici": [
+        {"cod": "SPIG_REC", "label": "Spigolo recinzione"},
+        {"cod": "PALO_REC", "label": "Palo recinzione"},
+        {"cod": "CANCEL",   "label": "Cancello / accesso"},
+        {"cod": "CONF_PT",  "label": "Punto di confine"},
+        {"cod": "CIPPO",    "label": "Cippo / termine"}
+      ]
+    },
+    {
+      "id": "viabilita",
+      "label": "Viabilità e infrastrutture",
+      "codici": [
+        {"cod": "CIGL_STR", "label": "Ciglio strada"},
+        {"cod": "MARG_STR", "label": "Margine pavimentazione"},
+        {"cod": "AIUOLA",   "label": "Bordo aiuola / isola"},
+        {"cod": "GRAD_STR", "label": "Gradino stradale"},
+        {"cod": "CURVA",    "label": "Curva / raccordo"},
+        {"cod": "CENTRO",   "label": "Asse strada (centro)"}
+      ]
+    },
+    {
+      "id": "impianti",
+      "label": "Impianti e manufatti",
+      "codici": [
+        {"cod": "POZZETTO", "label": "Pozzetto / chiusino"},
+        {"cod": "IDRANTE",  "label": "Idrante"},
+        {"cod": "PALO_ILL", "label": "Palo illuminazione"},
+        {"cod": "SEGNALE",  "label": "Segnale stradale"},
+        {"cod": "CABINA",   "label": "Cabina / armadio"},
+        {"cod": "BOCCHETT", "label": "Bocchetta / scarico"}
+      ]
+    },
+    {
+      "id": "verde",
+      "label": "Verde e vegetazione",
+      "codici": [
+        {"cod": "ALBERO",   "label": "Albero (fusto)"},
+        {"cod": "CESPUGL",  "label": "Cespuglio / siepe"},
+        {"cod": "BORDO_VRD","label": "Bordo area verde"},
+        {"cod": "SCARP",    "label": "Scarpata (piede)"},
+        {"cod": "SCARP_CR", "label": "Scarpata (cresta)"}
+      ]
+    },
+    {
+      "id": "quota",
+      "label": "Quota terreno e morfologia",
+      "codici": [
+        {"cod": "QT",       "label": "Quota terreno"},
+        {"cod": "QT_PIAN",  "label": "Quota terreno (piano)"},
+        {"cod": "QT_PEND",  "label": "Quota terreno (pendio)"},
+        {"cod": "FOSSO_FD", "label": "Fondo fosso"},
+        {"cod": "FOSSO_SP", "label": "Sponda fosso"},
+        {"cod": "CIGLIO_SC","label": "Ciglio scarpata"},
+        {"cod": "PIEDE_SC", "label": "Piede scarpata"}
+      ]
+    },
+    {
+      "id": "idrografia",
+      "label": "Idrografia",
+      "codici": [
+        {"cod": "SPONDA",   "label": "Sponda corso d'acqua"},
+        {"cod": "PELO_AQ",  "label": "Pelo libero acqua"},
+        {"cod": "ARGINE",   "label": "Argine (cresta)"},
+        {"cod": "ARGINE_P", "label": "Argine (piede)"}
+      ]
+    },
+    {
+      "id": "altro",
+      "label": "Altro",
+      "codici": [
+        {"cod": "STAZ",     "label": "Stazione / base"},
+        {"cod": "CTRL",     "label": "Punto di controllo"},
+        {"cod": "RIF",      "label": "Punto di riferimento"},
+        {"cod": "ALTRO",    "label": "Altro (vedi note)"}
+      ]
+    }
+  ]
+}

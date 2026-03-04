@@ -1,46 +1,154 @@
 {% extends "base.html" %}
 {% set active = "surveys" %}
 
-{% block title %}Aggiungi punto{% endblock %}
+{% block title %}Aggiungi punto — {{ active_title }}{% endblock %}
 
 {% block head %}
 <style>
-.container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
-  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-  .card h1 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
-  input, textarea, select { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #333; font-size: 16px; }
-  button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
-  button:hover, .btn:hover { background: #2980b9; }
-  .hint { font-size: 12px; color: #7f8c8d; }
-  label { display: block; margin: 16px 0 6px; color: #2c3e50; font-weight: 500; }
-  @media screen and (max-width: 768px) {
+.container { max-width: 800px; margin: 0 auto; padding: 0 10px; }
+.active-header { background: #2c3e50; color: white; padding: 10px 16px; border-radius: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.active-header .hdr-title { font-weight: 700; font-size: 16px; }
+.active-header .hdr-info { font-size: 13px; opacity: 0.85; }
+.active-header a { color: #aed6f1; text-decoration: none; font-size: 13px; }
+.active-header a:hover { color: white; text-decoration: underline; }
+.flash-ok { background: #27ae60; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 15px; font-weight: 600; }
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+input, textarea, select { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #333; font-size: 16px; box-sizing: border-box; }
+label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; font-size: 14px; }
+.btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
+.btn:hover { background: #2980b9; }
+.btn-misura { background: #27ae60; font-size: 18px; font-weight: 700; padding: 18px; width: 100%; margin-top: 20px; border-radius: 8px; letter-spacing: 1px; }
+.btn-misura:hover { background: #1e8449; }
+.hint { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
+@media screen and (max-width: 768px) {
   body { font-size: 14px; padding: 0; margin: 0; }
   .container { padding: 5px; margin: 0; }
   .card { padding: 12px; margin-bottom: 10px; }
-  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+  .btn { min-height: 44px; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container"><div class="card">
-<h1>Nuovo punto in {{ sid }}</h1>
-<form method="POST" action="/survey/{{ sid }}/point">
-  <label>Nome punto</label>
-  <input name="name" maxlength="20" required placeholder="es. P001"/>
+<div class="container">
 
-  <label>Descrizione</label>
-  <textarea name="desc" maxlength="300" rows="3"></textarea>
+<div class="active-header">
+  <span>
+    <span class="hdr-title">📋 {{ active_title }}</span>
+    <span class="hdr-info"> — {{ num_points }} punt{% if num_points == 1 %}o{% else %}i{% endif %}</span>
+  </span>
+  <span>
+    <a href="/survey/{{ sid }}">← Rilievo</a> &nbsp;
+    <a href="/surveys">📋 Lista rilievi</a>
+  </span>
+</div>
 
-  <label>Durata registrazione</label>
-  <select name="dur">
+{% if saved %}
+<div class="flash-ok" id="flash-ok">
+  ✅ Punto {{ saved }}{% if savedname %} ({{ savedname }}){% endif %}{% if savedcodice %} — {{ savedcodice }}{% endif %} salvato!
+</div>
+{% endif %}
+
+<div class="card">
+<form method="POST" action="/survey/{{ sid }}/point" id="point-form">
+
+  <label for="cat-select">Categoria</label>
+  <select id="cat-select">
+    <option value="">— seleziona categoria —</option>
+  </select>
+
+  <label for="codice-select">Codice punto</label>
+  <select id="codice-select">
+    <option value="">— seleziona codice —</option>
+  </select>
+  <input type="hidden" name="codice" id="codice-hidden" value="">
+
+  <label for="name-input">ID / Nome punto</label>
+  <input type="text" id="name-input" name="name" maxlength="20" required
+         value="{{ next_pid }}" placeholder="es. P001"/>
+
+  <label for="desc-input">Note</label>
+  <textarea id="desc-input" name="desc" maxlength="300" rows="2"
+            aria-label="Note aggiuntive sul punto"
+            placeholder="Dettagli aggiuntivi..."></textarea>
+
+  <label for="dur-select">Durata registrazione</label>
+  <select id="dur-select" name="dur">
+    <option value="5">5 secondi</option>
     <option value="10" selected>10 secondi</option>
     <option value="20">20 secondi</option>
     <option value="30">30 secondi</option>
     <option value="60">60 secondi</option>
   </select>
 
-  <p class="hint">Parametri URL restano attivi: es. <code>?dur=15&step=0.5</code></p>
-  <p><a class="btn" href="/survey/{{ sid }}">← Indietro</a> <button class="btn" type="submit">Rileva e salva</button></p>
+  <button class="btn btn-misura" type="submit">🎯 MISURA</button>
 </form>
-</div></div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const codiciData = {{ codici_json|safe }};
+  const categorie = codiciData.categorie || [];
+
+  const catSel = document.getElementById('cat-select');
+  const codSel = document.getElementById('codice-select');
+  const codHidden = document.getElementById('codice-hidden');
+
+  // Populate category select
+  categorie.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat.id;
+    opt.textContent = cat.label;
+    catSel.appendChild(opt);
+  });
+
+  function updateCodici(catId) {
+    codSel.innerHTML = '<option value="">— seleziona codice —</option>';
+    codHidden.value = '';
+    if (!catId) return;
+    const cat = categorie.find(c => c.id === catId);
+    if (!cat) return;
+    cat.codici.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.cod;
+      opt.textContent = c.cod + ' — ' + c.label;
+      codSel.appendChild(opt);
+    });
+    // Restore last codice for this category
+    const lastCod = localStorage.getItem('lastCodice_' + catId);
+    if (lastCod) {
+      codSel.value = lastCod;
+      codHidden.value = lastCod;
+    }
+  }
+
+  catSel.addEventListener('change', function() {
+    localStorage.setItem('lastCat', this.value);
+    updateCodici(this.value);
+  });
+
+  codSel.addEventListener('change', function() {
+    codHidden.value = this.value;
+    if (catSel.value) {
+      localStorage.setItem('lastCodice_' + catSel.value, this.value);
+    }
+  });
+
+  // Restore last category on load
+  const lastCat = localStorage.getItem('lastCat');
+  if (lastCat) {
+    catSel.value = lastCat;
+    updateCodici(lastCat);
+  }
+
+  // Auto-dismiss flash after 3 seconds
+  const flash = document.getElementById('flash-ok');
+  if (flash) {
+    setTimeout(() => { flash.style.display = 'none'; }, 3000);
+  }
+})();
+</script>
 {% endblock %}
