@@ -1,0 +1,18 @@
+{
+  "gnss_host": "rover.fritz.box",
+  "gnss_port": 1234,
+  "gnss_autoconnect": true,
+  "http_bind": "0.0.0.0",
+  "http_port": 8000,
+  "relay_enabled": true,
+  "relay_bind": "0.0.0.0",
+  "relay_port": 21100,
+  "retry_interval": 3,
+  "default_sample_duration": 10,
+  "default_sample_interval": 0.5,
+  "robust_mode": "sigma",
+  "robust_sigma": 2,
+  "robust_trim_q": 0.1,
+  "language": "it",
+  "theme": "light"
+}

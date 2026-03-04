@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% set active = "cogo" %}
+
+{% block title %}COGO - Proiezione Ortogonale{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width:900px; margin:24px auto; padding:0 16px; }
+  .card { background:white; border:none; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.25); margin-bottom:16px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  h2 { font-size:16px; margin:16px 0 8px; color:#2c3e50; }
+  label { display:block; margin:10px 0 6px; color:#2c3e50; font-weight:500; }
+  select, input { width:100%; padding:10px; border-radius:10px; border:1px solid #ddd; background:white; color:#333; box-sizing:border-box; }
+  .btn { background:#3498db; color:white; padding:10px 14px; border-radius:10px; text-decoration:none; border:none; cursor:pointer; display:inline-block; }
+  .btn:hover { filter:brightness(1.1); }
+  .btn-primary { background:#2d5016; border-color:#3d6826; }
+  .kv { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #eee; }
+  .kv:last-child { border-bottom:none; }
+  .k { color:#666; }
+  .v { font-variant-numeric: tabular-nums; font-weight:500; }
+  #result, #save-section { display:none; }
+  .warning { background:#fff3cd; border:1px solid #ffc107; padding:10px; border-radius:8px; margin:10px 0; color:#856404; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>📐 Piede della Perpendicolare</h1>
+    <p style="color:#666;line-height:1.6;">Calcola il piede della perpendicolare da un punto P a un allineamento A→B, con progressiva, offset e dislivello.</p>
+    
+    <label>Punto A (inizio allineamento)</label>
+    <select id="pointA" required>
+      <option value="">-- Seleziona punto --</option>
+      {{ options|safe }}
+    </select>
+    
+    <label>Punto B (fine allineamento)</label>
+    <select id="pointB" required>
+      <option value="">-- Seleziona punto --</option>
+      {{ options|safe }}
+    </select>
+    
+    <label>Punto P (da proiettare)</label>
+    <select id="pointP" required>
+      <option value="">-- Seleziona punto --</option>
+      {{ options|safe }}
+    </select>
+    
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+      <a class="btn" href="/cogo">← COGO</a>
+      <button class="btn btn-primary" type="button" id="calc-btn">Calcola</button>
+    </div>
+  </div>
+  
+  <div class="card" id="result">
+    <h2>Risultato Proiezione</h2>
+    <div id="result-data"></div>
+  </div>
+  
+  <div class="card" id="save-section">
+    <h2>Salva Piede Perpendicolare</h2>
+    <label>Nome punto</label>
+    <input type="text" id="point-name" placeholder="PERP001"/>
+    <label>Salva nel rilievo</label>
+    <select id="survey-id">
+      <option value="">-- Seleziona rilievo --</option>
+      {{ survey_options|safe }}
+    </select>
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary" type="button" id="save-btn">Salva Punto</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentFoot = null;
+
+document.getElementById('calc-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('calc-btn');
+  const pA = document.getElementById('pointA').value;
+  const pB = document.getElementById('pointB').value;
+  const pP = document.getElementById('pointP').value;
+
+  if (!pA || !pB || !pP) {
+    alert('Seleziona tutti i punti');
+    return;
+  }
+
+  const [sidA, pidA] = pA.split('|');
+  const [sidB, pidB] = pB.split('|');
+  const [sidP, pidP] = pP.split('|');
+
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = 'Calcolo…';
+
+  try {
+    const resp = await fetch('/cogo/perpendicular/calc', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        pointA: {sid: sidA, pid: pidA},
+        pointB: {sid: sidB, pid: pidB},
+        pointP: {sid: sidP, pid: pidP}
+      })
+    });
+
+    // Se il server risponde con 500/404 ecc.
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error('COGO perpendicular/calc non-OK:', resp.status, text);
+      alert(`Errore server (${resp.status}). Guarda la console (F12) o i log di Python.`);
+      return;
+    }
+
+    // Prova a leggere JSON; se non è JSON, mostra errore chiaro
+    let data = null;
+    try {
+      data = await resp.json();
+    } catch (e) {
+      const text = await resp.text();
+      console.error('Risposta non JSON:', text);
+      alert('Errore: risposta non JSON dal server. Controlla i log Python.');
+      return;
+    }
+
+    if (data.error) {
+      alert('Errore: ' + data.error);
+      return;
+    }
+
+    currentFoot = data.foot;
+
+    let html = '';
+       if (data.out_of_alignment) {
+      html += `<div class="warning">⚠️ Il piede cade fuori dall'allineamento A→B</div>`;
+    }
+
+    html += '<div class="kv"><span class="k">Lunghezza allineamento A→B</span><span class="v">' + data.line_length.toFixed(4) + ' m</span></div>';
+    html += '<div class="kv"><span class="k">Progressiva (da A)</span><span class="v">' + data.station.toFixed(4) + ' m</span></div>';
+    html += '<div class="kv"><span class="k">Offset ortogonale</span><span class="v">' + Math.abs(data.offset).toFixed(4) + ' m (' + data.offset_side + ')</span></div>';
+    html += '<div class="kv"><span class="k">Distanza P → piede</span><span class="v">' + data.distance_to_line.toFixed(4) + ' m</span></div>';
+    html += '<div class="kv"><span class="k">Quota interpolata piede</span><span class="v">' + data.interpolated_alt.toFixed(4) + ' m</span></div>';
+    html += '<div class="kv"><span class="k">ΔH (P − piede)</span><span class="v">' + data.delta_h.toFixed(4) + ' m</span></div>';
+    html += `<h3 style="margin-top:16px;">Coordinate Piede P'</h3>`;
+    html += '<div class="kv"><span class="k">Latitudine</span><span class="v">' + data.foot.lat.toFixed(9) + '°</span></div>';
+    html += '<div class="kv"><span class="k">Longitudine</span><span class="v">' + data.foot.lon.toFixed(9) + '°</span></div>';
+    html += '<div class="kv"><span class="k">Quota</span><span class="v">' + data.foot.alt.toFixed(4) + ' m</span></div>';
+    html += '<div class="kv"><span class="k">E (ENU)</span><span class="v">' + data.foot.e.toFixed(4) + ' m</span></div>';
+    html += '<div class="kv"><span class="k">N (ENU)</span><span class="v">' + data.foot.n.toFixed(4) + ' m</span></div>';
+
+    document.getElementById('result-data').innerHTML = html;
+    document.getElementById('result').style.display = 'block';
+    document.getElementById('save-section').style.display = 'block';
+  } catch (err) {
+    console.error('Errore fetch perpendicular/calc:', err);
+    alert('Errore di rete o JS. Guarda la console (F12).');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+});
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const pointName = document.getElementById('point-name').value || 'PERP001';
+  const surveyId = document.getElementById('survey-id').value;
+  
+  if (!surveyId) {
+    alert('Seleziona un rilievo di destinazione');
+    return;
+  }
+  
+  if (!currentFoot) {
+    alert('Calcola prima il piede della perpendicolare');
+    return;
+  }
+  
+  const resp = await fetch('/cogo/perpendicular/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      survey_id: surveyId,
+      point_name: pointName,
+      foot: currentFoot
+    })
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+  } else {
+    alert('✓ Punto salvato con ID: ' + data.point_id);
+  }
+});
+</script>
+{% endblock %}

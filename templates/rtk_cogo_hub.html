@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% set active = "cogo" %}
+
+{% block title %}COGO - Coordinate Geometry{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
+  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .card h1, .card h2 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
+  .card h2 { font-size: 18px; }
+  p { line-height: 1.6; color: #666; }
+  .cogo-list { display: grid; gap: 12px; margin-top: 16px; }
+  .cogo-item { display: block; background: #3498db; border: none; border-radius: 8px; padding: 16px; text-decoration: none; color: white; transition: all 0.2s; }
+  .cogo-item:hover { background: #2980b9; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+  .cogo-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .cogo-desc { font-size: 14px; opacity: 0.95; line-height: 1.4; }
+  button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
+  button:hover, .btn:hover { background: #2980b9; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>Strumenti di Calcolo Topografico</h1>
+    <p>Strumenti di calcolo topografico per il rilievo catastale e generale.</p>
+    
+    <div class="cogo-list">
+      <a href="/cogo/trilateration" class="cogo-item">
+        <div class="cogo-title">🎯 Trilaterazione Spigoli</div>
+        <div class="cogo-desc">Calcola la posizione di uno spigolo inaccessibile da 2-3 stazioni GNSS con misure di distanza laser (Disto). Include discriminazione soluzione e analisi ai minimi quadrati.</div>
+      </a>
+      
+      <a href="/cogo/bearing-intersection" class="cogo-item">
+        <div class="cogo-title">📍 Intersezione Diretta (Bearing-Bearing)</div>
+        <div class="cogo-desc">Calcola il punto di intersezione da due stazioni note e due azimut misurati.</div>
+      </a>
+      
+      <a href="/cogo/polar" class="cogo-item">
+        <div class="cogo-title">🧭 Punto Polare</div>
+        <div class="cogo-desc">Calcola un punto da stazione nota, azimut e distanza orizzontale.</div>
+      </a>
+      
+      <a href="/cogo/offset" class="cogo-item">
+        <div class="cogo-title">📏 Offset da Allineamento</div>
+        <div class="cogo-desc">Calcola progressiva e offset ortogonale di un punto rispetto a un allineamento definito da due punti.</div>
+      </a>
+      
+      <a href="/cogo/perpendicular" class="cogo-item">
+        <div class="cogo-title">📐 Proiezione Ortogonale su Linea</div>
+        <div class="cogo-desc">Calcola il piede della perpendicolare da un punto a un allineamento, con progressiva, offset e dislivello.</div>
+      </a>
+      
+      <a href="/cogo/alignment" class="cogo-item">
+        <div class="cogo-title">📊 Allineamento Multipunto</div>
+        <div class="cogo-desc">Calcola progressiva e offset di N punti rispetto a un allineamento. Libretto topografico con export CSV.</div>
+      </a>
+      
+      <a href="/cogo/helmert" class="cogo-item">
+        <div class="cogo-title">🔄 Rototraslazione Helmert 2D</div>
+        <div class="cogo-desc">Trasformazione conforme a 4 parametri (traslazione, rotazione, scala) con stima ai minimi quadrati, residui e diagnostica completa.</div>
+      </a>
+    </div>
+    
+    <div style="margin-top:20px;">
+      <a class="btn" href="/">← Dashboard</a>
+      <a class="btn" href="/surveys">📁 Rilievi</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

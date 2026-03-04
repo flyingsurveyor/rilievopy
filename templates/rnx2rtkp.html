@@ -1,0 +1,685 @@
+{% extends "base.html" %}
+{% block title %}PPK Processing{% endblock %}
+
+{% block content %}
+<div class="page-header flex-between">
+    <div>
+        <h1>PPK Processing</h1>
+        <p>Post-processed positioning with rnx2rtkp</p>
+    </div>
+    <div class="status-indicator">
+        {% if tool_available %}
+        <span class="status-dot"></span> rnx2rtkp ready{% if tool_version %} · {{ tool_version }}{% endif %}
+        {% else %}
+        <span class="status-dot error"></span> rnx2rtkp not found
+        {% endif %}
+    </div>
+</div>
+
+{% if not tool_available %}
+<div class="alert alert-error" style="flex-direction:column; align-items:flex-start; gap:8px;">
+    <strong>⚠ rnx2rtkp binary not found</strong>
+    <p style="margin:0; font-size:13px;">
+        Searched in: <code style="background:#fdedec; padding:2px 6px; border-radius:3px;">{{ binary_path }}</code>
+        and system PATH — not found.
+    </p>
+    <p style="margin:0; font-size:13px; font-weight:500;">Option A — Run the installer:</p>
+    <div class="console" style="width:100%; max-height:none; margin:0; padding:10px; font-size:13px; color:#2ecc71; background:#2c3e50;">cd {{ project_dir }}<br>chmod +x install.sh<br>./install.sh</div>
+    <p style="margin:0; font-size:13px; font-weight:500;">Option B — If you already have rnx2rtkp compiled elsewhere:</p>
+    <div class="console" style="width:100%; max-height:none; margin:0; padding:10px; font-size:12px; color:#2ecc71; background:#2c3e50;"># Symlink to project tools/ directory:<br>mkdir -p {{ project_dir }}/tools<br>ln -s /path/to/your/rnx2rtkp {{ project_dir }}/tools/rnx2rtkp<br><br># Or add to system PATH:<br>sudo ln -s /path/to/your/rnx2rtkp /usr/local/bin/<br><br># Or set env var:<br>export RTKLIB_RNX2RTKP_BIN=/path/to/your/rnx2rtkp</div>
+    <p style="margin:0; font-size:12px; color:#95a5a6;">
+        Then restart the server. Check <a href="/api/tools" style="color:#3498db;">/api/tools</a> for diagnostic info.
+        You can still configure options and preview the command below.
+    </p>
+</div>
+{% endif %}
+
+<!-- ═══ FILE SELECTION ═══ -->
+<div class="card">
+    <div class="card-header"><h2>📁 Input Files</h2></div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Rover Observation (required)</label>
+            <select id="roverObs">
+                <option value="">— select rover .obs —</option>
+                {% for f in obs_files %}
+                <option value="{{ f.path }}">{{ f.name }} ({{ f.size }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Base Observation (for relative modes)</label>
+            <select id="baseObs">
+                <option value="">— none (SPP/PPP) —</option>
+                {% for f in obs_files %}
+                <option value="{{ f.path }}">{{ f.name }} ({{ f.size }})</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Navigation Files (select all that apply)</label>
+        <div id="navFileList" class="file-list" style="max-height:180px; overflow-y:auto;">
+            {% for f in nav_files %}
+            <label class="file-item" style="cursor:pointer; padding:8px 12px;">
+                <input type="checkbox" class="nav-file-check" value="{{ f.path }}" checked>
+                <div class="file-icon nav">NAV</div>
+                <div class="file-info">
+                    <div class="file-name">{{ f.name }}</div>
+                    <div class="file-meta">{{ f.size }}</div>
+                </div>
+            </label>
+            {% endfor %}
+            {% if not nav_files %}
+            <div class="empty-state" style="padding:20px;">
+                <div class="empty-state-text">No navigation files found</div>
+                <div class="empty-state-hint">Convert raw files or upload RINEX nav files</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Upload files inline -->
+    <div class="flex gap-1 mt-1">
+        <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+            Upload Files
+            <input type="file" id="fileUpload" style="display:none" multiple
+                   accept=".obs,.rnx,.nav,.gnav,.hnav,.sp3,.eph,.clk,.conf,.atx,.24o,.24n,.24g,.24p">
+        </label>
+    </div>
+</div>
+
+<!-- ═══ CONFIGURATION PRESET ═══ -->
+<div class="card">
+    <div class="card-header">
+        <h2>⚙ Configuration</h2>
+        <span class="badge" id="confBadge">defaults</span>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Config Preset</label>
+            <select id="confPreset" onchange="loadConfPreset(this.value)">
+                <option value="">— defaults —</option>
+                {% for c in conf_files %}
+                <option value="{{ c }}">{{ c }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Upload Config</label>
+            <div class="flex gap-1">
+                <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                    Upload .conf
+                    <input type="file" id="confUpload" style="display:none" accept=".conf,.cfg">
+                </label>
+                <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                    Upload .atx (ANTEX)
+                    <input type="file" id="antexUpload" style="display:none" accept=".atx,.antex">
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Settings Summary -->
+    <div class="grid grid-4 mt-2" id="quickSettings">
+        <div class="stat-box">
+            <div class="stat-value" id="qs-mode">Kinematic</div>
+            <div class="stat-label">Mode</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="qs-soltype">Combined</div>
+            <div class="stat-label">Solution</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="qs-ar">Fix&Hold</div>
+            <div class="stat-label">AR Mode</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="qs-freq">L1+L2</div>
+            <div class="stat-label">Frequencies</div>
+        </div>
+    </div>
+
+    <!-- Options button -->
+    <div class="mt-2 text-center">
+        <button class="btn btn-secondary" onclick="toggleOptions()" id="optionsToggle">
+            ▼ Advanced Options (125 parameters)
+        </button>
+    </div>
+</div>
+
+<!-- ═══ ADVANCED OPTIONS (collapsible) ═══ -->
+<div id="optionsPanel" class="card hidden">
+    <div class="card-header">
+        <h2>🔧 Processing Options</h2>
+        <div class="flex gap-1">
+            <button class="btn btn-sm" onclick="saveConfAs()">Save As...</button>
+            <button class="btn btn-secondary btn-sm" onclick="resetToDefaults()">Reset</button>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="optionTabs">
+        {% for sec_key, sec in sections.items() %}
+        <button class="tab {% if loop.first %}active{% endif %}"
+                onclick="switchTab('{{ sec_key }}')">
+            {{ sec.icon }} {{ sec.label }}
+        </button>
+        {% endfor %}
+    </div>
+
+    <!-- Tab content (rendered by JS from schema) -->
+    {% for sec_key, sec in sections.items() %}
+    <div class="tab-content {% if loop.first %}active{% endif %}" id="tab-{{ sec_key }}">
+        <p class="text-muted mb-2" style="font-size:12px;">{{ sec.desc }}</p>
+        <div class="options-grid" id="opts-{{ sec_key }}">
+            <!-- Rendered by JavaScript -->
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ═══ PROCESS BUTTON ═══ -->
+<div class="card">
+    <div class="flex-between" style="flex-wrap:wrap; gap:8px;">
+        <button class="btn btn-success" id="processBtn"
+                onclick="runProcessing()" {% if not tool_available %}disabled title="rnx2rtkp not installed — run install.sh first"{% endif %}
+                style="min-width:200px; font-size:16px; padding:14px;">
+            {% if tool_available %}▶ Process PPK{% else %}▶ Process PPK (not installed){% endif %}
+        </button>
+        <button class="btn btn-secondary" onclick="previewCommand()">
+            👁 Preview Command
+        </button>
+        <div id="processStatus" class="status-indicator hidden">
+            <span class="spinner"></span> Processing...
+        </div>
+    </div>
+
+    <!-- Command preview -->
+    <div class="mt-1">
+        <div class="console" id="cmdPreview" style="max-height:80px; font-size:11px; color:#95a5a6;">
+            Select files and click "Preview Command" to see the rnx2rtkp command line
+        </div>
+    </div>
+</div>
+
+<!-- ═══ RESULTS ═══ -->
+<div id="resultsSection" class="hidden">
+    <div class="card">
+        <div class="card-header">
+            <h2>📊 Results</h2>
+            <div class="flex gap-1">
+                <a class="btn btn-sm" id="viewInPosView" href="#">📊 Open in PosView</a>
+                <a class="btn btn-sm btn-secondary" id="downloadPos" href="#" download>⬇ .pos</a>
+                <a class="btn btn-secondary btn-sm" id="downloadStat" href="#" download>⬇ .stat</a>
+            </div>
+        </div>
+
+        <!-- Summary stats -->
+        <div class="grid grid-4 mb-2" id="resultStats">
+            <div class="stat-box">
+                <div class="stat-value text-green" id="res-fix">—</div>
+                <div class="stat-label">Fix %</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value text-orange" id="res-float">—</div>
+                <div class="stat-label">Float %</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="res-epochs">—</div>
+                <div class="stat-label">Epochs</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="res-single">—</div>
+                <div class="stat-label">Single %</div>
+            </div>
+        </div>
+
+        <!-- Quality timeline chart -->
+        <div class="chart-container" style="height:120px;">
+            <canvas id="qualityChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Process output -->
+    <div class="card">
+        <div class="card-header"><h2>Console Output</h2></div>
+        <div class="console" id="processOutput" style="max-height:200px;">—</div>
+    </div>
+</div>
+
+<style>
+/* Options grid for the editor */
+.options-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width:768px) { .options-grid { grid-template-columns: 1fr 1fr; } }
+
+.opt-field { display: flex; flex-direction: column; gap: 2px; }
+.opt-field label { font-size: 12px; font-weight: 500; color: #2c3e50; }
+.opt-field .opt-help { font-size: 10px; color: #95a5a6; }
+.opt-field .opt-unit { font-size: 10px; color: #7f8c8d; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+.opt-field .opt-input-wrap { position: relative; }
+.opt-field input, .opt-field select { font-size: 13px; padding: 6px 8px; }
+
+/* Bitmask checkboxes */
+.bitmask-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.bitmask-group label {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; background: #ecf0f1; border: 1px solid #bdc3c7;
+    border-radius: 16px; font-size: 12px; cursor: pointer; transition: all 0.2s;
+}
+.bitmask-group label:has(input:checked) {
+    background: #3498db; border-color: #3498db; color: white;
+}
+.bitmask-group input { display: none; }
+
+/* Bool toggles */
+.bool-toggle { display: flex; gap: 8px; }
+.bool-toggle label {
+    padding: 4px 12px; border: 1px solid #bdc3c7; border-radius: 4px;
+    font-size: 12px; cursor: pointer; transition: all 0.2s;
+}
+.bool-toggle label:has(input:checked) {
+    background: #3498db; border-color: #3498db; color: white;
+}
+.bool-toggle input { display: none; }
+
+/* Quality chart legend */
+.quality-legend { display: flex; gap: 12px; justify-content: center; margin-top: 4px; font-size: 11px; }
+.quality-legend span::before {
+    content: ''; display: inline-block; width: 10px; height: 10px;
+    border-radius: 2px; margin-right: 4px; vertical-align: middle;
+}
+.ql-fix::before { background: #2ecc71; }
+.ql-float::before { background: #f39c12; }
+.ql-single::before { background: #e74c3c; }
+</style>
+
+<script>
+// ═══ Schema and state ═══
+const SCHEMA = {{ schema | tojson }};
+const SECTIONS = {{ sections | tojson }};
+const NAVSYS_BITS = {{ navsys_bits | tojson }};
+let confValues = {{ conf_values | tojson }};
+
+// ═══ Initialize ═══
+document.addEventListener('DOMContentLoaded', () => {
+    renderAllOptions();
+    updateQuickSettings();
+    setupUploads();
+});
+
+// ═══ Render options form from schema ═══
+function renderAllOptions() {
+    const bySec = {};
+    SCHEMA.forEach(opt => {
+        if (!bySec[opt.section]) bySec[opt.section] = [];
+        bySec[opt.section].push(opt);
+    });
+
+    Object.keys(bySec).forEach(sec => {
+        const container = document.getElementById('opts-' + sec);
+        if (!container) return;
+        container.innerHTML = '';
+        bySec[sec].forEach(opt => {
+            container.appendChild(renderOption(opt));
+        });
+    });
+}
+
+function renderOption(opt) {
+    const div = document.createElement('div');
+    div.className = 'opt-field';
+    const value = confValues[opt.key] || opt.default || '';
+    const unit = opt.unit ? ` <span class="text-muted">(${opt.unit})</span>` : '';
+
+    let input = '';
+
+    if (opt.type === 'enum') {
+        const options = opt.values.map(v =>
+            `<option value="${v.value}" ${value === v.value ? 'selected' : ''}>${v.label}</option>`
+        ).join('');
+        input = `<select id="opt-${opt.key}" data-key="${opt.key}" onchange="optChanged('${opt.key}',this.value)">${options}</select>`;
+
+    } else if (opt.type === 'bitmask') {
+        const mask = parseInt(value) || 0;
+        const checks = opt.values.map(v => {
+            const checked = (mask & v.value) ? 'checked' : '';
+            return `<label><input type="checkbox" value="${v.value}" ${checked} onchange="bitmaskChanged('${opt.key}')">${v.label}</label>`;
+        }).join('');
+        input = `<div class="bitmask-group" id="opt-${opt.key}" data-key="${opt.key}">${checks}</div>`;
+
+    } else if (opt.type === 'bool') {
+        const isOn = value === 'on';
+        input = `<div class="bool-toggle" id="opt-${opt.key}" data-key="${opt.key}">
+            <label><input type="radio" name="${opt.key}" value="on" ${isOn ? 'checked' : ''} onchange="optChanged('${opt.key}','on')">On</label>
+            <label><input type="radio" name="${opt.key}" value="off" ${!isOn ? 'checked' : ''} onchange="optChanged('${opt.key}','off')">Off</label>
+        </div>`;
+
+    } else if (opt.type === 'number') {
+        const step = opt.step === 'any' ? 'any' : (opt.step || 1);
+        const minMax = (opt.min !== undefined ? ` min="${opt.min}"` : '') + (opt.max !== undefined ? ` max="${opt.max}"` : '');
+        input = `<div class="opt-input-wrap">
+            <input type="number" id="opt-${opt.key}" data-key="${opt.key}" value="${value}" step="${step}"${minMax} onchange="optChanged('${opt.key}',this.value)">
+            ${opt.unit ? `<span class="opt-unit">${opt.unit}</span>` : ''}
+        </div>`;
+
+    } else {
+        input = `<input type="text" id="opt-${opt.key}" data-key="${opt.key}" value="${value}" onchange="optChanged('${opt.key}',this.value)">`;
+    }
+
+    div.innerHTML = `<label>${opt.label}${unit}</label>${input}<div class="opt-help">${opt.help || ''}</div>`;
+    return div;
+}
+
+// ═══ Option change handlers ═══
+function optChanged(key, value) {
+    confValues[key] = value;
+    updateQuickSettings();
+}
+
+function bitmaskChanged(key) {
+    const container = document.getElementById('opt-' + key);
+    let mask = 0;
+    container.querySelectorAll('input:checked').forEach(cb => { mask |= parseInt(cb.value); });
+    confValues[key] = String(mask);
+    updateQuickSettings();
+}
+
+function updateQuickSettings() {
+    document.getElementById('qs-mode').textContent = confValues['pos1-posmode'] || 'kinematic';
+    document.getElementById('qs-soltype').textContent = confValues['pos1-soltype'] || 'combined';
+    document.getElementById('qs-ar').textContent = confValues['pos2-armode'] || 'fix-and-hold';
+    document.getElementById('qs-freq').textContent = confValues['pos1-frequency'] || 'l1+l2';
+}
+
+// ═══ Tabs ═══
+function switchTab(sec) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+    // Find the clicked tab button
+    const tabs = document.querySelectorAll('.tab');
+    const secKeys = Object.keys(SECTIONS);
+    const idx = secKeys.indexOf(sec);
+    if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
+
+    const panel = document.getElementById('tab-' + sec);
+    if (panel) panel.classList.add('active');
+}
+
+function toggleOptions() {
+    const panel = document.getElementById('optionsPanel');
+    const btn = document.getElementById('optionsToggle');
+    panel.classList.toggle('hidden');
+    btn.textContent = panel.classList.contains('hidden')
+        ? '▼ Advanced Options (125 parameters)'
+        : '▲ Hide Options';
+}
+
+// ═══ Conf preset management ═══
+function loadConfPreset(name) {
+    if (!name) {
+        // Reset to defaults
+        fetch('/api/rnx2rtkp/conf/defaults')
+            .then(r => r.json())
+            .then(data => {
+                confValues = data;
+                renderAllOptions();
+                updateQuickSettings();
+                document.getElementById('confBadge').textContent = 'defaults';
+            });
+        return;
+    }
+
+    fetch('/api/rnx2rtkp/conf/load?name=' + encodeURIComponent(name))
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert(data.error); return; }
+            confValues = data.values;
+            renderAllOptions();
+            updateQuickSettings();
+            document.getElementById('confBadge').textContent = name;
+        });
+}
+
+function saveConfAs() {
+    const name = prompt('Save configuration as:', 'my_config.conf');
+    if (!name) return;
+
+    fetch('/api/rnx2rtkp/conf/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, values: confValues})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { alert(data.error); return; }
+        if (data.warnings) { alert('Saved with warnings:\n' + data.warnings.join('\n')); }
+        alert('Saved: ' + (data.filename || name));
+        // Add to dropdown if new
+        const sel = document.getElementById('confPreset');
+        const fn = data.filename || name;
+        if (![...sel.options].some(o => o.value === fn)) {
+            sel.add(new Option(fn, fn));
+        }
+        sel.value = fn;
+        document.getElementById('confBadge').textContent = fn;
+    });
+}
+
+function resetToDefaults() {
+    if (!confirm('Reset all options to defaults?')) return;
+    document.getElementById('confPreset').value = '';
+    loadConfPreset('');
+}
+
+// ═══ File uploads ═══
+function setupUploads() {
+    document.getElementById('fileUpload').addEventListener('change', function() {
+        uploadFiles(this.files, '/api/upload');
+    });
+    document.getElementById('confUpload').addEventListener('change', function() {
+        uploadFiles(this.files, '/api/rnx2rtkp/conf/upload', () => {
+            location.reload();
+        });
+    });
+    document.getElementById('antexUpload').addEventListener('change', function() {
+        uploadFiles(this.files, '/api/antex/upload');
+    });
+}
+
+function uploadFiles(files, url, onDone) {
+    Array.from(files).forEach(file => {
+        const fd = new FormData();
+        fd.append('file', file);
+        fetch(url, {method: 'POST', body: fd})
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) alert(data.error);
+                if (onDone) onDone(data);
+            })
+            .catch(err => alert('Upload error: ' + err));
+    });
+}
+
+// ═══ Preview command (always works, even without binary) ═══
+function previewCommand() {
+    const roverObs = document.getElementById('roverObs').value;
+    if (!roverObs) { alert('Select a rover observation file first'); return; }
+
+    const baseObs = document.getElementById('baseObs').value;
+    const navFiles = [...document.querySelectorAll('.nav-file-check:checked')].map(cb => cb.value);
+
+    fetch('/api/rnx2rtkp/preview', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            rover_obs: roverObs,
+            base_obs: baseObs,
+            nav_files: navFiles,
+            conf: confValues
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('cmdPreview').textContent = data.command || 'Error generating command';
+    })
+    .catch(err => {
+        document.getElementById('cmdPreview').textContent = 'Error: ' + err;
+    });
+}
+
+// ═══ Process ═══
+function runProcessing() {
+    const roverObs = document.getElementById('roverObs').value;
+    if (!roverObs) { alert('Select a rover observation file'); return; }
+
+    const baseObs = document.getElementById('baseObs').value;
+    const navFiles = [...document.querySelectorAll('.nav-file-check:checked')].map(cb => cb.value);
+
+    if (navFiles.length === 0) {
+        if (!confirm('No navigation files selected. Continue anyway?')) return;
+    }
+
+    const btn = document.getElementById('processBtn');
+    const status = document.getElementById('processStatus');
+    btn.disabled = true;
+    btn.textContent = '⏳ Processing...';
+    status.classList.remove('hidden');
+
+    // Build request
+    const payload = {
+        rover_obs: roverObs,
+        base_obs: baseObs,
+        nav_files: navFiles,
+        conf: confValues,
+        overrides: {}
+    };
+
+    // Show command preview
+    document.getElementById('cmdPreview').textContent = 'Processing...';
+
+    fetch('/api/rnx2rtkp/process', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = '▶ Process PPK';
+        status.classList.add('hidden');
+
+        // Show command
+        document.getElementById('cmdPreview').textContent = data.command || '';
+
+        // Show output
+        const output = document.getElementById('processOutput');
+        const combined = (data.stdout || '') + '\n' + (data.stderr || '');
+        output.textContent = combined.trim() || 'No output';
+
+        // Show results section
+        document.getElementById('resultsSection').classList.remove('hidden');
+
+        if (data.output_file && data.returncode === 0) {
+            // Set download link
+            const dlBtn = document.getElementById('downloadPos');
+            dlBtn.href = '/api/download?path=' + encodeURIComponent(data.output_file.path);
+
+            // Set PosView link
+            const pvBtn = document.getElementById('viewInPosView');
+            pvBtn.href = '/posview?file=' + encodeURIComponent(data.output_file.path);
+
+            // Load and display results
+            loadResults(data.output_file.path);
+        } else {
+            document.getElementById('res-fix').textContent = '—';
+            document.getElementById('res-float').textContent = '—';
+            document.getElementById('res-epochs').textContent = '—';
+            document.getElementById('res-single').textContent = '—';
+            if (data.error) {
+                output.innerHTML = `<span class="error">${data.error}</span>\n${combined}`;
+            }
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.textContent = '▶ Process PPK';
+        status.classList.add('hidden');
+        alert('Error: ' + err);
+    });
+}
+
+function loadResults(posPath) {
+    fetch('/api/rnx2rtkp/results?path=' + encodeURIComponent(posPath))
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) return;
+
+            const s = data.summary;
+            document.getElementById('res-fix').textContent = s.fix_pct + '%';
+            document.getElementById('res-float').textContent = s.float_pct + '%';
+            document.getElementById('res-epochs').textContent = s.total_epochs;
+
+            const singlePct = s.total_epochs > 0
+                ? Math.round(100 * s.single / s.total_epochs * 10) / 10
+                : 0;
+            document.getElementById('res-single').textContent = singlePct + '%';
+
+            // Draw quality timeline
+            drawQualityChart(data.quality_timeline);
+        });
+}
+
+// ═══ Quality timeline chart ═══
+function drawQualityChart(qualities) {
+    const canvas = document.getElementById('qualityChart');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.parentElement.clientWidth;
+    const h = 120;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.scale(dpr, dpr);
+
+    // Colors: 1=fix(green), 2=float(orange), 3=sbas, 4=dgps, 5=single(red)
+    const colors = {1:'#2ecc71', 2:'#f39c12', 3:'#3498db', 4:'#3498db', 5:'#e74c3c', 6:'#9b59b6'};
+
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(0, 0, w, h);
+
+    if (!qualities || qualities.length === 0) return;
+
+    const barW = Math.max(1, w / qualities.length);
+    const barH = h - 20;
+
+    qualities.forEach((q, i) => {
+        ctx.fillStyle = colors[q] || '#95a5a6';
+        ctx.fillRect(i * barW, 10, Math.ceil(barW), barH);
+    });
+
+    // Legend
+    ctx.fillStyle = '#2c3e50';
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+
+    const labels = [
+        {c:'#2ecc71', t:'Fix'}, {c:'#f39c12', t:'Float'},
+        {c:'#e74c3c', t:'Single'}, {c:'#9b59b6', t:'PPP'}
+    ];
+    const lw = w / labels.length;
+    labels.forEach((l, i) => {
+        const x = lw * i + lw / 2;
+        ctx.fillStyle = l.c;
+        ctx.fillRect(x - 20, h - 10, 8, 8);
+        ctx.fillStyle = '#7f8c8d';
+        ctx.fillText(l.t, x + 5, h - 2);
+    });
+}
+</script>
+{% endblock %}

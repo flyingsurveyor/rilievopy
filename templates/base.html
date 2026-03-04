@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>{% block title %}Rilievo GNSS{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    {# ── Determine mode from active page ── #}
+    {% set ppk_pages = ['convbin','rinex','ppk','posview','files'] %}
+    {% set mode = 'ppk' if active in ppk_pages else 'rtk' %}
+
+    <style>
+    /* ═══ Topbar ═══ */
+    .topbar {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+        height: 52px;
+        background: #1a1a2e;
+        display: flex; align-items: center;
+        padding: 0 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    }
+
+    /* Hamburger */
+    .nav-toggle {
+        background: none; border: none; cursor: pointer;
+        padding: 8px; margin-right: 10px;
+        display: flex; flex-direction: column; gap: 4px;
+        order: 0;
+    }
+    .nav-toggle span {
+        display: block; width: 20px; height: 2px;
+        background: #fff; border-radius: 2px; transition: .3s;
+    }
+
+    /* Mode switch button */
+    .mode-switch {
+        order: 1;
+        padding: 5px 14px;
+        border-radius: 6px;
+        border: none;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 1px;
+        cursor: pointer;
+        text-transform: uppercase;
+        text-decoration: none;
+        color: #fff;
+        margin-right: 14px;
+        transition: background .2s, transform .15s;
+        line-height: 1.2;
+    }
+    .mode-switch:hover { transform: scale(1.05); }
+    .mode-switch.to-ppk { background: #2ecc71; }
+    .mode-switch.to-rtk { background: #e74c3c; }
+
+    /* Brand */
+    .topbar-brand {
+        order: 2;
+        display: flex; align-items: center; gap: 6px;
+        white-space: nowrap;
+    }
+    .brand-icon { font-size: 22px; color: #e94560; }
+    .brand-text {
+        font-size: 16px; font-weight: 700; color: #eee;
+        letter-spacing: .5px;
+    }
+    .brand-accent { color: #e94560; }
+    .brand-mode {
+        font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+        margin-left: 4px;
+    }
+    .brand-mode.rtk { color: #2ecc71; }
+    .brand-mode.ppk { color: #e74c3c; }
+
+    /* ── GNSS status indicator in topbar ── */
+    .topbar-gnss {
+        order: 3;
+        margin-left: auto;
+        margin-right: 4px;
+        display: flex; align-items: center; gap: 7px;
+    }
+    /* The dot/dash indicator */
+    .gnss-dot {
+        width: 12px; height: 12px;
+        border-radius: 50%;
+        background: #e74c3c;
+        flex-shrink: 0;
+        transition: background .3s, border-radius .3s, height .3s;
+    }
+    /* no-data state: becomes a horizontal dash (same width, thin height) */
+    .gnss-dot.nodata {
+        border-radius: 3px;
+        height: 3px;
+        background: #94a3b8;
+    }
+    .gnss-dot.none  { background: #e74c3c; border-radius: 50%; height: 12px; }
+    .gnss-dot.float { background: #f39c12; border-radius: 50%; height: 12px; }
+    .gnss-dot.fixed { background: #2ecc71; border-radius: 50%; height: 12px; }
+    /* subtle glow on fixed */
+    .gnss-dot.fixed { box-shadow: 0 0 6px rgba(46,204,113,.7); }
+    /* label next to dot */
+    .gnss-label {
+        font-size: 11px; font-weight: 600; color: #94a3b8;
+        letter-spacing: .3px; white-space: nowrap;
+    }
+
+    /* ═══ Sidebar ═══ */
+    .sidebar {
+        position: fixed; top: 52px; left: -195px;
+        width: 195px; height: calc(100% - 52px);
+        background: #16213e; z-index: 999;
+        transition: left .25s ease;
+        overflow-y: auto;
+        display: flex; flex-direction: column;
+    }
+    .sidebar.open { left: 0; }
+    .sidebar-overlay {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,.5); z-index: 998;
+    }
+    .sidebar-overlay.visible { display: block; }
+
+    .sidebar-nav { flex: 1; padding: 8px 0; }
+
+    .nav-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 14px;
+        color: #94a3b8; text-decoration: none;
+        font-size: 13px; transition: .15s;
+        border-left: 3px solid transparent;
+        white-space: nowrap;
+    }
+    .nav-item:hover { background: rgba(255,255,255,.05); color: #e2e8f0; }
+    .nav-item.active {
+        color: #fff; background: rgba(255,255,255,.08);
+        border-left-color: #e94560;
+    }
+    .nav-item svg { flex-shrink: 0; opacity: .7; width: 18px; height: 18px; }
+    .nav-item.active svg { opacity: 1; }
+
+    .nav-section-label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 1.5px; color: #536878;
+        padding: 16px 14px 6px;
+    }
+
+    .sidebar-footer {
+        padding: 10px 14px;
+        border-top: 1px solid rgba(255,255,255,.06);
+    }
+
+    /* RTK live status dot in sidebar footer */
+    .rtk-status-line {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 11px; color: #94a3b8;
+    }
+    .rtk-status-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        display: inline-block;
+        background: #e74c3c;
+        transition: background .3s;
+        flex-shrink: 0;
+    }
+    .rtk-status-dot.fixed { background: #2ecc71; }
+    .rtk-status-dot.float { background: #f39c12; }
+    .rtk-status-dot.none  { background: #e74c3c; }
+
+    /* ═══ Main content ═══ */
+    .content {
+        margin-top: 52px;
+        min-height: calc(100vh - 52px);
+        padding: 0;
+    }
+
+    /* ═══ Desktop: sidebar always visible ═══ */
+    @media (min-width: 769px) {
+        .sidebar { left: 0; }
+        .content { margin-left: 195px; }
+        .nav-toggle { display: none; }
+        .sidebar-overlay { display: none !important; }
+    }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- ═══ Top bar ═══ -->
+    <nav class="topbar">
+        <button class="nav-toggle" id="navToggle" aria-label="Menu">
+            <span></span><span></span><span></span>
+        </button>
+
+        {% if mode == 'rtk' %}
+        <a href="/convbin" class="mode-switch to-ppk">PPK</a>
+        {% else %}
+        <a href="/" class="mode-switch to-rtk">RTK</a>
+        {% endif %}
+
+        <div class="topbar-brand">
+            <span class="brand-icon">◎</span>
+            <span class="brand-text">Rilievo<span class="brand-accent">GNSS</span></span>
+            <span class="brand-mode {{ mode }}">
+                {% if mode == 'rtk' %}— RTK{% else %}— PPK{% endif %}
+            </span>
+        </div>
+
+        <!-- GNSS status: always visible in topbar -->
+        <div class="topbar-gnss">
+            <span class="gnss-dot nodata" id="gnssDot"></span>
+            <span class="gnss-label" id="gnssLabel">—</span>
+        </div>
+    </nav>
+
+    <!-- ═══ Sidebar ═══ -->
+    <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+        {% if mode == 'rtk' %}
+            <div class="nav-section-label">Rilievo RTK</div>
+            <a href="/" class="nav-item {% if active == 'dashboard' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                <span>Dashboard</span>
+            </a>
+            <a href="/surveys" class="nav-item {% if active == 'surveys' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <span>Rilievi</span>
+            </a>
+            <a href="/cogo" class="nav-item {% if active == 'cogo' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                    <polyline points="2 17 12 22 22 17"/>
+                </svg>
+                <span>COGO</span>
+            </a>
+            <a href="/stakeout" class="nav-item {% if active == 'stakeout' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <span>Stakeout</span>
+            </a>
+            <a href="/settings" class="nav-item {% if active == 'settings' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Settings</span>
+            </a>
+
+        {% else %}
+            <div class="nav-section-label">Post-Processing</div>
+            <a href="/convbin" class="nav-item {% if active == 'convbin' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"/>
+                    <polyline points="8 6 2 12 8 18"/>
+                </svg>
+                <span>Convbin</span>
+            </a>
+            <a href="/rinex" class="nav-item {% if active == 'rinex' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                <span>RINEX QC</span>
+            </a>
+            <a href="/ppk" class="nav-item {% if active == 'ppk' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="12" x2="16" y2="14"/>
+                </svg>
+                <span>PPK Process</span>
+            </a>
+            <a href="/posview" class="nav-item {% if active == 'posview' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    <circle cx="12" cy="12" r="2"/>
+                </svg>
+                <span>PosView</span>
+            </a>
+            <a href="/files" class="nav-item {% if active == 'files' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span>Files</span>
+            </a>
+            <a href="/settings" class="nav-item {% if active == 'settings' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Settings</span>
+            </a>
+        {% endif %}
+        </nav>
+
+        <!-- RTK status in sidebar footer (small, secondary) -->
+        <div class="sidebar-footer">
+            <div class="rtk-status-line">
+                <span class="rtk-status-dot none" id="rtkDot"></span>
+                <span id="rtkStatusText">RTK: —</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ═══ Main content ═══ -->
+    <main class="content" id="mainContent">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Overlay for mobile sidebar -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <script src="/static/js/upload.js"></script>
+    <script>
+        /* ── Sidebar toggle ── */
+        var navToggle = document.getElementById('navToggle');
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+
+        navToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('visible');
+        });
+        overlay.addEventListener('click', function() {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('visible');
+        });
+
+        /* ── GNSS status indicator — topbar dot + sidebar footer dot ── */
+        (function() {
+            var gnssDot  = document.getElementById('gnssDot');
+            var gnssLbl  = document.getElementById('gnssLabel');
+            var sidebarDot = document.getElementById('rtkDot');
+            var sidebarTxt = document.getElementById('rtkStatusText');
+
+            var es = null;
+            var reconnectTimer = null;
+            var reconnectDelay = 2000;
+            var dataTimeout = null;    // detect "no data arriving"
+
+            function setNoData() {
+                if (gnssDot)    { gnssDot.className = 'gnss-dot nodata'; }
+                if (gnssLbl)    { gnssLbl.textContent = '—'; }
+                if (sidebarDot) { sidebarDot.className = 'rtk-status-dot none'; }
+                if (sidebarTxt) { sidebarTxt.textContent = 'RTK: —'; }
+            }
+
+            function applyStatus(rtk) {
+                var cls = rtk === 'RTK fixed' || rtk === 'likely fixed' ? 'fixed'
+                        : rtk === 'RTK float' ? 'float'
+                        : 'none';
+                var short = rtk === 'RTK fixed'    ? 'FIX'
+                          : rtk === 'RTK float'    ? 'FLT'
+                          : rtk === 'likely fixed' ? 'FIX'
+                          : rtk === '-' || !rtk    ? '—'
+                          : 'SGL';
+
+                if (gnssDot)    { gnssDot.className = 'gnss-dot ' + cls; }
+                if (gnssLbl)    { gnssLbl.textContent = short; }
+                if (sidebarDot) { sidebarDot.className = 'rtk-status-dot ' + cls; }
+                if (sidebarTxt) { sidebarTxt.textContent = 'RTK: ' + (rtk || '—'); }
+            }
+
+            function resetDataTimeout() {
+                clearTimeout(dataTimeout);
+                // If no message arrives within 3s, switch to nodata visual
+                dataTimeout = setTimeout(setNoData, 3000);
+            }
+
+            function connect() {
+                if (es) { try { es.close(); } catch(_) {} }
+                try {
+                    es = new EventSource('/events');
+                    es.onopen = function() { reconnectDelay = 2000; resetDataTimeout(); };
+                    es.onmessage = function(e) {
+                        resetDataTimeout();
+                        try {
+                            var p = JSON.parse(e.data);
+                            var rtk = (p.TPV || {}).rtk || null;
+                            if (rtk) {
+                                applyStatus(rtk);
+                            } else {
+                                setNoData();
+                            }
+                        } catch(_) {}
+                    };
+                    es.onerror = function() {
+                        setNoData();
+                        if (es) { try { es.close(); } catch(_) {} es = null; }
+                        clearTimeout(reconnectTimer);
+                        reconnectTimer = setTimeout(function() {
+                            if (document.visibilityState !== 'hidden') connect();
+                        }, reconnectDelay);
+                        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+                    };
+                } catch(_) {}
+            }
+
+            connect();
+
+            window.addEventListener('beforeunload', function() {
+                clearTimeout(reconnectTimer);
+                clearTimeout(dataTimeout);
+                if (es) { try { es.close(); } catch(_) {} es = null; }
+            });
+
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'hidden') {
+                    clearTimeout(reconnectTimer);
+                    clearTimeout(dataTimeout);
+                    if (es) { try { es.close(); } catch(_) {} es = null; }
+                } else {
+                    if (!es) connect();
+                }
+            });
+        })();
+
+        /* ── Helpers (used by PPK pages) ── */
+        function setStatus(text, state) {
+            var txt = document.getElementById('rtkStatusText');
+            if (txt) txt.textContent = text;
+        }
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+            return (bytes / 1073741824).toFixed(1) + ' GB';
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

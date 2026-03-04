@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% set active = "stakeout" %}
+
+{% block title %}Picchettamento{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 900px; margin: 20px auto; padding: 0 20px; }
+  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .card h1, .card h3 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
+  .card h3 { font-size: 18px; }
+  label { display: block; margin: 16px 0 6px; color: #2c3e50; font-weight: 500; }
+  input, select { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #333; font-size: 16px; }
+  button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
+  button:hover, .btn:hover { background: #2980b9; }
+  .kv { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eee; }
+  .kv:last-child { border-bottom: none; }
+  .k { color: #666; }
+  .v { font-variant-numeric: tabular-nums; font-weight: 700; color: #333; }
+  .direction { text-align: center; font-size: 48px; margin: 20px 0; }
+  .distance { text-align: center; font-size: 32px; font-weight: 700; color: #2ecc71; margin: 10px 0; }
+  .reached { background: #d5f4e6; color: #27ae60; padding: 20px; text-align: center; font-size: 24px; font-weight: 700; border-radius: 8px; border: 2px solid #2ecc71; }
+  .progress-bar { background: #ecf0f1; height: 20px; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+  .progress-fill { background: #2ecc71; height: 100%; transition: width 0.3s; }
+  #manual-form { display: none; margin-top: 10px; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>Picchettamento Punto</h1>
+    <label>Seleziona punto target</label>
+    <select id="target-select">
+      <option value="">-- Seleziona punto --</option>
+      {{ options|safe }}
+      <option value="_manual">📝 Inserimento manuale</option>
+    </select>
+    <div id="manual-form">
+      <label>Latitudine</label>
+      <input type="number" id="manual-lat" step="0.000000001" placeholder="45.123456789"/>
+      <label>Longitudine</label>
+      <input type="number" id="manual-lon" step="0.000000001" placeholder="7.987654321"/>
+      <label>Quota (m)</label>
+      <input type="number" id="manual-alt" step="0.001" placeholder="250.123"/>
+      <label>Nome punto (opzionale)</label>
+      <input type="text" id="manual-name" placeholder="P_Target"/>
+    </div>
+    <label>Soglia raggiungimento (m)</label>
+    <input type="number" id="threshold" value="0.05" step="0.01" min="0.01"/>
+    <p style="margin-top:14px;">
+      <button class="btn" id="start-btn">Avvia picchettamento</button>
+      <button class="btn" id="stop-btn" style="display:none;">Stop</button>
+      <a class="btn" href="/">← Dashboard</a>
+    </p>
+  </div>
+  
+  <div class="card" id="stakeout-data" style="display:none;">
+    <h3>Stato picchettamento</h3>
+    <div id="reached-msg" class="reached" style="display:none;">✅ Punto raggiunto!</div>
+    <div class="direction" id="direction">⬆️</div>
+    <div class="distance" id="distance">-</div>
+    <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%;"></div></div>
+    <div class="kv"><span class="k">Target</span><span class="v" id="target-name">-</span></div>
+    <div class="kv"><span class="k">ΔN (Nord)</span><span class="v" id="deltaN">-</span></div>
+    <div class="kv"><span class="k">ΔE (Est)</span><span class="v" id="deltaE">-</span></div>
+    <div class="kv"><span class="k">ΔU (Up)</span><span class="v" id="deltaU">-</span></div>
+    <div class="kv"><span class="k">Distanza 2D</span><span class="v" id="dist2d">-</span></div>
+    <div class="kv"><span class="k">Distanza 3D</span><span class="v" id="dist3d">-</span></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const $=id=>document.getElementById(id);
+let es = null;
+
+$('target-select').addEventListener('change', (e) => {
+  if(e.target.value === '_manual') {
+    $('manual-form').style.display = 'block';
+  } else {
+    $('manual-form').style.display = 'none';
+  }
+});
+
+$('start-btn').addEventListener('click', async () => {
+  const sel = $('target-select').value;
+  let target = null;
+  
+  if(sel === '_manual') {
+    const lat = parseFloat($('manual-lat').value);
+    const lon = parseFloat($('manual-lon').value);
+    const alt = parseFloat($('manual-alt').value);
+    const name = $('manual-name').value || 'Manual';
+    
+    if(isNaN(lat) || isNaN(lon) || isNaN(alt)) {
+      alert('Inserisci coordinate valide');
+      return;
+    }
+    
+    target = {lat, lon, alt, name};
+  } else if(sel) {
+    const [sid, pid] = sel.split('|');
+    target = {sid, pid};
+  } else {
+    alert('Seleziona un punto target');
+    return;
+  }
+  
+  const threshold = parseFloat($('threshold').value) || 0.05;
+  
+  const resp = await fetch('/stakeout/target', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({target, threshold})
+  });
+  
+  if(resp.ok) {
+    $('start-btn').style.display = 'none';
+    $('stop-btn').style.display = 'inline-block';
+    $('stakeout-data').style.display = 'block';
+    
+    es = new EventSource('/stakeout/events');
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      updateStakeout(data);
+    };
+  } else {
+    alert('Errore nell\\'impostare il target');
+  }
+});
+
+$('stop-btn').addEventListener('click', () => {
+  if(es) { es.close(); es = null; }
+  $('start-btn').style.display = 'inline-block';
+  $('stop-btn').style.display = 'none';
+  $('stakeout-data').style.display = 'none';
+});
+
+function updateStakeout(data) {
+  if(!data || data.error) {
+    $('distance').textContent = data?.error || 'Errore';
+    return;
+  }
+  
+  const threshold = parseFloat($('threshold').value) || 0.05;
+  const reached = data.dist3d < threshold;
+  
+  $('target-name').textContent = data.target_name || '-';
+  $('deltaN').textContent = data.deltaN?.toFixed(3) + ' m' || '-';
+  $('deltaE').textContent = data.deltaE?.toFixed(3) + ' m' || '-';
+  $('deltaU').textContent = data.deltaU?.toFixed(3) + ' m' || '-';
+  $('dist2d').textContent = data.dist2d?.toFixed(3) + ' m' || '-';
+  $('dist3d').textContent = data.dist3d?.toFixed(3) + ' m' || '-';
+  $('distance').textContent = data.dist3d?.toFixed(3) + ' m';
+  
+  // Direzione
+  let arrow = '⬆️';
+  if(reached) {
+    arrow = '✅';
+    $('reached-msg').style.display = 'block';
+  } else {
+    $('reached-msg').style.display = 'none';
+    const absN = Math.abs(data.deltaN || 0);
+    const absE = Math.abs(data.deltaE || 0);
+    
+    if(absN > absE) {
+      arrow = (data.deltaN > 0) ? '⬆️ NORD' : '⬇️ SUD';
+    } else {
+      arrow = (data.deltaE > 0) ? '➡️ EST' : '⬅️ OVEST';
+    }
+    
+    if(absN > 0.5 && absE > 0.5) {
+      if(data.deltaN > 0 && data.deltaE > 0) arrow = '↗️ NE';
+      else if(data.deltaN > 0 && data.deltaE < 0) arrow = '↖️ NO';
+      else if(data.deltaN < 0 && data.deltaE > 0) arrow = '↘️ SE';
+      else arrow = '↙️ SO';
+    }
+  }
+  $('direction').textContent = arrow;
+  
+  // Progress bar (inversamente proporzionale alla distanza)
+  const maxDist = 10; // 10m come riferimento
+  const progress = Math.max(0, Math.min(100, 100 * (1 - data.dist3d / maxDist)));
+  $('progress').style.width = progress + '%';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% set active = "surveys" %}
+{% block title %}Anteprima Import{% endblock %}
+{% block content %}
+<div style="max-width:900px;margin:0 auto;">
+  <div class="card" style="background:white;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.1);">
+    <h2>Anteprima Import</h2>
+    <p>Trovati {{ points|length }} punti validi</p>
+
+    {% if errors %}
+    <div style="color:#e74c3c;margin:12px 0;">
+      <strong>Errori:</strong>
+      <ul>{% for e in errors[:10] %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    {% if points %}
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr><th>Nome</th><th>Lat</th><th>Lon</th><th>Quota</th></tr></thead>
+      <tbody>
+      {% for pt in points[:20] %}
+        <tr><td>{{ pt.name }}</td><td>{{ "%.9f"|format(pt.lat) }}</td><td>{{ "%.9f"|format(pt.lon) }}</td><td>{{ "%.3f"|format(pt.alt) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <form method="POST" action="/import/confirm" style="margin-top:16px;">
+      <input type="hidden" name="dest" value="{{ dest }}"/>
+      <input type="hidden" name="points" value='{{ points_json }}'/>
+      <button type="submit" class="btn btn-primary" style="padding:10px 20px;border-radius:8px;background:#3498db;color:white;border:none;cursor:pointer;">Conferma import</button>
+      <a href="/import" style="margin-left:12px;">← Annulla</a>
+    </form>
+    {% else %}
+    <p>Nessun punto valido trovato. <a href="/import">← Indietro</a></p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

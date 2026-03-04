@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% set active = "cogo" %}
+
+{% block title %}COGO - Intersezione Distanza-Distanza{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width:900px; margin:24px auto; padding:0 16px; }
+  .card { background:white; border:none; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.25); margin-bottom:16px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  h2 { font-size:16px; margin:16px 0 8px; color:#2c3e50; }
+  label { display:block; margin:10px 0 6px; color:#2c3e50; }
+  select, input[type=text], input[type=number] { width:100%; padding:10px; border-radius:10px; border:1px solid #ddd; background:white; color:#333; box-sizing:border-box; }
+  .row { display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:12px; }
+  .btn { background:#3498db; color:white; padding:10px 14px; border-radius:10px; text-decoration:none; border:1px solid #ddd; cursor:pointer; }
+  .btn:hover { filter:brightness(1.1); }
+  .btn-primary { background:#2d5016; border-color:#3d6826; }
+  .kv { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #eee; }
+  .kv:last-child { border-bottom:none; }
+  .k { color:#666; }
+  .v { font-variant-numeric: tabular-nums; }
+  .solution-option { background:#1a2840; border:2px solid #2f3c6a; border-radius:12px; padding:12px; margin:8px 0; cursor:pointer; }
+  .solution-option:hover { border-color:#4a5c8a; }
+  .solution-option.selected { border-color:#62ffa2; background:#1a3020; }
+  #result { display:none; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>⭕ Intersezione Distanza-Distanza</h1>
+    <p style="color:#666;line-height:1.6;">Calcola il/i punto/i di intersezione da due punti noti e due distanze misurate.</p>
+    
+    <label>Punto 1</label>
+    <div class="row">
+      <select id="point1" required>
+        <option value="">-- Seleziona punto --</option>
+        {{ options|safe }}
+      </select>
+      <input type="number" id="distance1" placeholder="Distanza (m)" step="0.001" required/>
+    </div>
+    
+    <label>Punto 2</label>
+    <div class="row">
+      <select id="point2" required>
+        <option value="">-- Seleziona punto --</option>
+        {{ options|safe }}
+      </select>
+      <input type="number" id="distance2" placeholder="Distanza (m)" step="0.001" required/>
+    </div>
+    
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+      <a class="btn" href="/cogo">← COGO</a>
+      <button class="btn btn-primary" type="button" id="calc-btn">Calcola</button>
+    </div>
+  </div>
+  
+  <div class="card" id="solution-picker" style="display:none;">
+    <h2>Soluzioni trovate</h2>
+    <p style="color:#666;">Seleziona la soluzione corretta:</p>
+    <div id="solutions-list"></div>
+    <button class="btn btn-primary" type="button" id="confirm-solution-btn">Conferma soluzione</button>
+  </div>
+  
+  <div class="card" id="result">
+    <h2>Risultato Intersezione</h2>
+    <div id="result-data"></div>
+    
+    <h2 style="margin-top:20px;">Salva punto calcolato</h2>
+    <label>Rilievo destinazione</label>
+    <select id="target-survey">
+      {{ survey_options|safe }}
+    </select>
+    <label>Nome punto</label>
+    <input type="text" id="point-name" placeholder="DD001"/>
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary" type="button" id="save-btn">💾 Salva punto</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let calculatedSolutions = [];
+let selectedSolutionIndex = null;
+
+document.getElementById('calc-btn').addEventListener('click', async () => {
+  const p1 = document.getElementById('point1').value;
+  const p2 = document.getElementById('point2').value;
+  const d1 = parseFloat(document.getElementById('distance1').value);
+  const d2 = parseFloat(document.getElementById('distance2').value);
+  
+  if (!p1 || !p2 || isNaN(d1) || isNaN(d2)) {
+    alert('Compila tutti i campi');
+    return;
+  }
+  
+  const [sid1, pid1] = p1.split('|');
+  const [sid2, pid2] = p2.split('|');
+  
+  const resp = await fetch('/cogo/distance-intersection/calc', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      point1: {sid: sid1, pid: pid1},
+      point2: {sid: sid2, pid: pid2},
+      distance1: d1,
+      distance2: d2
+    })
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+    return;
+  }
+  
+  if (data.solutions.length === 0) {
+    alert('Nessuna soluzione trovata (le distanze non si intersecano)');
+    return;
+  }
+  
+  calculatedSolutions = data.solutions;
+  
+  if (data.solutions.length === 1) {
+    // Single solution (tangent circles)
+    showResult(data.solutions[0]);
+    document.getElementById('solution-picker').style.display = 'none';
+  } else {
+    // Two solutions
+    showSolutionPicker(data.solutions);
+    document.getElementById('result').style.display = 'none';
+  }
+});
+
+function showSolutionPicker(solutions) {
+  const solutionsList = document.getElementById('solutions-list');
+  solutionsList.innerHTML = '';
+  
+  solutions.forEach((sol, idx) => {
+    const div = document.createElement('div');
+    div.className = 'solution-option';
+    div.dataset.index = idx;
+    
+    let html = `<strong>Soluzione ${idx + 1}</strong><br/>`;
+    html += `E = ${sol.e.toFixed(4)} m, N = ${sol.n.toFixed(4)} m<br/>`;
+    html += `Lat = ${sol.lat.toFixed(9)}°, Lon = ${sol.lon.toFixed(9)}°<br/>`;
+    html += `Alt = ${sol.alt.toFixed(3)} m`;
+    
+    div.innerHTML = html;
+    div.addEventListener('click', () => selectSolution(idx));
+    solutionsList.appendChild(div);
+  });
+  
+  document.getElementById('solution-picker').style.display = 'block';
+  selectedSolutionIndex = null;
+}
+
+function selectSolution(idx) {
+  document.querySelectorAll('.solution-option').forEach(div => {
+    div.classList.remove('selected');
+  });
+  document.querySelector(`.solution-option[data-index="${idx}"]`).classList.add('selected');
+  selectedSolutionIndex = idx;
+}
+
+document.getElementById('confirm-solution-btn').addEventListener('click', () => {
+  if (selectedSolutionIndex === null) {
+    alert('Seleziona una soluzione');
+    return;
+  }
+  
+  showResult(calculatedSolutions[selectedSolutionIndex]);
+  document.getElementById('solution-picker').style.display = 'none';
+});
+
+function showResult(solution) {
+  let html = '<div class="kv"><span class="k">Latitudine</span><span class="v">' + solution.lat.toFixed(9) + '°</span></div>';
+  html += '<div class="kv"><span class="k">Longitudine</span><span class="v">' + solution.lon.toFixed(9) + '°</span></div>';
+  html += '<div class="kv"><span class="k">Quota</span><span class="v">' + solution.alt.toFixed(3) + ' m</span></div>';
+  html += '<div class="kv"><span class="k">E (ENU locale)</span><span class="v">' + solution.e.toFixed(4) + ' m</span></div>';
+  html += '<div class="kv"><span class="k">N (ENU locale)</span><span class="v">' + solution.n.toFixed(4) + ' m</span></div>';
+  
+  document.getElementById('result-data').innerHTML = html;
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('point-name').value = 'DD001';
+}
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const targetSurvey = document.getElementById('target-survey').value;
+  const pointName = document.getElementById('point-name').value;
+  
+  if (!targetSurvey || !pointName) {
+    alert('Seleziona rilievo e nome punto');
+    return;
+  }
+  
+  // Get the current solution (either from single result or selected from picker)
+  let solution;
+  if (calculatedSolutions.length === 1) {
+    solution = calculatedSolutions[0];
+  } else if (selectedSolutionIndex !== null) {
+    solution = calculatedSolutions[selectedSolutionIndex];
+  } else {
+    alert('Nessuna soluzione selezionata');
+    return;
+  }
+  
+  const resp = await fetch('/cogo/distance-intersection/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      survey_id: targetSurvey,
+      point_name: pointName,
+      solution: solution
+    })
+  });
+  
+  const result = await resp.json();
+  
+  if (result.error) {
+    alert('Errore: ' + result.error);
+  } else {
+    alert('Punto salvato con successo!');
+    window.location.href = '/survey/' + targetSurvey;
+  }
+});
+</script>
+{% endblock %}

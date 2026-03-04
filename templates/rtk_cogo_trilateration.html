@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% set active = "cogo" %}
+
+{% block title %}COGO - Trilaterazione Spigoli{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
+  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .card h1, .card h2 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
+  .card h2 { font-size: 18px; }
+  label { display: block; margin: 16px 0 6px; color: #2c3e50; font-weight: 500; }
+  select, input[type=text], input[type=number] { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #333; font-size: 16px; }
+  .row { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 12px; }
+  button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
+  button:hover, .btn:hover { background: #2980b9; }
+  .btn-primary, .btn-success { background: #2ecc71; }
+  .btn-primary:hover, .btn-success:hover { background: #27ae60; }
+  .kv { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eee; }
+  .kv:last-child { border-bottom: none; }
+  .k { color: #666; }
+  .v { font-variant-numeric: tabular-nums; color: #333; }
+  .quality-excellent { color: #2ecc71; font-weight: 600; }
+  .quality-good { color: #f39c12; font-weight: 600; }
+  .quality-acceptable { color: #e67e22; font-weight: 600; }
+  .quality-check { color: #e74c3c; font-weight: 600; }
+  .station-row { margin-bottom: 8px; }
+  .add-station-btn { background: #2ecc71; margin-top: 8px; }
+  .add-station-btn:hover { background: #27ae60; }
+  .solution-option { background: #ecf0f1; border: 2px solid #bdc3c7; border-radius: 8px; padding: 12px; margin: 8px 0; cursor: pointer; }
+  .solution-option:hover { border-color: #95a5a6; }
+  .solution-option.selected { border-color: #2ecc71; background: #d5f4e6; }
+  #result { display: none; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  .row { grid-template-columns: 1fr; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>Trilaterazione Spigoli</h1>
+    <p style="color:#666;line-height:1.6;">Calcola la posizione di uno spigolo inaccessibile da 2-3 punti GNSS RTK con misure di distanza orizzontale (Disto).</p>
+    
+    <div id="stations-container">
+      <div class="station-row" data-index="0">
+        <label>Stazione 1</label>
+        <div class="row">
+          <select class="station-select" required>
+            <option value="">-- Seleziona punto --</option>
+            {{ options|safe }}
+          </select>
+          <input type="number" class="distance-input" placeholder="Distanza (m)" step="0.001" required/>
+        </div>
+      </div>
+      
+      <div class="station-row" data-index="1">
+        <label>Stazione 2</label>
+        <div class="row">
+          <select class="station-select" required>
+            <option value="">-- Seleziona punto --</option>
+            {{ options|safe }}
+          </select>
+          <input type="number" class="distance-input" placeholder="Distanza (m)" step="0.001" required/>
+        </div>
+      </div>
+      
+      <div class="station-row" data-index="2">
+        <label>Stazione 3 (opzionale, consigliata per disambiguare)</label>
+        <div class="row">
+          <select class="station-select">
+            <option value="">-- Seleziona punto --</option>
+            {{ options|safe }}
+          </select>
+          <input type="number" class="distance-input" placeholder="Distanza (m)" step="0.001"/>
+        </div>
+      </div>
+    </div>
+    
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+      <a class="btn" href="/cogo">← COGO</a>
+      <button class="btn btn-primary" type="button" id="calc-btn">Calcola</button>
+    </div>
+  </div>
+  
+  <div class="card" id="solution-picker" style="display:none;">
+    <h2>⚠️ Due soluzioni possibili</h2>
+    <p style="color:#666;">Con solo 2 stazioni ci sono 2 soluzioni (destra/sinistra). Seleziona quella corretta:</p>
+    <div id="solutions-list"></div>
+    <button class="btn btn-primary" type="button" id="confirm-solution-btn">Conferma soluzione</button>
+  </div>
+  
+  <div class="card" id="result">
+    <h2>Risultato Trilaterazione</h2>
+    <div id="result-data"></div>
+    
+    <h2 style="margin-top:20px;">Salva punto calcolato</h2>
+    <label>Rilievo destinazione</label>
+    <select id="target-survey">
+      {{ survey_options|safe }}
+    </select>
+    <label>Nome punto (suggerito: SP###)</label>
+    <input type="text" id="point-name" placeholder="SP001"/>
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary" type="button" id="save-btn">💾 Salva punto</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const calcBtn = document.getElementById('calc-btn');
+const resultDiv = document.getElementById('result');
+const resultDataDiv = document.getElementById('result-data');
+const solutionPicker = document.getElementById('solution-picker');
+const solutionsList = document.getElementById('solutions-list');
+const confirmSolutionBtn = document.getElementById('confirm-solution-btn');
+
+let calculatedSolution = null;
+let selectedSolutionIndex = null;
+
+calcBtn.addEventListener('click', async () => {
+  const stations = [];
+  const distances = [];
+  
+  document.querySelectorAll('.station-row').forEach(row => {
+    const select = row.querySelector('.station-select');
+    const distInput = row.querySelector('.distance-input');
+    
+    if (select.value && distInput.value) {
+      const [sid, pid] = select.value.split('|');
+      stations.push({sid, pid});
+      distances.push(parseFloat(distInput.value));
+    }
+  });
+  
+  if (stations.length < 2) {
+    alert('Servono almeno 2 stazioni con distanze');
+    return;
+  }
+  
+  const resp = await fetch('/cogo/trilateration/calc', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({stations, distances})
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+    return;
+  }
+  
+  if (data.ambiguous) {
+    // Show solution picker
+    showSolutionPicker(data.solutions, data.stations_enu, distances);
+    resultDiv.style.display = 'none';
+  } else {
+    // Show single solution result
+    showResult(data);
+    solutionPicker.style.display = 'none';
+  }
+});
+
+function showSolutionPicker(solutions, stations, distances) {
+  solutionsList.innerHTML = '';
+  solutions.forEach((sol, idx) => {
+    const div = document.createElement('div');
+    div.className = 'solution-option';
+    div.dataset.index = idx;
+    
+    let html = `<strong>Soluzione ${idx + 1}</strong><br/>`;
+    html += `E = ${sol.e.toFixed(4)} m, N = ${sol.n.toFixed(4)} m<br/>`;
+    html += `Lat = ${sol.lat.toFixed(9)}°, Lon = ${sol.lon.toFixed(9)}°<br/>`;
+    html += `Alt = ${sol.alt.toFixed(3)} m<br/>`;
+    html += '<small>Verifica residui:</small><br/>';
+    
+    stations.forEach((st, i) => {
+      const dist = Math.hypot(sol.e - st.e, sol.n - st.n);
+      const residual = dist - distances[i];
+      html += `<small>Stazione ${i+1}: residuo = ${residual.toFixed(4)} m</small><br/>`;
+    });
+    
+    div.innerHTML = html;
+    div.addEventListener('click', () => selectSolution(idx));
+    solutionsList.appendChild(div);
+  });
+  
+  solutionPicker.style.display = 'block';
+  selectedSolutionIndex = null;
+}
+
+function selectSolution(idx) {
+  document.querySelectorAll('.solution-option').forEach(div => {
+    div.classList.remove('selected');
+  });
+  document.querySelector(`.solution-option[data-index="${idx}"]`).classList.add('selected');
+  selectedSolutionIndex = idx;
+}
+
+confirmSolutionBtn.addEventListener('click', async () => {
+  if (selectedSolutionIndex === null) {
+    alert('Seleziona una soluzione');
+    return;
+  }
+  
+  const stations = [];
+  const distances = [];
+  
+  document.querySelectorAll('.station-row').forEach(row => {
+    const select = row.querySelector('.station-select');
+    const distInput = row.querySelector('.distance-input');
+    
+    if (select.value && distInput.value) {
+      const [sid, pid] = select.value.split('|');
+      stations.push({sid, pid});
+      distances.push(parseFloat(distInput.value));
+    }
+  });
+  
+  const resp = await fetch('/cogo/trilateration/calc', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({stations, distances, solution_index: selectedSolutionIndex})
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+    return;
+  }
+  
+  showResult(data);
+  solutionPicker.style.display = 'none';
+});
+
+function showResult(data) {
+  calculatedSolution = data;
+  
+  let html = '<div class="kv"><span class="k">Latitudine</span><span class="v">' + data.lat.toFixed(9) + '°</span></div>';
+  html += '<div class="kv"><span class="k">Longitudine</span><span class="v">' + data.lon.toFixed(9) + '°</span></div>';
+  html += '<div class="kv"><span class="k">Quota (media stazioni)</span><span class="v">' + data.alt.toFixed(3) + ' m</span></div>';
+  html += '<div class="kv"><span class="k">E (ENU locale)</span><span class="v">' + data.e.toFixed(4) + ' m</span></div>';
+  html += '<div class="kv"><span class="k">N (ENU locale)</span><span class="v">' + data.n.toFixed(4) + ' m</span></div>';
+  
+  if (data.residuals) {
+    html += '<h2 style="margin-top:16px;">Residui per stazione</h2>';
+    data.residuals.forEach((r, i) => {
+      html += `<div class="kv"><span class="k">Stazione ${i+1}</span><span class="v">${r.toFixed(4)} m</span></div>`;
+    });
+  }
+  
+  if (data.rms !== undefined) {
+    const qualityClass = 'quality-' + data.quality;
+    html += '<div class="kv"><span class="k">RMS</span><span class="v">' + data.rms.toFixed(4) + ' m</span></div>';
+    html += '<div class="kv"><span class="k">Qualità</span><span class="v"><span class="' + qualityClass + '">' + 
+            (data.quality === 'excellent' ? 'Eccellente' : 
+             data.quality === 'good' ? 'Buono' : 
+             data.quality === 'acceptable' ? 'Accettabile' : 'Ricontrollare') + 
+            '</span></span></div>';
+  }
+  
+  resultDataDiv.innerHTML = html;
+  resultDiv.style.display = 'block';
+  
+  // Auto-suggest point name (use a simple counter, user can change it)
+  document.getElementById('point-name').value = 'SP001';
+}
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  if (!calculatedSolution) {
+    alert('Nessun punto calcolato');
+    return;
+  }
+  
+  const targetSurvey = document.getElementById('target-survey').value;
+  const pointName = document.getElementById('point-name').value;
+  
+  if (!targetSurvey || !pointName) {
+    alert('Seleziona rilievo e nome punto');
+    return;
+  }
+  
+  const resp = await fetch('/cogo/trilateration/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      survey_id: targetSurvey,
+      point_name: pointName,
+      solution: calculatedSolution
+    })
+  });
+  
+  const result = await resp.json();
+  
+  if (result.error) {
+    alert('Errore: ' + result.error);
+  } else {
+    alert('Punto salvato con successo!');
+    window.location.href = '/survey/' + targetSurvey;
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% set active = "settings" %}
+
+{% block title %}Impostazioni — Rilievo GNSS{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 720px; margin: 20px auto; padding: 0 20px; }
+.card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 16px; }
+.card h2 { color: #2c3e50; margin: 0 0 16px; font-size: 18px; border-bottom: 2px solid #3498db; padding-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.card h2 .ico { font-size: 22px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-weight: 600; color: #555; margin-bottom: 4px; font-size: 13px; }
+.field input[type=text], .field input[type=number], .field select {
+    width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 15px; font-family: inherit; background: #fafafa;
+    transition: border 0.2s;
+  }
+.field input:focus, .field select:focus { border-color: #3498db; outline: none; background: white; }
+.field .hint { font-size: 11px; color: #999; margin-top: 2px; }
+.row { display: flex; gap: 12px; }
+.row .field { flex: 1; }
+.toggle-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.toggle-row label { font-weight: 600; color: #555; font-size: 14px; margin: 0; }
+.switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 26px; transition: 0.3s; }
+.slider::before { content: ""; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+.switch input:checked + .slider { background: #2ecc71; }
+.switch input:checked + .slider::before { transform: translateX(22px); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.btn { display: inline-block; padding: 12px 24px; border: none; border-radius: 6px;
+         font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none;
+         text-align: center; transition: background 0.2s, transform 0.1s; }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: #3498db; color: white; }
+.btn-primary:hover { background: #2980b9; }
+.btn-success { background: #2ecc71; color: white; }
+.btn-success:hover { background: #27ae60; }
+.btn-danger { background: #e74c3c; color: white; font-size: 13px; padding: 8px 16px; }
+.btn-danger:hover { background: #c0392b; }
+.btn-outline { background: transparent; color: #555; border: 1px solid #ddd; }
+.btn-outline:hover { background: #f0f0f0; }
+.status-bar { padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.status-bar .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.status-connected { background: #d5f5e3; color: #1e8449; }
+.status-connected .dot { background: #2ecc71; }
+.status-disconnected { background: #fdebd0; color: #935116; }
+.status-disconnected .dot { background: #f39c12; }
+.status-nocfg { background: #f2f3f4; color: #666; }
+.status-nocfg .dot { background: #bbb; }
+.toast { position: fixed; top: 20px; right: 20px; padding: 14px 20px; border-radius: 8px;
+           color: white; font-weight: 600; z-index: 999; transform: translateX(120%);
+           transition: transform 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.toast.show { transform: translateX(0); }
+.toast-ok { background: #2ecc71; }
+.toast-err { background: #e74c3c; }
+.container { padding: 5px; margin: 0; }
+.card { padding: 14px; }
+.row { flex-direction: column; gap: 0; }
+.nav a .nav-icon { font-size: 24px; }
+.nav a .nav-text { font-size: 11px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- Connection status -->
+  <div id="connStatus" class="status-bar status-nocfg">
+    <span class="dot"></span>
+    <span id="connText">Caricamento...</span>
+  </div>
+
+  <form id="settingsForm">
+
+  <!-- GNSS Connection -->
+  <div class="card">
+    <h2><span class="ico">📡</span> Connessione GNSS</h2>
+    <div class="row">
+      <div class="field">
+        <label>Host / IP del ricevitore GNSS</label>
+        <input type="text" name="gnss_host" id="gnss_host" placeholder="es. 192.168.1.100" value="{{ gnss_host }}"/>
+        <div class="hint">Indirizzo IP o hostname del ricevitore GNSS (RTK)</div>
+      </div>
+      <div class="field" style="max-width:140px">
+        <label>Porta TCP</label>
+        <input type="number" name="gnss_port" id="gnss_port" min="1" max="65535" value="{{ gnss_port }}"/>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" name="gnss_autoconnect" id="gnss_autoconnect" {{ gnss_autoconnect_checked }} /><span class="slider"></span></label>
+      <label>Connessione automatica all'avvio</label>
+    </div>
+    <div class="field">
+      <label>Intervallo di riconnessione (secondi)</label>
+      <input type="number" name="retry_interval" id="retry_interval" min="1" max="60" step="0.5" value="{{ retry_interval }}"/>
+    </div>
+  </div>
+
+  <!-- TCP Relay -->
+  <div class="card">
+    <h2><span class="ico">🔁</span> TCP Relay</h2>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" name="relay_enabled" id="relay_enabled" {{ relay_enabled_checked }} /><span class="slider"></span></label>
+      <label>Abilita relay TCP locale (per GNSS Master, ecc.)</label>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Bind address</label>
+        <input type="text" name="relay_bind" id="relay_bind" value="{{ relay_bind }}"/>
+        <div class="hint">127.0.0.1 = solo locale, 0.0.0.0 = LAN</div>
+      </div>
+      <div class="field" style="max-width:140px">
+        <label>Porta</label>
+        <input type="number" name="relay_port" id="relay_port" min="1" max="65535" value="{{ relay_port }}"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- Survey defaults -->
+  <div class="card">
+    <h2><span class="ico">📏</span> Parametri rilievo</h2>
+    <div class="row">
+      <div class="field">
+        <label>Durata campionamento (s)</label>
+        <input type="number" name="default_sample_duration" id="default_sample_duration" min="1" max="600" step="1" value="{{ default_sample_duration }}"/>
+      </div>
+      <div class="field">
+        <label>Intervallo campioni (s)</label>
+        <input type="number" name="default_sample_interval" id="default_sample_interval" min="0.1" max="10" step="0.1" value="{{ default_sample_interval }}"/>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Modalità media robusta</label>
+        <select name="robust_mode" id="robust_mode">
+          <option value="sigma" {{ sel_sigma }}>Sigma-clipping</option>
+          <option value="trim" {{ sel_trim }}>Trimmed mean</option>
+          <option value="median" {{ sel_median }}>Mediana</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Sigma threshold</label>
+        <input type="number" name="robust_sigma" id="robust_sigma" min="1" max="5" step="0.1" value="{{ robust_sigma }}"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- Web server (read-only info) -->
+  <div class="card">
+    <h2><span class="ico">🌐</span> Server Web</h2>
+    <div class="row">
+      <div class="field">
+        <label>Bind address</label>
+        <input type="text" name="http_bind" id="http_bind" value="{{ http_bind }}"/>
+        <div class="hint">0.0.0.0 = accessibile dalla LAN. Richiede riavvio app.</div>
+      </div>
+      <div class="field" style="max-width:140px">
+        <label>Porta HTTP</label>
+        <input type="number" name="http_port" id="http_port" min="1" max="65535" value="{{ http_port }}"/>
+        <div class="hint">Richiede riavvio</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="card">
+    <div class="actions">
+      <button type="submit" class="btn btn-primary">💾 Salva impostazioni</button>
+      <button type="button" class="btn btn-success" onclick="saveAndConnect()">💾 Salva e (ri)connetti</button>
+      <button type="button" class="btn btn-danger" onclick="resetDefaults()">🔄 Reset default</button>
+      <a href="/" class="btn btn-outline">← Dashboard</a>
+    </div>
+  </div>
+
+  </form>
+</div>
+
+<div id="toast" class="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showToast(msg, ok) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err') + ' show';
+  setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+function getFormData() {
+  var f = document.getElementById('settingsForm');
+  return {
+    gnss_host: f.gnss_host.value.trim(),
+    gnss_port: parseInt(f.gnss_port.value) || 1234,
+    gnss_autoconnect: f.gnss_autoconnect.checked,
+    retry_interval: parseFloat(f.retry_interval.value) || 3.0,
+    relay_enabled: f.relay_enabled.checked,
+    relay_bind: f.relay_bind.value.trim() || '127.0.0.1',
+    relay_port: parseInt(f.relay_port.value) || 21100,
+    default_sample_duration: parseFloat(f.default_sample_duration.value) || 10.0,
+    default_sample_interval: parseFloat(f.default_sample_interval.value) || 0.5,
+    robust_mode: f.robust_mode.value,
+    robust_sigma: parseFloat(f.robust_sigma.value) || 2.0,
+    http_bind: f.http_bind.value.trim() || '0.0.0.0',
+    http_port: parseInt(f.http_port.value) || 8000
+  };
+}
+
+document.getElementById('settingsForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: 'save', settings: getFormData()})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.ok) showToast('Impostazioni salvate ✓', true);
+      else showToast('Errore: ' + (d.error||'?'), false);
+    }).catch(function(e){ showToast('Errore di rete', false); });
+});
+
+function saveAndConnect() {
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: 'save_and_connect', settings: getFormData()})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.ok) showToast('Salvato e connessione avviata ✓', true);
+      else showToast('Errore: ' + (d.error||'?'), false);
+      updateStatus();
+    }).catch(function(e){ showToast('Errore di rete', false); });
+}
+
+function resetDefaults() {
+  if(!confirm('Ripristinare tutte le impostazioni ai valori predefiniti?')) return;
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: 'reset'})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.ok) { showToast('Reset completato ✓', true); setTimeout(function(){ location.reload(); }, 500); }
+      else showToast('Errore', false);
+    }).catch(function(e){ showToast('Errore di rete', false); });
+}
+
+function updateStatus() {
+  fetch('/api/settings/status')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var el = document.getElementById('connStatus');
+      var txt = document.getElementById('connText');
+      if(!d.gnss_host) {
+        el.className = 'status-bar status-nocfg';
+        txt.textContent = 'GNSS non configurato — inserisci host e porta';
+      } else if(d.gnss_connected) {
+        el.className = 'status-bar status-connected';
+        txt.textContent = 'Connesso a ' + d.gnss_host + ':' + d.gnss_port +
+          (d.relay_active ? '  •  Relay attivo' : '');
+      } else {
+        el.className = 'status-bar status-disconnected';
+        txt.textContent = 'Connessione a ' + d.gnss_host + ':' + d.gnss_port + ' in corso...';
+      }
+    }).catch(function(){});
+}
+
+updateStatus();
+setInterval(updateStatus, 3000);
+</script>
+{% endblock %}

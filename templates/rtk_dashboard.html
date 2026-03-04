@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+{% set active = "dashboard" %}
+
+{% block title %}Dashboard — RilievoGNSS{% endblock %}
+
+{% block head %}
+<!-- Leaflet for mini-map -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  /* ── Mini-map ── */
+  .dash-minimap-wrap {
+    margin: 14px 20px 0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    position: relative;
+    background: #f0f4f8;
+  }
+  #dashMap {
+    height: 220px;
+    width: 100%;
+    background: #f0f4f8;
+    z-index: 0;
+  }
+  .dash-map-status {
+    position: absolute;
+    bottom: 6px;
+    left: 6px;
+    z-index: 500;
+    background: rgba(255,255,255,.88);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #444;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+  }
+  .dash-map-nodata {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: #999;
+    pointer-events: none;
+    z-index: 400;
+  }
+  .hidden { display: none !important; }
+
+  /* ── Dashboard header ── */
+  .dash-header {
+    padding: 20px 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .dash-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .dash-rtk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 13px;
+    color: white;
+    background: #e74c3c;
+    transition: background .3s;
+    white-space: nowrap;
+  }
+  .dash-rtk-badge.fixed  { background: #2ecc71; }
+  .dash-rtk-badge.float  { background: #f39c12; }
+  .dash-rtk-badge.none   { background: #e74c3c; }
+  .dash-rtk-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(255,255,255,.7);
+    animation: blink 1.8s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  /* ── Info chips strip ── */
+  .dash-chips {
+    padding: 10px 20px 0;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .dash-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: #edf2f7;
+    border: 1px solid #cbd5e0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #2d3748;
+  }
+  .dash-chip svg { opacity: .6; }
+
+  /* ── Card grid ── */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 16px;
+    padding: 16px 20px 24px;
+  }
+  .card {
+    background: white;
+    border-radius: 10px;
+    padding: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+  .card h3 {
+    color: #1a202c;
+    margin: 0 0 14px;
+    font-size: 15px;
+    font-weight: 700;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .card h3 svg { opacity: .5; flex-shrink: 0; }
+  .kv {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px dashed #edf2f7;
+    gap: 8px;
+  }
+  .kv:last-child { border-bottom: none; }
+  .k { color: #718096; font-size: 12px; flex-shrink: 0; }
+  .v { font-variant-numeric: tabular-nums; color: #2d3748; font-size: 13px; text-align: right; word-break: break-all; }
+  .ts { color: #a0aec0; font-size: 11px; margin-top: 8px; text-align: right; }
+
+  @media (max-width: 768px) {
+    .dash-header { padding: 14px 12px 0; }
+    .dash-chips  { padding: 8px 12px 0; }
+    .dash-grid   { padding: 12px 12px 20px; gap: 10px; grid-template-columns: 1fr; }
+    .dash-minimap-wrap { margin: 10px 12px 0; }
+    #dashMap { height: 180px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header with RTK status ── -->
+<div class="dash-header">
+  <h2 class="dash-title">RilievoGNSS &mdash; RTK</h2>
+  <span class="dash-rtk-badge none" id="rtkBadge">
+    <span class="dash-rtk-dot"></span>
+    <span id="rtkBadgeText">RTK: &mdash;</span>
+  </span>
+</div>
+
+<!-- ── Info chips (SV · Mode · Relay) ── -->
+<div class="dash-chips">
+  <span class="dash-chip">
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+    <span id="chipSV">SV &mdash;</span>
+  </span>
+  <span class="dash-chip">
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+    <span id="chipMode">mode &mdash;</span>
+  </span>
+  <span class="dash-chip">
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+    </svg>
+    <span id="chipRelay">relay &mdash;</span>
+  </span>
+</div>
+
+<!-- ── Mini real-time map ── -->
+<div class="dash-minimap-wrap">
+  <div id="dashMap"></div>
+  <div class="dash-map-status" id="dashMapStatus">Caricamento...</div>
+  <div class="dash-map-nodata hidden" id="dashMapNoData">Nessuna posizione disponibile</div>
+</div>
+
+<!-- ── Data cards ── -->
+<div class="dash-grid">
+
+  <section class="card">
+    <h3>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      Posizione (TPV)
+    </h3>
+    <div class="kv"><span class="k">Lat</span><span class="v" id="lat">&mdash;</span></div>
+    <div class="kv"><span class="k">Lon</span><span class="v" id="lon">&mdash;</span></div>
+    <div class="kv"><span class="k">hMSL</span><span class="v" id="hmsl">&mdash;</span></div>
+    <div class="kv"><span class="k">hAcc</span><span class="v" id="hacc">&mdash;</span></div>
+    <div class="ts" id="tpv_ts">&mdash;</div>
+  </section>
+
+  <section class="card">
+    <h3>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      HPPOSLLH &mdash; Alta Precisione
+    </h3>
+    <div class="kv"><span class="k">Lat</span><span class="v" id="hpp_lat">&mdash;</span></div>
+    <div class="kv"><span class="k">Lon</span><span class="v" id="hpp_lon">&mdash;</span></div>
+    <div class="kv"><span class="k">Alt HAE</span><span class="v" id="hpp_h">&mdash;</span></div>
+    <div class="kv"><span class="k">Alt MSL</span><span class="v" id="hpp_hmsl">&mdash;</span></div>
+    <div class="kv"><span class="k">hAcc / vAcc</span><span class="v" id="hpp_acc">&mdash;</span></div>
+    <div class="ts" id="hpp_ts">&mdash;</div>
+  </section>
+
+  <section class="card">
+    <h3>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+      HPPOSECEF
+    </h3>
+    <div class="kv"><span class="k">X</span><span class="v" id="ecefX">&mdash;</span></div>
+    <div class="kv"><span class="k">Y</span><span class="v" id="ecefY">&mdash;</span></div>
+    <div class="kv"><span class="k">Z</span><span class="v" id="ecefZ">&mdash;</span></div>
+    <div class="kv"><span class="k">pAcc</span><span class="v" id="ecefPacc">&mdash;</span></div>
+    <div class="ts" id="ecef_ts">&mdash;</div>
+  </section>
+
+  <section class="card">
+    <h3>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      DOP
+    </h3>
+    <div class="kv"><span class="k">GDOP</span><span class="v" id="gdop">&mdash;</span></div>
+    <div class="kv"><span class="k">PDOP</span><span class="v" id="pdop">&mdash;</span></div>
+    <div class="kv"><span class="k">HDOP</span><span class="v" id="hdop">&mdash;</span></div>
+    <div class="kv"><span class="k">VDOP</span><span class="v" id="vdop">&mdash;</span></div>
+    <div class="ts" id="dop_ts">&mdash;</div>
+  </section>
+
+  <section class="card">
+    <h3>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h18"/></svg>
+      Covarianza Posizione (NED)
+    </h3>
+    <div class="kv"><span class="k">σN / σE / σD (m)</span><span class="v" id="sigTriplet">&mdash;</span></div>
+    <div class="kv"><span class="k">NN / EE / DD (m²)</span><span class="v" id="covDiag">&mdash;</span></div>
+    <div class="kv"><span class="k">NE / ND / ED (m²)</span><span class="v" id="covCross">&mdash;</span></div>
+    <div class="kv"><span class="k">valid</span><span class="v" id="covValid">&mdash;</span></div>
+    <div class="ts" id="cov_ts">&mdash;</div>
+  </section>
+
+  <section class="card">
+    <h3>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      Relative Position (RELPOSNED)
+    </h3>
+    <div class="kv"><span class="k">N</span><span class="v" id="relN">&mdash;</span></div>
+    <div class="kv"><span class="k">E</span><span class="v" id="relE">&mdash;</span></div>
+    <div class="kv"><span class="k">D</span><span class="v" id="relD">&mdash;</span></div>
+    <div class="kv"><span class="k">σN / σE / σD</span><span class="v" id="relsig">&mdash;</span></div>
+    <div class="kv"><span class="k">|baseline|</span><span class="v" id="baseline">&mdash;</span></div>
+    <div class="kv"><span class="k">Bearing</span><span class="v" id="bearing">&mdash;</span></div>
+    <div class="kv"><span class="k">Slope</span><span class="v" id="slope">&mdash;</span></div>
+    <div class="ts" id="rel_ts">&mdash;</div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Mini-map ──────────────────────────────────────────────────
+(function() {
+
+  // Colour by RTK status (same logic as badge + map viewer)
+  function rtkColor(rtkStr) {
+    const s = String(rtkStr || '').toLowerCase();
+    if (s.includes('fixed'))        return '#2ecc71';
+    if (s.includes('float'))        return '#f39c12';
+    if (s.includes('trilateration') || s.includes('cogo')) return '#3498db';
+    return '#e74c3c';
+  }
+
+  // Cross-hair SVG icon (size px, color)
+  function crossIcon(color, size) {
+    size = size || 14;
+    const h = Math.round(size / 2);
+    const w = 3;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <line x1="${h}" y1="0" x2="${h}" y2="${size}" stroke="${color}" stroke-width="${w}" stroke-linecap="round"/>
+      <line x1="0" y1="${h}" x2="${size}" y2="${h}" stroke="${color}" stroke-width="${w}" stroke-linecap="round"/>
+      <circle cx="${h}" cy="${h}" r="2" fill="${color}"/>
+    </svg>`;
+    return L.divIcon({
+      html: svg,
+      className: '',
+      iconSize: [size, size],
+      iconAnchor: [h, h]
+    });
+  }
+
+  // Blinking live-position icon
+  function liveIcon(color) {
+    const size = 18;
+    const h = size / 2;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${h}" cy="${h}" r="${h - 1}" fill="none" stroke="${color}" stroke-width="2.5" opacity="0.55"/>
+      <line x1="${h}" y1="0" x2="${h}" y2="${size}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+      <line x1="0" y1="${h}" x2="${size}" y2="${h}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+    </svg>`;
+    return L.divIcon({
+      html: `<div style="animation:dash-blink 1.4s infinite">${svg}</div>`,
+      className: '',
+      iconSize: [size, size],
+      iconAnchor: [h, h]
+    });
+  }
+
+  // Add blink keyframe to page
+  const bStyle = document.createElement('style');
+  bStyle.textContent = '@keyframes dash-blink{0%,100%{opacity:1}50%{opacity:.3}}';
+  document.head.appendChild(bStyle);
+
+  // Init Leaflet
+  const map = L.map('dashMap', {
+    zoomControl: true,
+    attributionControl: false,
+    scrollWheelZoom: true,
+    touchZoom: true,
+    maxZoom: 28,
+    minZoom: 1,
+    zoomSnap: 0.5,
+    zoomDelta: 0.5
+  });
+
+  // White background – no tile layer
+  document.getElementById('dashMap').style.background = '#f8f9fa';
+
+  // Layers
+  const surveyLayer = L.layerGroup().addTo(map);
+  const liveLayer   = L.layerGroup().addTo(map);
+
+  // Status label
+  const statusEl  = document.getElementById('dashMapStatus');
+  const noDataEl  = document.getElementById('dashMapNoData');
+
+  let mapInitialized  = false;
+  let liveMarker      = null;
+  let liveLatLng      = null;
+  let surveyBounds    = null;
+
+  // ── Load all survey points once ──
+  fetch('/api/all_points')
+    .then(r => r.json())
+    .then(gj => {
+      const features = gj.features || [];
+      if (features.length === 0) return;
+
+      const allLls = [];
+      const surveyCoords = {};
+
+      features.forEach(f => {
+        const coords = f.geometry && f.geometry.coordinates;
+        if (!coords) return;
+        const lat = coords[1], lon = coords[0];
+        if (!isFinite(lat) || !isFinite(lon)) return;
+
+        const props  = f.properties || {};
+        const tpv    = props.TPV || {};
+        const color  = rtkColor(tpv.rtk);
+        const name   = props.name || '?';
+        const sid    = props._survey_id || '';
+        const stitle = props._survey_title || sid;
+
+        const m = L.marker([lat, lon], { icon: crossIcon(color, 12), interactive: true });
+        m.bindTooltip(`<b>${name}</b><br>${stitle}<br>${lat.toFixed(7)}, ${lon.toFixed(7)}`, { direction: 'top', offset: [0, -6] });
+        m.addTo(surveyLayer);
+        allLls.push([lat, lon]);
+
+        if (!surveyCoords[sid]) surveyCoords[sid] = [];
+        surveyCoords[sid].push([lat, lon]);
+      });
+
+      if (allLls.length > 0) {
+        surveyBounds = L.latLngBounds(allLls);
+        if (!mapInitialized) {
+          map.fitBounds(surveyBounds, { padding: [28, 28] });
+          mapInitialized = true;
+        }
+        const nSurveys = Object.keys(surveyCoords).length;
+        statusEl.textContent = features.length + ' pt · ' + nSurveys + (nSurveys === 1 ? ' rilievo' : ' rilievi');
+      }
+    })
+    .catch(() => { statusEl.textContent = 'Punti non disponibili'; });
+
+  // ── Live position from SSE ──
+  // Re-use the main EventSource defined below (after this IIFE),
+  // so we register a secondary handler via a custom event.
+  window._dashMapUpdate = function(payload) {
+    const tpv = payload.TPV || {};
+    const hpp = payload.HPPOSLLH || {};
+
+    // Prefer HPPOSLLH then TPV
+    const lat = hpp.lat != null ? hpp.lat : tpv.lat;
+    const lon = hpp.lon != null ? hpp.lon : tpv.lon;
+
+    if (lat == null || lon == null || !isFinite(lat) || !isFinite(lon)) {
+      noDataEl.classList.remove('hidden');
+      return;
+    }
+    noDataEl.classList.add('hidden');
+
+    const color = rtkColor(tpv.rtk);
+    const ll    = L.latLng(lat, lon);
+    liveLatLng  = ll;
+
+    if (!liveMarker) {
+      liveMarker = L.marker(ll, { icon: liveIcon(color), zIndexOffset: 1000 }).addTo(liveLayer);
+    } else {
+      liveMarker.setLatLng(ll);
+      liveMarker.setIcon(liveIcon(color));
+    }
+
+    // First time we get a position, center map if no survey points
+    if (!mapInitialized) {
+      map.setView(ll, 17);
+      mapInitialized = true;
+    }
+
+    // Status
+    const acc = hpp.hAcc != null ? hpp.hAcc : tpv.hAcc;
+    const accStr = acc != null ? ' · ±' + Number(acc).toFixed(3) + 'm' : '';
+    statusEl.textContent = lat.toFixed(7) + ', ' + lon.toFixed(7) + accStr;
+  };
+
+  // Fit button: show all survey points + live position
+  // (reachable from outside via window._dashMapFit)
+  window._dashMapFit = function() {
+    const bounds = surveyBounds ? surveyBounds : null;
+    if (liveLatLng) {
+      const b = bounds ? bounds.extend(liveLatLng) : L.latLngBounds([liveLatLng, liveLatLng]);
+      map.fitBounds(b, { padding: [28, 28], maxZoom: 20 });
+    } else if (bounds) {
+      map.fitBounds(bounds, { padding: [28, 28] });
+    }
+  };
+
+  // Initial: no position yet
+  statusEl.textContent = 'In attesa di posizione…';
+
+})();
+
+// ── SSE ───────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+function fmt(val, digits=3) {
+  if (val == null || Number.isNaN(val)) return '\u2014';
+  return Number(val).toFixed(digits);
+}
+
+function setRtkBadge(rtk) {
+  const badge = $('rtkBadge');
+  const txt   = $('rtkBadgeText');
+  txt.textContent = 'RTK: ' + (rtk || '\u2014');
+  const cls = rtk === 'RTK fixed' || rtk === 'likely fixed' ? 'fixed'
+            : rtk === 'RTK float' ? 'float'
+            : 'none';
+  badge.className = 'dash-rtk-badge ' + cls;
+  // Sync sidebar dot (in base.html footer)
+  const dot    = document.getElementById('rtkDot');
+  const dotTxt = document.getElementById('rtkStatusText');
+  if (dot)    dot.className    = 'rtk-status-dot ' + cls;
+  if (dotTxt) dotTxt.textContent = 'RTK: ' + (rtk || '\u2014');
+}
+
+function modeName(m) { return ({1:'no-fix',2:'2D',3:'3D'})[m] || '\u2014'; }
+
+function updateUI(p) {
+  const tpv = p.TPV || {};
+  setRtkBadge(tpv.rtk || null);
+  $('chipMode').textContent = 'mode ' + modeName(tpv.mode);
+  $('chipSV').textContent   = 'SV '  + (tpv.numSV != null ? tpv.numSV : '\u2014');
+
+  const rel = p.RELAY || {};
+  $('chipRelay').textContent = rel.on
+    ? 'relay ' + (rel.bind || '?') + ':' + (rel.port || '?') + ' \u00b7 ' + (rel.clients || 0) + ' cli'
+    : 'relay off';
+
+  // TPV
+  $('lat').textContent  = tpv.lat    != null ? tpv.lat.toFixed(9)       : '\u2014';
+  $('lon').textContent  = tpv.lon    != null ? tpv.lon.toFixed(9)       : '\u2014';
+  $('hmsl').textContent = tpv.altMSL != null ? fmt(tpv.altMSL,3)+' m'  : '\u2014';
+  $('hacc').textContent = tpv.hAcc   != null ? fmt(tpv.hAcc,3)+' m'    : '\u2014';
+  $('tpv_ts').textContent = tpv.time || '\u2014';
+
+  // HPPOSLLH
+  const hpp = p.HPPOSLLH || {};
+  $('hpp_lat').textContent  = hpp.lat    != null ? hpp.lat.toFixed(9)      : '\u2014';
+  $('hpp_lon').textContent  = hpp.lon    != null ? hpp.lon.toFixed(9)      : '\u2014';
+  $('hpp_h').textContent    = hpp.altHAE != null ? fmt(hpp.altHAE,3)+' m' : '\u2014';
+  $('hpp_hmsl').textContent = hpp.altMSL != null ? fmt(hpp.altMSL,3)+' m' : '\u2014';
+  $('hpp_acc').textContent  = [hpp.hAcc, hpp.vAcc].map(v => v!=null?fmt(v,3):'\u2014').join(' / ');
+  $('hpp_ts').textContent   = hpp.time || '\u2014';
+
+  // HPPOSECEF
+  const hp = p.HPPOSECEF || {};
+  $('ecefX').textContent    = hp.X    != null ? fmt(hp.X,4)+' m'     : '\u2014';
+  $('ecefY').textContent    = hp.Y    != null ? fmt(hp.Y,4)+' m'     : '\u2014';
+  $('ecefZ').textContent    = hp.Z    != null ? fmt(hp.Z,4)+' m'     : '\u2014';
+  $('ecefPacc').textContent = hp.pAcc != null ? fmt(hp.pAcc,4)+' m' : '\u2014';
+  $('ecef_ts').textContent  = hp.time || '\u2014';
+
+  // DOP
+  const dop = p.DOP || {};
+  $('gdop').textContent   = fmt(dop.gdop,2);
+  $('pdop').textContent   = fmt(dop.pdop,2);
+  $('hdop').textContent   = fmt(dop.hdop,2);
+  $('vdop').textContent   = fmt(dop.vdop,2);
+  $('dop_ts').textContent = dop.time || '\u2014';
+
+  // COV
+  const cov = p.COV || {};
+  $('sigTriplet').textContent = [cov.sigN,cov.sigE,cov.sigD].map(v=>v!=null?fmt(v,3):'\u2014').join(' / ');
+  $('covDiag').textContent    = [cov.covNN,cov.covEE,cov.covDD].map(v=>v!=null?Number(v).toExponential(4):'\u2014').join(' / ');
+  $('covCross').textContent   = [cov.covNE,cov.covND,cov.covED].map(v=>v!=null?Number(v).toExponential(4):'\u2014').join(' / ');
+  $('covValid').textContent   = cov.valid===true?'yes':cov.valid===false?'no':'\u2014';
+  $('cov_ts').textContent     = cov.time || '\u2014';
+
+  // RELPOS
+  const rp = p.RELPOS || {};
+  $('relN').textContent     = rp.N           != null ? fmt(rp.N,4)+' m'          : '\u2014';
+  $('relE').textContent     = rp.E           != null ? fmt(rp.E,4)+' m'          : '\u2014';
+  $('relD').textContent     = rp.D           != null ? fmt(rp.D,4)+' m'          : '\u2014';
+  $('relsig').textContent   = [rp.sN,rp.sE,rp.sD].map(v=>v!=null?fmt(v,3):'\u2014').join(' / ');
+  $('baseline').textContent = rp.baseline    != null ? fmt(rp.baseline,4)+' m'   : '\u2014';
+  $('bearing').textContent  = rp.bearingDeg  != null ? fmt(rp.bearingDeg,1)+'\u00b0' : '\u2014';
+  $('slope').textContent    = rp.slopeDeg    != null ? fmt(rp.slopeDeg,1)+'\u00b0'   : '\u2014';
+  $('rel_ts').textContent   = rp.time || '\u2014';
+}
+
+// Dashboard has its OWN EventSource (separate from the sidebar dot in base.html).
+// Both must be closed on unload, otherwise Werkzeug runs out of threads.
+const es = new EventSource('/events');
+es.onmessage = e => { try { const p = JSON.parse(e.data); updateUI(p); if(window._dashMapUpdate) window._dashMapUpdate(p); } catch(_) {} };
+es.onerror   = () => {};
+window.addEventListener('beforeunload', () => { try { es.close(); } catch(_) {} });
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { try { es.close(); } catch(_) {} }
+});
+</script>
+{% endblock %}

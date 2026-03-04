@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% set active = "surveys" %}
+{% block title %}Import completato{% endblock %}
+{% block content %}
+<div style="max-width:680px;margin:0 auto;">
+  <div class="card" style="background:white;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.1);">
+    <h2>✅ Import completato</h2>
+    <p>Importati {{ count }} punti per picchettamento</p>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+      <a href="/stakeout" style="padding:10px 16px;background:#2ecc71;color:white;border-radius:8px;text-decoration:none;">→ Vai al picchettamento</a>
+      <a href="/import" style="padding:10px 16px;background:#3498db;color:white;border-radius:8px;text-decoration:none;">← Import altro file</a>
+      <a href="/" style="padding:10px 16px;background:#95a5a6;color:white;border-radius:8px;text-decoration:none;">Dashboard</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

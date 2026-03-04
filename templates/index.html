@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}RTKLIB Web PPK — Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p>RTKLIB PPK Processing Suite</p>
+</div>
+
+<!-- Quick Actions -->
+<div class="grid grid-3">
+    <a href="/convbin" class="card" style="text-decoration:none; color:inherit;">
+        <div class="flex-between mb-1">
+            <h2 style="font-size:16px; font-weight:600;">Raw → RINEX</h2>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#3498db" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+            </svg>
+        </div>
+        <p style="font-size:13px; color:#7f8c8d;">
+            Convert raw receiver data (UBX, etc.) to RINEX with convbin
+        </p>
+    </a>
+
+    <a href="/rinex" class="card" style="text-decoration:none; color:inherit;">
+        <div class="flex-between mb-1">
+            <h2 style="font-size:16px; font-weight:600;">RINEX QC</h2>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#2ecc71" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+        </div>
+        <p style="font-size:13px; color:#7f8c8d;">
+            Analyze observation data: satellite visibility, SNR, cycle slips
+        </p>
+    </a>
+
+    <a href="/ppk" class="card" style="text-decoration:none; color:inherit;">
+        <div class="flex-between mb-1">
+            <h2 style="font-size:16px; font-weight:600;">PPK Process</h2>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#f39c12" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="12" x2="16" y2="14"/>
+            </svg>
+        </div>
+        <p style="font-size:13px; color:#7f8c8d;">
+            Post-process GNSS observations with rnx2rtkp (static, kinematic, PPP)
+        </p>
+    </a>
+
+    <a href="/posview" class="card" style="text-decoration:none; color:inherit;">
+        <div class="flex-between mb-1">
+            <h2 style="font-size:16px; font-weight:600;">PosView</h2>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#e74c3c" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                <circle cx="12" cy="12" r="2"/>
+            </svg>
+        </div>
+        <p style="font-size:13px; color:#7f8c8d;">
+            View solution files: ground track, ENU, quality, satellites — rtkplot style
+        </p>
+    </a>
+
+    <a href="/files" class="card" style="text-decoration:none; color:inherit;">
+        <div class="flex-between mb-1">
+            <h2 style="font-size:16px; font-weight:600;">Files</h2>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#9b59b6" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+        </div>
+        <p style="font-size:13px; color:#7f8c8d;">
+            Browse, upload and manage all data files
+        </p>
+    </a>
+</div>
+
+<!-- System Info -->
+<div class="card mt-2">
+    <div class="card-header">
+        <h2>System</h2>
+        <span class="badge" id="toolStatus">checking...</span>
+    </div>
+    <div class="grid grid-4">
+        <div class="stat-box">
+            <div class="stat-value" id="statUploadFiles">—</div>
+            <div class="stat-label">Raw files</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="statRinexFiles">—</div>
+            <div class="stat-label">RINEX files</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="statResultFiles">—</div>
+            <div class="stat-label">Results</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="statConfFiles">—</div>
+            <div class="stat-label">Config profiles</div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload -->
+<div class="card mt-2">
+    <div class="card-header">
+        <h2>Quick Upload</h2>
+    </div>
+    <div class="upload-zone" id="uploadZone">
+        <div class="upload-zone-icon">⬆</div>
+        <div class="upload-zone-text">Drop files here or tap to browse</div>
+        <div class="upload-zone-hint">.ubx .raw .obs .nav .rnx .pos .conf .sp3</div>
+        <input type="file" id="uploadInput" multiple hidden>
+    </div>
+    <div id="uploadProgressWrap" class="hidden" style="margin-top:12px;">
+        <div id="uploadProgressText" style="font-size:12px; color:#7f8c8d; margin-bottom:6px;">Uploading...</div>
+        <div class="progress-bar">
+            <div id="uploadProgressBar" class="progress-fill" style="width:0%"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ─── Upload zone events ───
+    var uploadZone = document.getElementById('uploadZone');
+    var uploadInput = document.getElementById('uploadInput');
+
+    uploadZone.addEventListener('click', function() { uploadInput.click(); });
+    uploadZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+    });
+    uploadZone.addEventListener('dragleave', function() {
+        uploadZone.classList.remove('dragover');
+    });
+    uploadZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        handleUpload(e.dataTransfer.files);
+    });
+    uploadInput.addEventListener('change', function() {
+        handleUpload(uploadInput.files);
+    });
+
+    // ─── Upload handler (uses global uploadFilesWithProgress from upload.js) ───
+    async function handleUpload(fileList) {
+        var files = Array.from(fileList || []);
+        if (!files.length) return;
+
+        var progressEl = {
+            wrap: document.getElementById('uploadProgressWrap'),
+            bar:  document.getElementById('uploadProgressBar'),
+            text: document.getElementById('uploadProgressText'),
+        };
+
+        setStatus('Uploading...', 'processing');
+
+        try {
+            await uploadFilesWithProgress(files, progressEl);
+            setStatus('Ready', '');
+            loadStats();
+        } catch (err) {
+            setStatus('Upload failed', 'error');
+        }
+
+        uploadInput.value = '';
+    }
+
+    // ─── Load dashboard stats ───
+    async function loadStats() {
+        try {
+            var resp = await fetch('/api/ppk/stats');
+            var data = await resp.json();
+            document.getElementById('statUploadFiles').textContent = data.uploads || 0;
+            document.getElementById('statRinexFiles').textContent = data.rinex || 0;
+            document.getElementById('statResultFiles').textContent = data.results || 0;
+            document.getElementById('statConfFiles').textContent = data.configs || 0;
+            document.getElementById('toolStatus').textContent =
+                (data.convbin_ok && data.rnx2rtkp_ok) ? 'tools ready' :
+                (!data.convbin_ok && !data.rnx2rtkp_ok) ? 'convbin + rnx2rtkp missing' :
+                !data.convbin_ok ? 'convbin missing' : 'rnx2rtkp missing';
+            document.getElementById('toolStatus').style.color =
+                (data.convbin_ok && data.rnx2rtkp_ok) ? '#27ae60' : '#e74c3c';
+        } catch (err) {
+            document.getElementById('toolStatus').textContent = 'offline';
+        }
+    }
+
+    loadStats();
+</script>
+{% endblock %}

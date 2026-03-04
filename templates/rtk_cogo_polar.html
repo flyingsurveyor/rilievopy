@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% set active = "cogo" %}
+
+{% block title %}COGO - Punto Polare (Stazione Totale){% endblock %}
+
+{% block head %}
+<style>
+.container { max-width:900px; margin:24px auto; padding:0 16px; }
+  .card { background:white; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.25); margin-bottom:16px; }
+  h1 { font-size:20px; margin:0 0 8px; }
+  h2 { font-size:16px; margin:16px 0 8px; color:#2c3e50; }
+  h3 { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#888; margin:16px 0 6px; }
+  label { display:block; margin:10px 0 4px; color:#2c3e50; font-size:13px; font-weight:500; }
+  select, input[type=number], input[type=text] { width:100%; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .btn { background:#3498db; color:white; padding:10px 16px; border-radius:10px; border:none; cursor:pointer; font-size:14px; text-decoration:none; display:inline-block; }
+  .btn-primary { background:#2d5016; }
+  .btn:hover { filter:brightness(1.1); }
+  .kv { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px dashed #eee; font-size:14px; }
+  .kv:last-child { border-bottom:none; }
+  .k { color:#666; }
+  .v { font-weight:500; font-variant-numeric:tabular-nums; }
+  .note { font-size:12px; color:#999; margin-top:3px; line-height:1.4; }
+  .sep { border-top:2px solid #f0f0f0; margin:16px 0 12px; }
+  .step { border-left:4px solid #3498db; background:#f8f9ff; border-radius:0 8px 8px 0; padding:9px 14px; margin-bottom:8px; font-size:13px; color:#2c3e50; }
+  .step strong { font-weight:700; }
+  .badge { background:#3498db; color:white; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:700; margin-left:8px; }
+  .radio-row { display:flex; gap:20px; margin:8px 0; }
+  .radio-row label { display:flex; align-items:center; gap:6px; margin:0; font-weight:400; cursor:pointer; }
+  .radio-row input[type=radio] { width:auto; }
+  #result { display:none; }
+  @media(max-width:768px) {
+  .row2 { grid-template-columns:1fr; }
+  .btn { width:100%; min-height:44px; margin-bottom:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>Punto Polare <span class="badge">Stazione Totale</span></h1>
+    <p style="color:#666;font-size:14px;line-height:1.6;margin-bottom:12px;">
+      Coordinate di un punto inaccessibile rilevato con stazione totale, orientata su due punti GNSS noti.
+    </p>
+    <div class="step"><strong>1. Stazione:</strong> punto GNSS dove posizioni la stazione totale</div>
+    <div class="step"><strong>2. Orientamento:</strong> secondo punto GNSS verso cui miri per orientare (deve essere pi&#249; lontano del punto incognito)</div>
+    <div class="step"><strong>3. Letture:</strong> Hz all orientamento, Hz al punto incognito, distanza, angolo zenitale</div>
+    <div class="step"><strong>4. Altezze:</strong> altezza strumento e altezza prisma</div>
+  </div>
+
+  <div class="card">
+    <h3>1 &mdash; Punto di stazione (GNSS)</h3>
+    <select id="station-point">
+      <option value="">-- Seleziona punto GNSS stazione --</option>
+      {{ options|safe }}
+    </select>
+
+    <div class="sep"></div>
+    <h3>2 &mdash; Punto di orientamento (GNSS)</h3>
+    <select id="ref-point">
+      <option value="">-- Seleziona punto GNSS orientamento --</option>
+      {{ options|safe }}
+    </select>
+    <p class="note">Il punto verso cui hai puntato per orientare lo strumento (tipicamente il pi&#249; lontano)</p>
+
+    <div class="sep"></div>
+    <h3>3 &mdash; Letture angolari e distanza</h3>
+    <div class="row2">
+      <div>
+        <label>Hz al punto di orientamento (gon)</label>
+        <input type="number" id="hz-ref" placeholder="0.0000" step="0.0001"/>
+        <p class="note">Lettura cerchio orizzontale al punto di orientamento</p>
+      </div>
+      <div>
+        <label>Hz al punto incognito (gon)</label>
+        <input type="number" id="hz-target" placeholder="0.0000" step="0.0001"/>
+        <p class="note">Lettura cerchio orizzontale al punto incognito</p>
+      </div>
+    </div>
+
+    <label style="margin-top:14px;">Tipo di distanza misurata</label>
+    <div class="radio-row">
+      <label><input type="radio" name="dist-type" value="inclined" checked/> Distanza inclinata</label>
+      <label><input type="radio" name="dist-type" value="horizontal"/> Distanza orizzontale</label>
+    </div>
+
+    <div class="row2" style="margin-top:8px;">
+      <div>
+        <label id="dist-label">Distanza inclinata (m)</label>
+        <input type="number" id="dist" placeholder="0.000" step="0.001"/>
+      </div>
+      <div>
+        <label>Angolo zenitale V (gon)</label>
+        <input type="number" id="zenith" placeholder="100.0000" step="0.0001"/>
+        <p class="note" id="zenith-note">100 gon = orizzontale &mdash; destrorso</p>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+    <h3>4 &mdash; Altezze</h3>
+    <div class="row2">
+      <div>
+        <label>Altezza strumento hs (m)</label>
+        <input type="number" id="hs" placeholder="1.500" step="0.001"/>
+      </div>
+      <div>
+        <label>Altezza prisma hp (m)</label>
+        <input type="number" id="ht" placeholder="1.500" step="0.001"/>
+      </div>
+    </div>
+
+    <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <a class="btn" href="/cogo">&#8592; COGO</a>
+      <button class="btn btn-primary" id="calc-btn" type="button">Calcola punto</button>
+    </div>
+  </div>
+
+  <div class="card" id="result">
+    <h2>Risultato &mdash; Coordinate Punto Incognito</h2>
+    <div id="result-data"></div>
+    <div class="sep"></div>
+    <h2>Salva nel rilievo</h2>
+    <label>Nome punto</label>
+    <input type="text" id="point-name" placeholder="POL001"/>
+    <label style="margin-top:10px;">Rilievo destinazione</label>
+    <select id="target-survey">
+      <option value="">-- Seleziona rilievo --</option>
+      {{ survey_options|safe }}
+    </select>
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary" id="save-btn" type="button">Salva punto</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let calculatedSolution = null;
+
+// Aggiorna label e note zenitale in base al tipo distanza
+document.querySelectorAll('input[name="dist-type"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const isInclined = document.querySelector('input[name="dist-type"]:checked').value === 'inclined';
+    document.getElementById('dist-label').textContent = isInclined ? 'Distanza inclinata (m)' : 'Distanza orizzontale (m)';
+    document.getElementById('zenith-note').textContent = isInclined
+      ? '100 gon = orizzontale \u2014 richiesto'
+      : '100 gon = orizzontale \u2014 necessario solo per la quota';
+  });
+});
+
+document.getElementById('calc-btn').addEventListener('click', async () => {
+  try {
+    const stPt     = document.getElementById('station-point').value;
+    const refPt    = document.getElementById('ref-point').value;
+    const hzRef    = parseFloat(document.getElementById('hz-ref').value);
+    const hzTarget = parseFloat(document.getElementById('hz-target').value);
+    const dist     = parseFloat(document.getElementById('dist').value);
+    const zenith   = parseFloat(document.getElementById('zenith').value);
+    const hs       = parseFloat(document.getElementById('hs').value);
+    const ht       = parseFloat(document.getElementById('ht').value);
+    const distType = document.querySelector('input[name="dist-type"]:checked').value;
+
+    if (!stPt || !refPt)               { alert("Seleziona stazione e punto di orientamento"); return; }
+    if (isNaN(hzRef) || isNaN(hzTarget)) { alert("Inserisci le letture angolari Hz"); return; }
+    if (isNaN(dist) || dist <= 0)      { alert("Inserisci la distanza al punto incognito"); return; }
+    if (distType === 'inclined' && isNaN(zenith)) { alert("Per distanza inclinata l'angolo zenitale e' obbligatorio"); return; }
+    if (isNaN(hs) || isNaN(ht))        { alert("Inserisci altezza strumento e prisma"); return; }
+
+    const [sidSt,  pidSt]  = stPt.split('|');
+    const [sidRef, pidRef] = refPt.split('|');
+
+    const btn = document.getElementById('calc-btn');
+    btn.disabled = true; btn.textContent = "Calcolo...";
+
+    const payload = {
+      station:   {sid:sidSt,  pid:pidSt},
+      ref_point: {sid:sidRef, pid:pidRef},
+      hz_ref: hzRef, hz_target: hzTarget,
+      dist: dist, dist_type: distType,
+      hs: hs, ht: ht
+    };
+    if (!isNaN(zenith)) payload.zenith = zenith;
+
+    const resp = await fetch('/cogo/polar/calc', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+
+    btn.disabled = false; btn.textContent = "Calcola punto";
+
+    if (!resp.ok) { alert("Errore server (" + resp.status + "): " + await resp.text()); return; }
+    const data = await resp.json();
+    if (data.error) { alert("Errore: " + data.error); return; }
+
+    calculatedSolution = data;
+
+    let html = "";
+    html += '<div class="kv"><span class="k">Latitudine</span><span class="v">'              + data.lat.toFixed(9) + " deg</span></div>";
+    html += '<div class="kv"><span class="k">Longitudine</span><span class="v">'             + data.lon.toFixed(9) + " deg</span></div>";
+    html += '<div class="kv"><span class="k">Quota ellissoidica</span><span class="v">'      + data.alt.toFixed(4) + " m</span></div>";
+    html += '<div class="kv"><span class="k">E (ENU locale)</span><span class="v">'          + data.e.toFixed(4)   + " m</span></div>";
+    html += '<div class="kv"><span class="k">N (ENU locale)</span><span class="v">'          + data.n.toFixed(4)   + " m</span></div>";
+    html += '<div class="kv"><span class="k">Distanza orizzontale</span><span class="v">'   + data.d_horizontal.toFixed(4) + " m</span></div>";
+    if (data.d_inclined != null)
+      html += '<div class="kv"><span class="k">Distanza inclinata</span><span class="v">'   + data.d_inclined.toFixed(4) + " m</span></div>";
+    html += '<div class="kv"><span class="k">Dislivello (dz)</span><span class="v">'        + (data.dz >= 0 ? "+" : "") + data.dz.toFixed(4) + " m</span></div>";
+    html += '<div class="kv"><span class="k">Azimut staz.&#8594;punto</span><span class="v">' + data.bearing_gon.toFixed(4) + " gon</span></div>";
+    if (data.quota_note)
+      html += '<div class="kv"><span class="k">Nota quota</span><span class="v" style="color:#e67e22;">' + data.quota_note + '</span></div>';
+
+    document.getElementById('result-data').innerHTML = html;
+    document.getElementById('result').style.display = 'block';
+    document.getElementById('point-name').value = 'POL001';
+  } catch(err) { alert("Errore JS: " + (err.message||err)); }
+});
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  try {
+    if (!calculatedSolution) { alert("Calcola prima il punto"); return; }
+    const survey = document.getElementById('target-survey').value;
+    const name   = document.getElementById('point-name').value.trim();
+    if (!survey) { alert("Seleziona un rilievo"); return; }
+    if (!name)   { alert("Inserisci un nome per il punto"); return; }
+    const resp = await fetch('/cogo/polar/save', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({survey_id:survey, point_name:name, solution:calculatedSolution})
+    });
+    const res = await resp.json();
+    if (res.error) { alert("Errore: " + res.error); }
+    else { alert("Punto " + name + " salvato!"); window.location.href = '/survey/' + survey; }
+  } catch(err) { alert("Errore salvataggio: " + (err.message||err)); }
+});
+</script>
+{% endblock %}

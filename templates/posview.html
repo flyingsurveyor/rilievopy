@@ -1,0 +1,1146 @@
+{% extends "base.html" %}
+{% block title %}PosView — RTKLIB Web PPK{% endblock %}
+
+{% block content %}
+<div class="page-header flex-between">
+    <div>
+        <h1>PosView</h1>
+        <p>Position solution viewer — rtkplot style</p>
+    </div>
+    <div id="loadingStatus" class="status-indicator hidden">
+        <span class="spinner"></span> Parsing...
+    </div>
+</div>
+
+<!-- ═══ FILE SELECTION ═══ -->
+<div class="card">
+    <div class="card-header flex-between">
+        <h2>📍 Solution File</h2>
+        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('posUpload').click()">⬆ Upload .pos</button>
+        <input type="file" id="posUpload" hidden accept=".pos">
+    </div>
+    <div class="form-row">
+        <div class="form-group" style="flex:1;">
+            <select id="posFileSelect" onchange="loadFile(this.value)">
+                <option value="">— select .pos file —</option>
+                {% for f in pos_files %}
+                <option value="{{ f.path }}" {% if f.path == selected_file %}selected{% endif %}>{{ f.name }} ({{ f.size }})</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ SUMMARY STATS ═══ -->
+<div id="summarySection" class="hidden">
+    <div class="grid grid-4">
+        <div class="stat-box" id="statFix">
+            <div class="stat-value" style="color:#2ecc71;">—</div>
+            <div class="stat-label">Fix %</div>
+        </div>
+        <div class="stat-box" id="statFloat">
+            <div class="stat-value" style="color:#f39c12;">—</div>
+            <div class="stat-label">Float %</div>
+        </div>
+        <div class="stat-box" id="statSingle">
+            <div class="stat-value" style="color:#e74c3c;">—</div>
+            <div class="stat-label">Single %</div>
+        </div>
+        <div class="stat-box" id="statEpochs">
+            <div class="stat-value">—</div>
+            <div class="stat-label">Epochs</div>
+        </div>
+    </div>
+
+    <!-- Detail stats row -->
+    <div class="grid grid-4" style="margin-top:8px;">
+        <div class="stat-box" id="statDuration">
+            <div class="stat-value" style="font-size:16px;">—</div>
+            <div class="stat-label">Duration</div>
+        </div>
+        <div class="stat-box" id="statHRMS">
+            <div class="stat-value" style="font-size:16px;">—</div>
+            <div class="stat-label">H-RMS (fix)</div>
+        </div>
+        <div class="stat-box" id="statVRMS">
+            <div class="stat-value" style="font-size:16px;">—</div>
+            <div class="stat-label">V-StDev (fix)</div>
+        </div>
+        <div class="stat-box" id="statSats">
+            <div class="stat-value" style="font-size:16px;">—</div>
+            <div class="stat-label">Avg Satellites</div>
+        </div>
+    </div>
+
+    <!-- ═══ TAB BAR ═══ -->
+    <div class="card mt-1" style="padding:0;">
+        <div class="tab-bar" id="chartTabs">
+            <button class="tab-btn active" onclick="switchTab('groundtrack')">Ground Track</button>
+            <button class="tab-btn" onclick="switchTab('enu')">E / N / U</button>
+            <button class="tab-btn" onclick="switchTab('quality')">Quality</button>
+            <button class="tab-btn" onclick="switchTab('sats')">Satellites</button>
+            <button class="tab-btn" onclick="switchTab('stdev')">Std Dev</button>
+            <button class="tab-btn" onclick="switchTab('ratio')">Ratio / Age</button>
+            <button class="tab-btn" onclick="switchTab('table')">Data</button>
+        </div>
+    </div>
+
+    <!-- ═══ GROUND TRACK ═══ -->
+    <div class="card chart-panel" id="panel-groundtrack">
+        <div class="flex-between mb-1">
+            <h3 style="font-size:14px; font-weight:600;">Ground Track (E-N)</h3>
+            <div>
+                <span class="legend-dot" style="background:#2ecc71;"></span> Fix
+                <span class="legend-dot" style="background:#f39c12;"></span> Float
+                <span class="legend-dot" style="background:#e74c3c;"></span> Single
+                <span style="margin-left:8px; font-size:11px; color:#95a5a6;" id="gtRef"></span>
+            </div>
+        </div>
+        <div style="position:relative; width:100%; aspect-ratio:1/1; max-height:500px;">
+            <canvas id="canvasGT" style="width:100%; height:100%;"></canvas>
+            <!-- Ground Track controls (overlay) -->
+            <div class="gt-controls" aria-label="Ground Track Controls">
+                <button class="gt-btn" type="button" title="Zoom in" onclick="gtZoomIn()">+</button>
+                <button class="gt-btn" type="button" title="Zoom out" onclick="gtZoomOut()">−</button>
+                <button class="gt-btn" type="button" title="Reset view" onclick="gtResetView()">⤾</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ ENU TIME SERIES ═══ -->
+    <div class="card chart-panel hidden" id="panel-enu">
+        <div class="flex-between mb-1">
+            <h3 style="font-size:14px; font-weight:600;">E / N / U vs Time</h3>
+            <div>
+                <span class="legend-dot" style="background:#e74c3c;"></span> East
+                <span class="legend-dot" style="background:#2ecc71;"></span> North
+                <span class="legend-dot" style="background:#3498db;"></span> Up
+            </div>
+        </div>
+        <canvas id="canvasE" style="width:100%; height:140px;"></canvas>
+        <canvas id="canvasN" style="width:100%; height:140px;"></canvas>
+        <canvas id="canvasU" style="width:100%; height:140px;"></canvas>
+    </div>
+
+    <!-- ═══ QUALITY ═══ -->
+    <div class="card chart-panel hidden" id="panel-quality">
+        <h3 style="font-size:14px; font-weight:600; margin-bottom:8px;">Solution Quality vs Time</h3>
+        <canvas id="canvasQ" style="width:100%; height:120px;"></canvas>
+        <div style="margin-top:8px;">
+            <h3 style="font-size:14px; font-weight:600; margin-bottom:8px;">Height vs Time</h3>
+            <canvas id="canvasH" style="width:100%; height:180px;"></canvas>
+        </div>
+    </div>
+
+    <!-- ═══ SATELLITES ═══ -->
+    <div class="card chart-panel hidden" id="panel-sats">
+        <h3 style="font-size:14px; font-weight:600; margin-bottom:8px;">Number of Satellites vs Time</h3>
+        <canvas id="canvasNS" style="width:100%; height:220px;"></canvas>
+    </div>
+
+    <!-- ═══ STD DEV ═══ -->
+    <div class="card chart-panel hidden" id="panel-stdev">
+        <div class="flex-between mb-1">
+            <h3 style="font-size:14px; font-weight:600;">Position Std Dev vs Time</h3>
+            <div>
+                <span class="legend-dot" style="background:#e74c3c;"></span> σE
+                <span class="legend-dot" style="background:#2ecc71;"></span> σN
+                <span class="legend-dot" style="background:#3498db;"></span> σU
+            </div>
+        </div>
+        <canvas id="canvasSD" style="width:100%; height:250px;"></canvas>
+    </div>
+
+    <!-- ═══ RATIO / AGE ═══ -->
+    <div class="card chart-panel hidden" id="panel-ratio">
+        <h3 style="font-size:14px; font-weight:600; margin-bottom:8px;">AR Ratio vs Time</h3>
+        <canvas id="canvasR" style="width:100%; height:180px;"></canvas>
+        <div style="margin-top:8px;">
+            <h3 style="font-size:14px; font-weight:600; margin-bottom:8px;">Age of Differential (s)</h3>
+            <canvas id="canvasAge" style="width:100%; height:180px;"></canvas>
+        </div>
+    </div>
+
+    <!-- ═══ DATA TABLE ═══ -->
+    <div class="card chart-panel hidden" id="panel-table">
+        <div class="flex-between mb-1">
+            <h3 style="font-size:14px; font-weight:600;">Position Data</h3>
+            <div>
+                <span style="font-size:11px; color:#95a5a6;" id="tableInfo">—</span>
+                <button class="btn btn-sm btn-secondary" onclick="exportCSV()">⬇ CSV</button>
+            </div>
+        </div>
+        <div style="overflow-x:auto; max-height:500px; overflow-y:auto;">
+            <table class="data-table" id="posTable">
+                <thead>
+                    <tr>
+                        <th>Time</th><th>Lat</th><th>Lon</th><th>Hgt(m)</th>
+                        <th>Q</th><th>ns</th><th>σN(m)</th><th>σE(m)</th><th>σU(m)</th>
+                        <th>Age(s)</th><th>Ratio</th>
+                    </tr>
+                </thead>
+                <tbody id="posTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══ HEADER INFO ═══ -->
+    <div class="card mt-1">
+        <details>
+            <summary style="cursor:pointer; font-size:13px; font-weight:600;">📋 File Header & Reference Position</summary>
+            <div class="console" id="headerInfo" style="margin-top:8px; max-height:200px; font-size:11px;">
+                Select a file...
+            </div>
+        </details>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .legend-dot {
+        display: inline-block;
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        margin: 0 3px 0 8px;
+        vertical-align: middle;
+    }
+    .tab-bar {
+        display: flex;
+        overflow-x: auto;
+        gap: 0;
+        border-bottom: 2px solid #ecf0f1;
+        padding: 0 12px;
+    }
+    .tab-btn {
+        background: none;
+        border: none;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: #7f8c8d;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        white-space: nowrap;
+    }
+    .tab-btn.active {
+        color: #3498db;
+        border-bottom-color: #3498db;
+    }
+    .tab-btn:hover { color: #2c3e50; }
+    .chart-panel canvas {
+        display: block;
+        image-rendering: pixelated;
+    }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        font-family: 'SF Mono', 'Consolas', monospace;
+    }
+    .data-table th {
+        position: sticky;
+        top: 0;
+        background: #2c3e50;
+        color: white;
+        padding: 6px 8px;
+        text-align: left;
+        font-weight: 500;
+    }
+    .data-table td {
+        padding: 3px 8px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .data-table tr:hover { background: #f8f9fa; }
+    .q-badge {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 3px;
+        color: white;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    /* Ground Track (canvasGT) zoom/pan controls */
+    .gt-controls {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        z-index: 5;
+    }
+    .gt-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        border: 1px solid rgba(0,0,0,0.18);
+        background: rgba(255,255,255,0.92);
+        color: #2c3e50;
+        font-weight: 800;
+        font-size: 16px;
+        line-height: 1;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.10);
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .gt-btn:active { transform: translateY(1px); }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ═══════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════
+var posData = null;   // parsed result from API
+var activeTab = 'groundtrack';
+
+const Q_COLORS = {1:'#2ecc71', 2:'#f39c12', 3:'#3498db', 4:'#3498db', 5:'#e74c3c', 6:'#9b59b6'};
+const Q_LABELS = {1:'Fix', 2:'Float', 3:'SBAS', 4:'DGPS', 5:'Single', 6:'PPP'};
+
+// ═══════════════════════════════════════════════
+// Ground Track (canvasGT) view state (zoom/pan)
+// - scale: 1 = fit all data (auto). >1 zoom in.
+// - panE/panN: meters offset from base center.
+// Double-click / double-tap resets.
+// ═══════════════════════════════════════════════
+var gtBase = null; // {centerE, centerN, range}
+var gtView = { scale: 1.0, panE: 0.0, panN: 0.0 };
+var gtDragging = false;
+var gtLastPt = null;
+var gtPointers = new Map(); // pointerId -> {x,y}
+var gtPinch = null; // {startDist, startScale, startCenter:{x,y}, startPanE, startPanN}
+
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+function resetGroundTrackView() {
+    gtView.scale = 1.0;
+    gtView.panE = 0.0;
+    gtView.panN = 0.0;
+}
+
+function gtResetView() {
+    resetGroundTrackView();
+    drawActiveChart();
+}
+
+function gtApplyZoomAt(canvas, mx, my, newScale) {
+    var rect = canvas.getBoundingClientRect();
+    var w = rect.width, h = rect.height;
+    var margin = 40;
+    var pw = Math.max(1, w - margin * 2);
+    var ph = Math.max(1, h - margin * 2);
+
+    // Current view
+    var viewRange = gtBase.range / gtView.scale;
+    var centerE = gtBase.centerE + gtView.panE;
+    var centerN = gtBase.centerN + gtView.panN;
+    var emin = centerE - viewRange / 2;
+    var nmax = centerN + viewRange / 2;
+
+    // Data point under cursor (in EN)
+    var eAt = emin + ((mx - margin) / pw) * viewRange;
+    var nAt = nmax - ((my - margin) / ph) * viewRange;
+
+    // New view, keep (eAt,nAt) under cursor
+    var newViewRange = gtBase.range / newScale;
+    var newCenterE = eAt - (((mx - margin) / pw) * newViewRange) + newViewRange / 2;
+    var newCenterN = nAt + (((my - margin) / ph) * newViewRange) - newViewRange / 2;
+
+    gtView.scale = newScale;
+    gtView.panE = newCenterE - gtBase.centerE;
+    gtView.panN = newCenterN - gtBase.centerN;
+}
+
+function gtZoomBy(factor) {
+    if (!posData || !gtBase) return;
+    var canvas = document.getElementById('canvasGT');
+    if (!canvas) return;
+    var rect = canvas.getBoundingClientRect();
+    var mx = rect.width / 2;
+    var my = rect.height / 2;
+    var newScale = clamp(gtView.scale * factor, 1.0, 50.0);
+    gtApplyZoomAt(canvas, mx, my, newScale);
+    drawActiveChart();
+}
+
+function gtZoomIn() { gtZoomBy(1.25); }
+function gtZoomOut() { gtZoomBy(0.80); }
+
+function initGroundTrackInteractions() {
+    var canvas = document.getElementById('canvasGT');
+    if (!canvas || canvas._gtInterInit) return;
+    canvas._gtInterInit = true;
+
+    // Prevent page scroll/zoom gestures while interacting with the plot.
+    canvas.style.touchAction = 'none';
+
+    // Double click / double tap to reset
+    canvas.addEventListener('dblclick', function() {
+        resetGroundTrackView();
+        drawActiveChart();
+    });
+
+    // Wheel zoom (desktop trackpad/mouse)
+    canvas.addEventListener('wheel', function(e) {
+        if (!posData || !gtBase) return;
+        e.preventDefault();
+
+        var rect = canvas.getBoundingClientRect();
+        var mx = e.clientX - rect.left;
+        var my = e.clientY - rect.top;
+
+        // Zoom factor: smooth on trackpads, reasonable on wheels
+        var delta = -e.deltaY;
+        var z = Math.exp(delta * 0.0015);
+        var newScale = clamp(gtView.scale * z, 1.0, 50.0);
+        gtApplyZoomAt(canvas, mx, my, newScale);
+
+        drawActiveChart();
+    }, {passive:false});
+
+    // Pointer-based panning + pinch zoom (mouse + touch)
+    canvas.addEventListener('pointerdown', function(e) {
+        if (!posData || !gtBase) return;
+        canvas.setPointerCapture(e.pointerId);
+        gtPointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+
+        if (gtPointers.size === 1) {
+            gtDragging = true;
+            gtLastPt = {x: e.clientX, y: e.clientY};
+        }
+
+        if (gtPointers.size === 2) {
+            var pts = Array.from(gtPointers.values());
+            var dx = pts[0].x - pts[1].x;
+            var dy = pts[0].y - pts[1].y;
+            var dist = Math.sqrt(dx*dx + dy*dy);
+            var cx = (pts[0].x + pts[1].x) / 2;
+            var cy = (pts[0].y + pts[1].y) / 2;
+            gtPinch = {
+                startDist: dist,
+                startScale: gtView.scale,
+                startCenter: {x: cx, y: cy},
+                startPanE: gtView.panE,
+                startPanN: gtView.panN
+            };
+            gtDragging = false;
+            gtLastPt = null;
+        }
+    });
+
+    canvas.addEventListener('pointermove', function(e) {
+        if (!posData || !gtBase) return;
+        if (!gtPointers.has(e.pointerId)) return;
+        gtPointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+
+        var rect = canvas.getBoundingClientRect();
+        var w = rect.width, h = rect.height;
+        var margin = 40;
+        var pw = Math.max(1, w - margin * 2);
+        var ph = Math.max(1, h - margin * 2);
+
+        if (gtPinch && gtPointers.size === 2) {
+            var pts = Array.from(gtPointers.values());
+            var dx = pts[0].x - pts[1].x;
+            var dy = pts[0].y - pts[1].y;
+            var dist = Math.sqrt(dx*dx + dy*dy);
+            if (gtPinch.startDist > 0) {
+                var z = dist / gtPinch.startDist;
+                var newScale = clamp(gtPinch.startScale * z, 1.0, 50.0);
+
+                var mx = gtPinch.startCenter.x - rect.left;
+                var my = gtPinch.startCenter.y - rect.top;
+
+                var viewRange0 = gtBase.range / gtPinch.startScale;
+                var centerE0 = gtBase.centerE + gtPinch.startPanE;
+                var centerN0 = gtBase.centerN + gtPinch.startPanN;
+                var emin0 = centerE0 - viewRange0 / 2;
+                var nmax0 = centerN0 + viewRange0 / 2;
+                var eAt = emin0 + ((mx - margin) / pw) * viewRange0;
+                var nAt = nmax0 - ((my - margin) / ph) * viewRange0;
+
+                var viewRange1 = gtBase.range / newScale;
+                var newCenterE = eAt - (((mx - margin) / pw) * viewRange1) + viewRange1 / 2;
+                var newCenterN = nAt + (((my - margin) / ph) * viewRange1) - viewRange1 / 2;
+
+                gtView.scale = newScale;
+                gtView.panE = newCenterE - gtBase.centerE;
+                gtView.panN = newCenterN - gtBase.centerN;
+
+                drawActiveChart();
+            }
+            return;
+        }
+
+        if (gtDragging && gtLastPt) {
+            var dx = e.clientX - gtLastPt.x;
+            var dy = e.clientY - gtLastPt.y;
+            gtLastPt = {x: e.clientX, y: e.clientY};
+
+            var viewRange = gtBase.range / gtView.scale;
+            var mPerPxX = viewRange / pw;
+            var mPerPxY = viewRange / ph;
+            gtView.panE -= dx * mPerPxX;
+            gtView.panN += dy * mPerPxY;
+
+            drawActiveChart();
+        }
+    });
+
+    function endPointer(e) {
+        if (gtPointers.has(e.pointerId)) gtPointers.delete(e.pointerId);
+        if (gtPointers.size < 2) gtPinch = null;
+        if (gtPointers.size === 0) {
+            gtDragging = false;
+            gtLastPt = null;
+        }
+    }
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
+    canvas.addEventListener('pointerleave', endPointer);
+}
+
+// ═══════════════════════════════════════════════
+// File loading
+// ═══════════════════════════════════════════════
+function loadFile(filepath) {
+    if (!filepath) return;
+
+    var statusEl = document.getElementById('loadingStatus');
+    statusEl.classList.remove('hidden');
+
+    fetch('/api/pos/parse', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filepath: filepath})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        statusEl.classList.add('hidden');
+        if (data.error) {
+            alert('Error: ' + data.error);
+            return;
+        }
+        posData = data;
+        document.getElementById('summarySection').classList.remove('hidden');
+        updateSummary();
+        updateHeader();
+        drawActiveChart();
+    })
+    .catch(function(err) {
+        statusEl.classList.add('hidden');
+        alert('Parse error: ' + err);
+    });
+}
+
+// Auto-load if pre-selected
+document.addEventListener('DOMContentLoaded', function() {
+    initGroundTrackInteractions();
+    var sel = document.getElementById('posFileSelect');
+    if (sel.value) loadFile(sel.value);
+});
+
+// Upload handler
+document.getElementById('posUpload').addEventListener('change', function() {
+    var file = this.files[0];
+    if (!file) return;
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('target_dir', 'pos');
+    fetch('/api/upload', {method: 'POST', body: fd})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.path) {
+            var opt = new Option(file.name, data.path, true, true);
+            document.getElementById('posFileSelect').add(opt);
+            loadFile(data.path);
+        }
+    });
+});
+
+// ═══════════════════════════════════════════════
+// Summary update
+// ═══════════════════════════════════════════════
+function updateSummary() {
+    var s = posData.summary;
+    setStat('statFix', s.fix_pct + '%');
+    setStat('statFloat', s.float_pct + '%');
+    setStat('statSingle', s.single_pct + '%');
+    setStat('statEpochs', s.total_epochs.toLocaleString());
+
+    var ts = posData.time_span;
+    setStat('statDuration', ts && ts.duration_str ? ts.duration_str : '—');
+
+    var enu = s.enu_stats || {};
+    setStat('statHRMS', enu.h_rms != null ? (enu.h_rms * 1000).toFixed(1) + ' mm' : '—');
+    setStat('statVRMS', enu.u_std != null ? (enu.u_std * 1000).toFixed(1) + ' mm' : '—');
+
+    var ns = s.ns_stats || {};
+    setStat('statSats', ns.mean != null ? ns.mean.toFixed(0) : '—');
+}
+
+function setStat(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.querySelector('.stat-value').textContent = val;
+}
+
+function updateHeader() {
+    var h = posData.header || [];
+    var ref = posData.ref_pos;
+    var txt = h.join('\n');
+    if (ref) {
+        txt += '\n\n── Reference Position ──\n';
+        txt += 'Lat: ' + ref.lat.toFixed(8) + '°  Lon: ' + ref.lon.toFixed(8) + '°  Hgt: ' + ref.height.toFixed(3) + ' m\n';
+        txt += 'From: ' + (ref.from_fix ? 'Fix solutions' : 'All solutions') + ' (n=' + ref.n_averaged + ')';
+    }
+    document.getElementById('headerInfo').textContent = txt;
+
+    if (ref) {
+        document.getElementById('gtRef').textContent =
+            'Ref: ' + ref.lat.toFixed(6) + '°, ' + ref.lon.toFixed(6) + '°';
+    }
+}
+
+// ═══════════════════════════════════════════════
+// Tab switching
+// ═══════════════════════════════════════════════
+function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(function(b, i) {
+        var tabs = ['groundtrack','enu','quality','sats','stdev','ratio','table'];
+        b.classList.toggle('active', tabs[i] === tab);
+    });
+    document.querySelectorAll('.chart-panel').forEach(function(p) {
+        p.classList.add('hidden');
+    });
+    var panel = document.getElementById('panel-' + tab);
+    if (panel) panel.classList.remove('hidden');
+    drawActiveChart();
+}
+
+function drawActiveChart() {
+    if (!posData) return;
+    var c = posData.charts;
+    switch (activeTab) {
+        case 'groundtrack': drawGroundTrack(c); break;
+        case 'enu': drawENU(c); break;
+        case 'quality': drawQuality(c); drawHeight(c); break;
+        case 'sats': drawSats(c); break;
+        case 'stdev': drawStdDev(c); break;
+        case 'ratio': drawRatio(c); drawAge(c); break;
+        case 'table': fillTable(c); break;
+    }
+}
+
+// ═══════════════════════════════════════════════
+// Canvas helpers
+// ═══════════════════════════════════════════════
+function setupCanvas(id) {
+    var canvas = document.getElementById(id);
+    var rect = canvas.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    return {ctx: ctx, w: rect.width, h: rect.height};
+}
+
+// Chart margin/padding
+var M = {top: 8, right: 12, bottom: 24, left: 52};
+
+function drawTimeSeries(canvasId, times, values, color, label, unit, qualities) {
+    var s = setupCanvas(canvasId);
+    var ctx = s.ctx, w = s.w, h = s.h;
+    var pw = w - M.left - M.right;
+    var ph = h - M.top - M.bottom;
+    var n = values.length;
+    if (n === 0) return;
+
+    // Y range
+    var ymin = Infinity, ymax = -Infinity;
+    for (var i = 0; i < n; i++) {
+        if (values[i] < ymin) ymin = values[i];
+        if (values[i] > ymax) ymax = values[i];
+    }
+    var pad = (ymax - ymin) * 0.1 || 1;
+    ymin -= pad; ymax += pad;
+
+    // Grid
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 0.5;
+    var nGrid = 5;
+    for (var g = 0; g <= nGrid; g++) {
+        var gy = M.top + ph - (g / nGrid) * ph;
+        ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(w - M.right, gy); ctx.stroke();
+        // Label
+        ctx.fillStyle = '#95a5a6';
+        ctx.font = '10px system-ui';
+        ctx.textAlign = 'right';
+        var gv = ymin + (g / nGrid) * (ymax - ymin);
+        ctx.fillText(gv.toFixed(unit === 'mm' ? 1 : 3), M.left - 4, gy + 3);
+    }
+
+    // Label
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText(label + (unit ? ' (' + unit + ')' : ''), M.left, M.top - 0);
+
+    // Data
+    if (qualities) {
+        // Colored dots by quality
+        for (var i = 0; i < n; i++) {
+            var x = M.left + (i / (n - 1 || 1)) * pw;
+            var y = M.top + ph - ((values[i] - ymin) / (ymax - ymin)) * ph;
+            ctx.fillStyle = Q_COLORS[qualities[i]] || '#bdc3c7';
+            ctx.fillRect(x - 0.8, y - 0.8, 1.6, 1.6);
+        }
+    } else {
+        // Line
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (var i = 0; i < n; i++) {
+            var x = M.left + (i / (n - 1 || 1)) * pw;
+            var y = M.top + ph - ((values[i] - ymin) / (ymax - ymin)) * ph;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+
+    // Time axis labels
+    drawTimeAxis(ctx, times, M.left, w - M.right, h - 4);
+}
+
+function drawTimeAxis(ctx, times, x0, x1, y) {
+    if (!times || times.length === 0) return;
+    ctx.fillStyle = '#95a5a6';
+    ctx.font = '9px system-ui';
+    ctx.textAlign = 'center';
+
+    var n = times.length;
+    var nLabels = Math.min(5, n);
+    for (var i = 0; i < nLabels; i++) {
+        var idx = Math.floor(i * (n - 1) / (nLabels - 1 || 1));
+        var t = times[idx] || '';
+        // Show only HH:MM:SS
+        var short = t.split(' ')[1] || t;
+        if (short.length > 8) short = short.substring(0, 8);
+        var x = x0 + (idx / (n - 1 || 1)) * (x1 - x0);
+        ctx.fillText(short, x, y);
+    }
+}
+
+// ═══════════════════════════════════════════════
+// Ground Track
+// ═══════════════════════════════════════════════
+function drawGroundTrack(c) {
+    var s = setupCanvas('canvasGT');
+    var ctx = s.ctx, w = s.w, h = s.h;
+    var n = c.e.length;
+    if (n === 0) return;
+
+    var margin = 40;
+    var pw = w - margin * 2;
+    var ph = h - margin * 2;
+
+    // Find range
+    var emin = Infinity, emax = -Infinity, nmin = Infinity, nmax = -Infinity;
+    for (var i = 0; i < n; i++) {
+        if (c.e[i] < emin) emin = c.e[i]; if (c.e[i] > emax) emax = c.e[i];
+        if (c.n[i] < nmin) nmin = c.n[i]; if (c.n[i] > nmax) nmax = c.n[i];
+    }
+
+    // Enforce square aspect ratio (base view fits all data)
+    var erange = emax - emin || 0.001;
+    var nrange = nmax - nmin || 0.001;
+    var baseRange = Math.max(erange, nrange) * 1.1;
+    var baseCenterE = (emin + emax) / 2;
+    var baseCenterN = (nmin + nmax) / 2;
+    gtBase = {centerE: baseCenterE, centerN: baseCenterN, range: baseRange};
+
+    // Apply interactive view
+    var viewRange = baseRange / (gtView.scale || 1.0);
+    if (viewRange < 1e-6) viewRange = 1e-6;
+
+    // Clamp pan so the view doesn't drift too far away (still allows looking at edges)
+    var maxPan = Math.max(0, (baseRange - viewRange) / 2);
+    gtView.panE = clamp(gtView.panE, -maxPan, maxPan);
+    gtView.panN = clamp(gtView.panN, -maxPan, maxPan);
+
+    var centerE = baseCenterE + gtView.panE;
+    var centerN = baseCenterN + gtView.panN;
+
+    emin = centerE - viewRange / 2; emax = centerE + viewRange / 2;
+    nmin = centerN - viewRange / 2; nmax = centerN + viewRange / 2;
+
+    function toX(e) { return margin + ((e - emin) / (emax - emin)) * pw; }
+    function toY(nn) { return margin + ph - ((nn - nmin) / (nmax - nmin)) * ph; }
+
+    // Grid
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 0.5;
+    var nGrid = 6;
+    for (var g = 0; g <= nGrid; g++) {
+        var gx = margin + (g / nGrid) * pw;
+        var gy = margin + (g / nGrid) * ph;
+        ctx.beginPath(); ctx.moveTo(gx, margin); ctx.lineTo(gx, margin + ph); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(margin, gy); ctx.lineTo(margin + pw, gy); ctx.stroke();
+    }
+
+    // Axis labels
+    ctx.fillStyle = '#95a5a6';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'center';
+    for (var g = 0; g <= nGrid; g += 2) {
+        var ev = emin + (g / nGrid) * (emax - emin);
+        var nv = nmin + (1 - g / nGrid) * (nmax - nmin);
+        ctx.fillText(ev.toFixed(3) + 'm', margin + (g / nGrid) * pw, h - 4);
+        ctx.textAlign = 'right';
+        ctx.fillText(nv.toFixed(3) + 'm', margin - 4, margin + (g / nGrid) * ph + 3);
+        ctx.textAlign = 'center';
+    }
+
+    // Axis titles
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('East (m)', w / 2, h - 14 + margin / 2);
+    ctx.save();
+    ctx.translate(12, h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('North (m)', 0, 0);
+    ctx.restore();
+
+    // Crosshair at origin (0,0)
+    ctx.strokeStyle = '#bdc3c7';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([4, 4]);
+    var ox = toX(0), oy = toY(0);
+    ctx.beginPath(); ctx.moveTo(ox, margin); ctx.lineTo(ox, margin + ph); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(margin, oy); ctx.lineTo(margin + pw, oy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Plot points — draw single/float first, fix on top
+    var order = [5, 6, 3, 4, 2, 1]; // draw fix last (on top)
+    for (var qi = 0; qi < order.length; qi++) {
+        var q = order[qi];
+        ctx.fillStyle = Q_COLORS[q] || '#bdc3c7';
+        for (var i = 0; i < n; i++) {
+            if (c.quality[i] !== q) continue;
+            var x = toX(c.e[i]);
+            var y = toY(c.n[i]);
+            ctx.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);
+        }
+    }
+
+    // Range annotation
+    ctx.fillStyle = '#95a5a6';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'right';
+    var zoomLbl = gtView.scale > 1.001 ? ('  Zoom: ' + gtView.scale.toFixed(2) + '×') : '';
+    ctx.fillText('Range: ' + viewRange.toFixed(3) + ' m' + zoomLbl, w - margin, margin - 4);
+}
+
+// ═══════════════════════════════════════════════
+// ENU vs Time
+// ═══════════════════════════════════════════════
+function drawENU(c) {
+    // Convert to mm for display
+    var emm = c.e.map(function(v) { return v * 1000; });
+    var nmm = c.n.map(function(v) { return v * 1000; });
+    var umm = c.u.map(function(v) { return v * 1000; });
+
+    drawTimeSeries('canvasE', c.time, emm, '#e74c3c', 'East', 'mm', c.quality);
+    drawTimeSeries('canvasN', c.time, nmm, '#2ecc71', 'North', 'mm', c.quality);
+    drawTimeSeries('canvasU', c.time, umm, '#3498db', 'Up', 'mm', c.quality);
+}
+
+// ═══════════════════════════════════════════════
+// Quality bar
+// ═══════════════════════════════════════════════
+function drawQuality(c) {
+    var s = setupCanvas('canvasQ');
+    var ctx = s.ctx, w = s.w, h = s.h;
+    var n = c.quality.length;
+    if (n === 0) return;
+
+    var barH = h - M.top - M.bottom;
+
+    // Draw colored bars
+    var barW = Math.max(1, (w - M.left - M.right) / n);
+    for (var i = 0; i < n; i++) {
+        ctx.fillStyle = Q_COLORS[c.quality[i]] || '#bdc3c7';
+        var x = M.left + (i / n) * (w - M.left - M.right);
+        ctx.fillRect(x, M.top, barW + 0.5, barH);
+    }
+
+    // Y axis labels
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'right';
+    var labels = ['Fix', 'Float', '', '', 'Single'];
+    var yPositions = [0.1, 0.35, 0.5, 0.65, 0.9];
+    for (var i = 0; i < labels.length; i++) {
+        if (labels[i]) {
+            ctx.fillText(labels[i], M.left - 4, M.top + yPositions[i] * barH + 4);
+        }
+    }
+
+    drawTimeAxis(ctx, c.time, M.left, w - M.right, h - 4);
+}
+
+// Height vs time
+function drawHeight(c) {
+    drawTimeSeries('canvasH', c.time, c.height, '#8e44ad', 'Height', 'm', c.quality);
+}
+
+// ═══════════════════════════════════════════════
+// Satellites vs Time
+// ═══════════════════════════════════════════════
+function drawSats(c) {
+    var s = setupCanvas('canvasNS');
+    var ctx = s.ctx, w = s.w, h = s.h;
+    var n = c.ns.length;
+    if (n === 0) return;
+
+    var pw = w - M.left - M.right;
+    var ph = h - M.top - M.bottom;
+
+    // Y range
+    var ymax = 0;
+    for (var i = 0; i < n; i++) { if (c.ns[i] > ymax) ymax = c.ns[i]; }
+    ymax = Math.max(ymax + 2, 10);
+
+    // Grid
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 0.5;
+    for (var g = 0; g <= ymax; g += 5) {
+        var gy = M.top + ph - (g / ymax) * ph;
+        ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(w - M.right, gy); ctx.stroke();
+        ctx.fillStyle = '#95a5a6';
+        ctx.font = '10px system-ui';
+        ctx.textAlign = 'right';
+        ctx.fillText(g, M.left - 4, gy + 3);
+    }
+
+    // Bars colored by quality
+    var barW = Math.max(1, pw / n);
+    for (var i = 0; i < n; i++) {
+        var x = M.left + (i / n) * pw;
+        var barH = (c.ns[i] / ymax) * ph;
+        ctx.fillStyle = Q_COLORS[c.quality[i]] || '#bdc3c7';
+        ctx.fillRect(x, M.top + ph - barH, barW + 0.5, barH);
+    }
+
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText('Satellites', M.left, M.top - 0);
+
+    drawTimeAxis(ctx, c.time, M.left, w - M.right, h - 4);
+}
+
+// ═══════════════════════════════════════════════
+// Std Dev vs Time
+// ═══════════════════════════════════════════════
+function drawStdDev(c) {
+    var s = setupCanvas('canvasSD');
+    var ctx = s.ctx, w = s.w, h = s.h;
+    var n = c.sdn.length;
+    if (n === 0) return;
+
+    var pw = w - M.left - M.right;
+    var ph = h - M.top - M.bottom;
+
+    // Convert to mm
+    var sdn = c.sdn.map(function(v) { return v * 1000; });
+    var sde = c.sde.map(function(v) { return v * 1000; });
+    var sdu = c.sdu.map(function(v) { return v * 1000; });
+
+    // Y range (cap at 95th percentile to avoid outlier stretching)
+    var all = sdn.concat(sde, sdu).filter(function(v) { return v > 0; }).sort(function(a,b) { return a-b; });
+    var ymax = all.length > 0 ? all[Math.min(Math.floor(all.length * 0.95), all.length - 1)] * 1.2 : 10;
+    ymax = Math.max(ymax, 1);
+
+    // Grid
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 0.5;
+    var nGrid = 5;
+    for (var g = 0; g <= nGrid; g++) {
+        var gy = M.top + ph - (g / nGrid) * ph;
+        ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(w - M.right, gy); ctx.stroke();
+        ctx.fillStyle = '#95a5a6';
+        ctx.font = '10px system-ui';
+        ctx.textAlign = 'right';
+        ctx.fillText((g / nGrid * ymax).toFixed(1), M.left - 4, gy + 3);
+    }
+
+    // Lines
+    function drawLine(vals, color) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (var i = 0; i < n; i++) {
+            var x = M.left + (i / (n - 1 || 1)) * pw;
+            var v = Math.min(vals[i], ymax);
+            var y = M.top + ph - (v / ymax) * ph;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+
+    drawLine(sdu, '#3498db');
+    drawLine(sdn, '#2ecc71');
+    drawLine(sde, '#e74c3c');
+
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText('Std Dev (mm)', M.left, M.top - 0);
+
+    drawTimeAxis(ctx, c.time, M.left, w - M.right, h - 4);
+}
+
+// ═══════════════════════════════════════════════
+// AR Ratio vs Time
+// ═══════════════════════════════════════════════
+function drawRatio(c) {
+    var s = setupCanvas('canvasR');
+    var ctx = s.ctx, w = s.w, h = s.h;
+    var n = c.ratio.length;
+    if (n === 0) return;
+
+    var pw = w - M.left - M.right;
+    var ph = h - M.top - M.bottom;
+
+    // Cap ratio display at reasonable max
+    var sorted = c.ratio.filter(function(v) { return v > 0; }).sort(function(a,b) { return a-b; });
+    var ymax = sorted.length > 0 ? Math.min(sorted[Math.floor(sorted.length * 0.95)] * 1.3, 999.9) : 10;
+    ymax = Math.max(ymax, 5);
+
+    // Grid
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 0.5;
+    var nGrid = 5;
+    for (var g = 0; g <= nGrid; g++) {
+        var gy = M.top + ph - (g / nGrid) * ph;
+        ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(w - M.right, gy); ctx.stroke();
+        ctx.fillStyle = '#95a5a6';
+        ctx.font = '10px system-ui';
+        ctx.textAlign = 'right';
+        ctx.fillText((g / nGrid * ymax).toFixed(1), M.left - 4, gy + 3);
+    }
+
+    // AR threshold line (default 3.0)
+    var thY = M.top + ph - (3.0 / ymax) * ph;
+    if (thY > M.top && thY < M.top + ph) {
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(M.left, thY); ctx.lineTo(w - M.right, thY); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#e74c3c';
+        ctx.font = '9px system-ui';
+        ctx.textAlign = 'left';
+        ctx.fillText('AR=3.0', w - M.right + 2, thY + 3);
+    }
+
+    // Bars colored by quality
+    var barW = Math.max(1, pw / n);
+    for (var i = 0; i < n; i++) {
+        var x = M.left + (i / n) * pw;
+        var v = Math.min(c.ratio[i], ymax);
+        var barH = (v / ymax) * ph;
+        ctx.fillStyle = Q_COLORS[c.quality[i]] || '#bdc3c7';
+        ctx.fillRect(x, M.top + ph - barH, barW + 0.5, barH);
+    }
+
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText('AR Ratio', M.left, M.top - 0);
+
+    drawTimeAxis(ctx, c.time, M.left, w - M.right, h - 4);
+}
+
+// Age of differential
+function drawAge(c) {
+    drawTimeSeries('canvasAge', c.time, c.age, '#e67e22', 'Age', 's');
+}
+
+// ═══════════════════════════════════════════════
+// Data Table
+// ═══════════════════════════════════════════════
+function fillTable(c) {
+    var tbody = document.getElementById('posTableBody');
+    var n = c.time.length;
+    // Limit table rows
+    var maxRows = 500;
+    var step = Math.max(1, Math.floor(n / maxRows));
+
+    var html = '';
+    var shown = 0;
+    for (var i = 0; i < n; i += step) {
+        var q = c.quality[i];
+        var qColor = Q_COLORS[q] || '#bdc3c7';
+        var qLabel = Q_LABELS[q] || q;
+        html += '<tr>' +
+            '<td>' + (c.time[i] || '') + '</td>' +
+            '<td>' + c.lat[i].toFixed(8) + '</td>' +
+            '<td>' + c.lon[i].toFixed(8) + '</td>' +
+            '<td>' + c.height[i].toFixed(3) + '</td>' +
+            '<td><span class="q-badge" style="background:' + qColor + '">' + qLabel + '</span></td>' +
+            '<td>' + c.ns[i] + '</td>' +
+            '<td>' + c.sdn[i].toFixed(4) + '</td>' +
+            '<td>' + c.sde[i].toFixed(4) + '</td>' +
+            '<td>' + c.sdu[i].toFixed(4) + '</td>' +
+            '<td>' + c.age[i].toFixed(1) + '</td>' +
+            '<td>' + c.ratio[i].toFixed(1) + '</td>' +
+            '</tr>';
+        shown++;
+    }
+    tbody.innerHTML = html;
+
+    document.getElementById('tableInfo').textContent =
+        shown + ' of ' + c.total_epochs + ' epochs' +
+        (step > 1 ? ' (every ' + step + 'th)' : '');
+}
+
+// ═══════════════════════════════════════════════
+// CSV Export
+// ═══════════════════════════════════════════════
+function exportCSV() {
+    if (!posData) return;
+    var c = posData.charts;
+    var n = c.time.length;
+    var csv = 'Time,Lat,Lon,Height,Q,ns,sdN,sdE,sdU,Age,Ratio,E,N,U\n';
+    for (var i = 0; i < n; i++) {
+        csv += [c.time[i], c.lat[i], c.lon[i], c.height[i], c.quality[i],
+                c.ns[i], c.sdn[i], c.sde[i], c.sdu[i], c.age[i], c.ratio[i],
+                c.e[i], c.n[i], c.u[i]].join(',') + '\n';
+    }
+    var blob = new Blob([csv], {type: 'text/csv'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (posData.filename || 'solution').replace('.pos', '') + '.csv';
+    a.click();
+}
+
+// ═══════════════════════════════════════════════
+// Resize handler
+// ═══════════════════════════════════════════════
+var resizeTimer;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() { drawActiveChart(); }, 200);
+});
+</script>
+{% endblock %}

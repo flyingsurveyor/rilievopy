@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% set active = "cogo" %}
+
+{% block title %}COGO - Intersezione Diretta (Stazione Totale){% endblock %}
+
+{% block head %}
+<style>
+.container { max-width:900px; margin:24px auto; padding:0 16px; }
+  .card { background:white; border:none; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.25); margin-bottom:16px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  h2 { font-size:16px; margin:16px 0 8px; color:#2c3e50; }
+  h3 { font-size:14px; margin:14px 0 6px; color:#9db0ff; }
+  label { display:block; margin:10px 0 6px; color:#2c3e50; font-size:13px; }
+  select, input[type=text], input[type=number] { width:100%; padding:10px; border-radius:10px; border:1px solid #ddd; background:white; color:#333; box-sizing:border-box; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .btn { background:#3498db; color:white; padding:10px 14px; border-radius:10px; text-decoration:none; border:1px solid #ddd; cursor:pointer; }
+  .btn:hover { filter:brightness(1.1); }
+  .btn-primary { background:#2d5016; border-color:#3d6826; }
+  .kv { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #eee; }
+  .kv:last-child { border-bottom:none; }
+  .k { color:#666; }
+  .v { font-variant-numeric: tabular-nums; }
+  #result { display:none; }
+  .optional-section { border-top:1px solid #1d274b; margin-top:16px; padding-top:12px; }
+  .small-text { font-size:12px; color:#7a8cb0; line-height:1.4; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>📍 Intersezione Diretta (Stazione Totale)</h1>
+    <p style="color:#666;line-height:1.6;">Calcola il punto di intersezione da due stazioni GNSS con letture Hz dalla stazione totale (angoli in gon).</p>
+    
+    <h3>🔷 Stazione 1 (Punto GNSS)</h3>
+    <label>Seleziona stazione 1</label>
+    <select id="point1" required>
+      <option value="">-- Seleziona punto GNSS --</option>
+      {{ options|safe }}
+    </select>
+    
+    <div class="row2">
+      <div>
+        <label>Hz su Stazione 2 (gon)</label>
+        <input type="number" id="hz1_ref" placeholder="0.0000" step="0.0001" required/>
+      </div>
+      <div>
+        <label>Hz su punto incognito (gon)</label>
+        <input type="number" id="hz1_target" placeholder="0.0000" step="0.0001" required/>
+      </div>
+    </div>
+    
+    <h3>🔶 Stazione 2 (Punto GNSS)</h3>
+    <label>Seleziona stazione 2</label>
+    <select id="point2" required>
+      <option value="">-- Seleziona punto GNSS --</option>
+      {{ options|safe }}
+    </select>
+    
+    <div class="row2">
+      <div>
+        <label>Hz su Stazione 1 (gon)</label>
+        <input type="number" id="hz2_ref" placeholder="0.0000" step="0.0001" required/>
+      </div>
+      <div>
+        <label>Hz su punto incognito (gon)</label>
+        <input type="number" id="hz2_target" placeholder="0.0000" step="0.0001" required/>
+      </div>
+    </div>
+    
+    <div class="optional-section">
+      <h3>📐 Quota (Opzionale - da angolo zenitale)</h3>
+      <p class="small-text">Se forniti angolo zenitale + h strumento + h prisma, la quota viene calcolata. Altrimenti si usa la media delle quote delle stazioni.</p>
+      
+      <label>Stazione 1:</label>
+      <div class="row2">
+        <div>
+          <label>Angolo zenitale V₁ (gon)</label>
+          <input type="number" id="v1" placeholder="100.0000" step="0.0001"/>
+          <p class="small-text">100 gon = orizzontale</p>
+        </div>
+        <div class="row2" style="grid-template-columns:1fr 1fr; gap:6px;">
+          <div>
+            <label>h strum. (m)</label>
+            <input type="number" id="hs1" placeholder="1.500" step="0.001"/>
+          </div>
+          <div>
+            <label>h prisma (m)</label>
+            <input type="number" id="ht1" placeholder="1.500" step="0.001"/>
+          </div>
+        </div>
+      </div>
+      
+      <label style="margin-top:12px;">Stazione 2:</label>
+      <div class="row2">
+        <div>
+          <label>Angolo zenitale V₂ (gon)</label>
+          <input type="number" id="v2" placeholder="100.0000" step="0.0001"/>
+          <p class="small-text">100 gon = orizzontale</p>
+        </div>
+        <div class="row2" style="grid-template-columns:1fr 1fr; gap:6px;">
+          <div>
+            <label>h strum. (m)</label>
+            <input type="number" id="hs2" placeholder="1.500" step="0.001"/>
+          </div>
+          <div>
+            <label>h prisma (m)</label>
+            <input type="number" id="ht2" placeholder="1.500" step="0.001"/>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+      <a class="btn" href="/cogo">← COGO</a>
+      <button class="btn btn-primary" type="button" id="calc-btn">Calcola</button>
+    </div>
+  </div>
+  
+  <div class="card" id="result">
+    <h2>Risultato Intersezione</h2>
+    <div id="result-data"></div>
+    
+    <h2 style="margin-top:20px;">Salva punto calcolato</h2>
+    <label>Rilievo destinazione</label>
+    <select id="target-survey">
+      {{ survey_options|safe }}
+    </select>
+    <label>Nome punto</label>
+    <input type="text" id="point-name" placeholder="INT001"/>
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary" type="button" id="save-btn">💾 Salva punto</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let calculatedSolution = null;
+
+document.getElementById('calc-btn').addEventListener('click', async () => {
+  const p1 = document.getElementById('point1').value;
+  const p2 = document.getElementById('point2').value;
+  const hz1_ref = parseFloat(document.getElementById('hz1_ref').value);
+  const hz1_target = parseFloat(document.getElementById('hz1_target').value);
+  const hz2_ref = parseFloat(document.getElementById('hz2_ref').value);
+  const hz2_target = parseFloat(document.getElementById('hz2_target').value);
+  
+  if (!p1 || !p2 || isNaN(hz1_ref) || isNaN(hz1_target) || isNaN(hz2_ref) || isNaN(hz2_target)) {
+    alert('Compila tutti i campi obbligatori');
+    return;
+  }
+  
+  const [sid1, pid1] = p1.split('|');
+  const [sid2, pid2] = p2.split('|');
+  
+  // Optional elevation data
+  const v1 = parseFloat(document.getElementById('v1').value);
+  const hs1 = parseFloat(document.getElementById('hs1').value);
+  const ht1 = parseFloat(document.getElementById('ht1').value);
+  const v2 = parseFloat(document.getElementById('v2').value);
+  const hs2 = parseFloat(document.getElementById('hs2').value);
+  const ht2 = parseFloat(document.getElementById('ht2').value);
+  
+  const payload = {
+    point1: {sid: sid1, pid: pid1},
+    point2: {sid: sid2, pid: pid2},
+    hz1_ref: hz1_ref,
+    hz1_target: hz1_target,
+    hz2_ref: hz2_ref,
+    hz2_target: hz2_target
+  };
+  
+  // Add optional elevation data if all fields for a station are filled
+  if (!isNaN(v1) && !isNaN(hs1) && !isNaN(ht1)) {
+    payload.v1 = v1;
+    payload.hs1 = hs1;
+    payload.ht1 = ht1;
+  }
+  if (!isNaN(v2) && !isNaN(hs2) && !isNaN(ht2)) {
+    payload.v2 = v2;
+    payload.hs2 = hs2;
+    payload.ht2 = ht2;
+  }
+  
+  const resp = await fetch('/cogo/bearing-intersection/calc', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+    return;
+  }
+  
+  calculatedSolution = data;
+  
+  let html = '<div class="kv"><span class="k">Latitudine</span><span class="v">' + data.lat.toFixed(9) + '°</span></div>';
+  html += '<div class="kv"><span class="k">Longitudine</span><span class="v">' + data.lon.toFixed(9) + '°</span></div>';
+  html += '<div class="kv"><span class="k">Quota</span><span class="v">' + data.alt.toFixed(3) + ' m</span></div>';
+  html += '<div class="kv"><span class="k">E (ENU locale)</span><span class="v">' + data.e.toFixed(4) + ' m</span></div>';
+  html += '<div class="kv"><span class="k">N (ENU locale)</span><span class="v">' + data.n.toFixed(4) + ' m</span></div>';
+  
+  if (data.elevation_info) {
+    html += '<div class="kv"><span class="k">Quota da St.1</span><span class="v">' + data.elevation_info.alt_from_st1.toFixed(3) + ' m</span></div>';
+    html += '<div class="kv"><span class="k">Quota da St.2</span><span class="v">' + data.elevation_info.alt_from_st2.toFixed(3) + ' m</span></div>';
+    html += '<div class="kv"><span class="k">Residuo quota</span><span class="v">' + data.elevation_info.residual.toFixed(3) + ' m</span></div>';
+  }
+  
+  document.getElementById('result-data').innerHTML = html;
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('point-name').value = 'INT001';
+});
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  if (!calculatedSolution) {
+    alert('Nessun punto calcolato');
+    return;
+  }
+  
+  const targetSurvey = document.getElementById('target-survey').value;
+  const pointName = document.getElementById('point-name').value;
+  
+  if (!targetSurvey || !pointName) {
+    alert('Seleziona rilievo e nome punto');
+    return;
+  }
+  
+  const resp = await fetch('/cogo/bearing-intersection/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      survey_id: targetSurvey,
+      point_name: pointName,
+      solution: calculatedSolution
+    })
+  });
+  
+  const result = await resp.json();
+  
+  if (result.error) {
+    alert('Errore: ' + result.error);
+  } else {
+    alert('Punto salvato con successo!');
+    window.location.href = '/survey/' + targetSurvey;
+  }
+});
+</script>
+{% endblock %}

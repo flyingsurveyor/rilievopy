@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% set active = "cogo" %}
+
+{% block title %}COGO - Helmert 2D{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width:1200px; margin:24px auto; padding:0 16px; }
+  .card { background:white; border:none; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.25); margin-bottom:16px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  h2 { font-size:16px; margin:16px 0 8px; color:#2c3e50; }
+  h3 { font-size:14px; margin:12px 0 6px; color:#34495e; }
+  label { display:block; margin:10px 0 6px; color:#2c3e50; font-weight:500; }
+  select, input { width:100%; padding:10px; border-radius:10px; border:1px solid #ddd; background:white; color:#333; box-sizing:border-box; }
+  .btn { background:#3498db; color:white; padding:10px 14px; border-radius:10px; text-decoration:none; border:none; cursor:pointer; display:inline-block; margin-right:10px; margin-bottom:8px; }
+  .btn:hover { filter:brightness(1.1); }
+  .btn-primary { background:#2d5016; border-color:#3d6826; }
+  .btn-danger { background:#e74c3c; }
+  .kv { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #eee; }
+  .k { color:#666; }
+  .v { font-variant-numeric: tabular-nums; font-weight:500; }
+  .pair { border:1px solid #ddd; padding:12px; border-radius:8px; margin-bottom:10px; background:#f9f9f9; }
+  .pair-row { display:grid; grid-template-columns: 1fr 1fr auto; gap:10px; align-items:center; }
+  #params, #transform-section, #save-section { display:none; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; font-size:14px; }
+  th, td { padding:8px; text-align:left; border-bottom:1px solid #eee; }
+  th { background:#f5f5f5; font-weight:600; color:#2c3e50; }
+  td { font-variant-numeric: tabular-nums; }
+  .flagged { background:#fff3cd; color:#856404; font-weight:600; }
+  .warning { background:#fff3cd; border:1px solid #ffc107; padding:10px; border-radius:8px; margin:10px 0; color:#856404; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+  .pair-row { grid-template-columns: 1fr; }
+  table { font-size:12px; }
+  th, td { padding:6px 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>🔄 Trasformazione Helmert 2D (4 parametri)</h1>
+    <p style="color:#666;line-height:1.6;">Stima traslazione, rotazione e scala tra due sistemi di coordinate con minimi quadrati. Minimo 2 coppie di punti omologhi.</p>
+    
+    <h2>1. Punti Omologhi (Sorgente → Destinazione)</h2>
+    <div id="pairs-container">
+      <div class="pair" data-index="0">
+        <div class="pair-row">
+          <div>
+            <label>Punto Sorgente 1</label>
+            <select class="src-point" required>
+              <option value="">-- Seleziona --</option>
+              {{ options|safe }}
+            </select>
+          </div>
+          <div>
+            <label>Punto Destinazione 1</label>
+            <select class="dst-point" required>
+              <option value="">-- Seleziona --</option>
+              {{ options|safe }}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="pair" data-index="1">
+        <div class="pair-row">
+          <div>
+            <label>Punto Sorgente 2</label>
+            <select class="src-point" required>
+              <option value="">-- Seleziona --</option>
+              {{ options|safe }}
+            </select>
+          </div>
+          <div>
+            <label>Punto Destinazione 2</label>
+            <select class="dst-point" required>
+              <option value="">-- Seleziona --</option>
+              {{ options|safe }}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="margin-top:14px;">
+      <button class="btn" type="button" id="add-pair-btn">➕ Aggiungi Coppia</button>
+      <button class="btn btn-primary" type="button" id="calc-params-btn">Calcola Parametri</button>
+      <a class="btn" href="/cogo">← COGO</a>
+    </div>
+  </div>
+  
+  <div class="card" id="params">
+    <h2>Parametri di Trasformazione</h2>
+    <div id="warnings"></div>
+    <div id="params-data"></div>
+    
+    <h3>Residui ai Punti Omologhi</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Punto</th>
+          <th>vE (m)</th>
+          <th>vN (m)</th>
+          <th>|v| (m)</th>
+        </tr>
+      </thead>
+      <tbody id="residuals-table"></tbody>
+    </table>
+  </div>
+  
+  <div class="card" id="transform-section">
+    <h2>2. Trasforma Punti Aggiuntivi</h2>
+    <label>Seleziona punti sorgente da trasformare (Ctrl/Cmd per multipli)</label>
+    <select id="transform-points" multiple size="6">
+      {{ options|safe }}
+    </select>
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary" type="button" id="apply-transform-btn">Applica Trasformazione</button>
+    </div>
+    
+    <div id="transformed-result" style="display:none;">
+      <h3 style="margin-top:16px;">Punti Trasformati</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Punto</th>
+            <th>Lat Dst</th>
+            <th>Lon Dst</th>
+            <th>Alt (m)</th>
+          </tr>
+        </thead>
+        <tbody id="transformed-table"></tbody>
+      </table>
+    </div>
+  </div>
+  
+  <div class="card" id="save-section">
+    <h2>3. Salva Punti Trasformati</h2>
+    <label>Salva nel rilievo</label>
+    <select id="survey-id">
+      <option value="">-- Seleziona rilievo --</option>
+      {{ survey_options|safe }}
+    </select>
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary" type="button" id="save-btn">Salva Tutti</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let pairIndex = 2;
+let currentParams = null;
+let currentTransformed = null;
+
+document.getElementById('add-pair-btn').addEventListener('click', () => {
+  const container = document.getElementById('pairs-container');
+  const div = document.createElement('div');
+  div.className = 'pair';
+  div.setAttribute('data-index', pairIndex);
+  div.innerHTML = `
+    <div class="pair-row">
+      <div>
+        <label>Punto Sorgente ${pairIndex + 1}</label>
+        <select class="src-point" required>
+          <option value="">-- Seleziona --</option>
+          {{ options|safe }}
+        </select>
+      </div>
+      <div>
+        <label>Punto Destinazione ${pairIndex + 1}</label>
+        <select class="dst-point" required>
+          <option value="">-- Seleziona --</option>
+          {{ options|safe }}
+        </select>
+      </div>
+      <div>
+        <button class="btn btn-danger" type="button" onclick="this.closest('.pair').remove()">🗑️</button>
+      </div>
+    </div>
+  `;
+  container.appendChild(div);
+  pairIndex++;
+});
+
+document.getElementById('calc-params-btn').addEventListener('click', async () => {
+  const pairs = [];
+  const pairElements = document.querySelectorAll('.pair');
+  
+  for (const elem of pairElements) {
+    const src = elem.querySelector('.src-point').value;
+    const dst = elem.querySelector('.dst-point').value;
+    
+    if (!src || !dst) {
+      alert('Seleziona tutti i punti sorgente e destinazione');
+      return;
+    }
+    
+    const [sidSrc, pidSrc] = src.split('|');
+    const [sidDst, pidDst] = dst.split('|');
+    
+    pairs.push({
+      source: {sid: sidSrc, pid: pidSrc},
+      target: {sid: sidDst, pid: pidDst}
+    });
+  }
+  
+  if (pairs.length < 2) {
+    alert('Servono almeno 2 coppie di punti omologhi');
+    return;
+  }
+  
+  const resp = await fetch('/cogo/helmert/calc', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pairs: pairs})
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+    return;
+  }
+  
+  currentParams = data;
+  
+  // Display warnings
+  let warnHtml = '';
+  if (data.diagnostics.warnings.length > 0) {
+    warnHtml = '<div class="warning">';
+    for (const w of data.diagnostics.warnings) {
+      warnHtml += '⚠️ ' + w + '<br/>';
+    }
+    warnHtml += '</div>';
+  }
+  document.getElementById('warnings').innerHTML = warnHtml;
+  
+  // Display parameters
+  const p = data.parameters;
+  const d = data.diagnostics;
+  let html = '<div class="kv"><span class="k">a</span><span class="v">' + p.a.toFixed(9) + '</span></div>';
+  html += '<div class="kv"><span class="k">b</span><span class="v">' + p.b.toFixed(9) + '</span></div>';
+  html += '<div class="kv"><span class="k">tE (m)</span><span class="v">' + p.tE.toFixed(4) + '</span></div>';
+  html += '<div class="kv"><span class="k">tN (m)</span><span class="v">' + p.tN.toFixed(4) + '</span></div>';
+  html += '<div class="kv"><span class="k">Scala k</span><span class="v">' + p.scale.toFixed(9) + '</span></div>';
+  html += '<div class="kv"><span class="k">Scala (ppm)</span><span class="v">' + p.scale_ppm.toFixed(2) + ' ppm</span></div>';
+  html += '<div class="kv"><span class="k">Rotazione (gon)</span><span class="v">' + p.rotation_gon.toFixed(6) + ' gon</span></div>';
+  html += '<div class="kv"><span class="k">Rotazione (DMS)</span><span class="v">' + p.rotation_dms + '</span></div>';
+  html += '<h3 style="margin-top:16px;">Diagnostica</h3>';
+  html += '<div class="kv"><span class="k">N punti</span><span class="v">' + d.n_points + '</span></div>';
+  html += '<div class="kv"><span class="k">Ridondanza</span><span class="v">' + d.redundancy + '</span></div>';
+  html += '<div class="kv"><span class="k">σ₀</span><span class="v">' + d.sigma0.toFixed(4) + ' m</span></div>';
+  html += '<div class="kv"><span class="k">RMSE</span><span class="v">' + d.rmse.toFixed(4) + ' m</span></div>';
+  document.getElementById('params-data').innerHTML = html;
+  
+  // Display residuals
+  let tbody = '';
+  for (const r of data.residuals) {
+    const cls = r.flagged ? ' class="flagged"' : '';
+    tbody += '<tr' + cls + '>';
+    tbody += '<td>' + r.name + '</td>';
+    tbody += '<td>' + (r.vE >= 0 ? '+' : '') + r.vE.toFixed(4) + '</td>';
+    tbody += '<td>' + (r.vN >= 0 ? '+' : '') + r.vN.toFixed(4) + '</td>';
+    tbody += '<td>' + r.v_abs.toFixed(4) + '</td>';
+    tbody += '</tr>';
+  }
+  document.getElementById('residuals-table').innerHTML = tbody;
+  
+  document.getElementById('params').style.display = 'block';
+  document.getElementById('transform-section').style.display = 'block';
+});
+
+document.getElementById('apply-transform-btn').addEventListener('click', async () => {
+  if (!currentParams) {
+    alert('Calcola prima i parametri');
+    return;
+  }
+  
+  const pointsSelect = document.getElementById('transform-points');
+  const selectedPoints = Array.from(pointsSelect.selectedOptions).map(opt => opt.value);
+  
+  if (selectedPoints.length === 0) {
+    alert('Seleziona almeno un punto da trasformare');
+    return;
+  }
+  
+  const pairs = [];
+  const pairElements = document.querySelectorAll('.pair');
+  for (const elem of pairElements) {
+    const src = elem.querySelector('.src-point').value;
+    const dst = elem.querySelector('.dst-point').value;
+    if (src && dst) {
+      const [sidSrc, pidSrc] = src.split('|');
+      const [sidDst, pidDst] = dst.split('|');
+      pairs.push({
+        source: {sid: sidSrc, pid: pidSrc},
+        target: {sid: sidDst, pid: pidDst}
+      });
+    }
+  }
+  
+  const points = selectedPoints.map(p => {
+    const [sid, pid] = p.split('|');
+    return {sid, pid};
+  });
+  
+  const resp = await fetch('/cogo/helmert/calc', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      pairs: pairs,
+      transform_points: points
+    })
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+    return;
+  }
+  
+  currentTransformed = data.transformed_points;
+  
+  // Display transformed points
+  let tbody = '';
+  for (const pt of data.transformed_points) {
+    tbody += '<tr>';
+    tbody += '<td>' + pt.name + '</td>';
+    tbody += '<td>' + pt.lat_dst.toFixed(9) + '</td>';
+    tbody += '<td>' + pt.lon_dst.toFixed(9) + '</td>';
+    tbody += '<td>' + pt.alt.toFixed(4) + '</td>';
+    tbody += '</tr>';
+  }
+  document.getElementById('transformed-table').innerHTML = tbody;
+  document.getElementById('transformed-result').style.display = 'block';
+  document.getElementById('save-section').style.display = 'block';
+});
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  if (!currentTransformed || currentTransformed.length === 0) {
+    alert('Trasforma prima alcuni punti');
+    return;
+  }
+  
+  const surveyId = document.getElementById('survey-id').value;
+  if (!surveyId) {
+    alert('Seleziona un rilievo di destinazione');
+    return;
+  }
+  
+  const resp = await fetch('/cogo/helmert/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      survey_id: surveyId,
+      points: currentTransformed
+    })
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+  } else {
+    alert('✓ ' + data.point_ids.length + ' punti salvati: ' + data.point_ids.join(', '));
+  }
+});
+</script>
+{% endblock %}

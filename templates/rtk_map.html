@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% set active = "surveys" %}
+
+{% block title %}Mappa - {{ sid }}{% endblock %}
+
+{% block head %}
+<!-- Leaflet CSS and JS — required for the map -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+.map-container {max-width:100%;height:100vh;margin:0;padding:0;display:flex;flex-direction:column}
+  #map{flex:1;position:relative;z-index:0}
+  .controls{background:#34495e;padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;flex-shrink:0;box-shadow:0 -2px 4px rgba(0,0,0,0.1)}
+  .btn{background:#3498db;color:white;padding:8px 12px;border-radius:4px;text-decoration:none;border:none;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:4px;transition:background 0.3s}
+  .btn:hover{background:#2980b9}
+  .btn:disabled{opacity:0.5;cursor:not-allowed}
+  .loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.95);border:1px solid #ddd;border-radius:8px;padding:20px;text-align:center;z-index:2000;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.2)}
+  .hidden{display:none}
+  /* Layer Control */
+.custom-layer-control{position:absolute;top:10px;right:10px;z-index:1000}
+  .layer-control-btn{width:44px;height:44px;border:none;background:white;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.3);cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+  .layer-control-btn:hover{background:#f0f0f0}
+  .layer-panel{position:absolute;top:0;right:54px;background:white;border-radius:8px;padding:16px;min-width:240px;max-width:calc(100vw - 80px);max-height:calc(100vh - 120px);overflow-y:auto;box-shadow:0 2px 12px rgba(0,0,0,0.3);-webkit-overflow-scrolling:touch;color:#333}
+  .layer-panel.hidden{display:none}
+  .layer-panel h3{font-size:14px;margin:12px 0 6px 0;color:#333;font-weight:bold}
+  .layer-group{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .layer-group label{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;padding:8px;border-radius:6px;min-height:44px;-webkit-tap-highlight-color:transparent}
+  .layer-group label:hover,.layer-group label:active{background:#f0f7ff}
+  .layer-group input[type="checkbox"],.layer-group input[type="radio"]{width:20px;height:20px;cursor:pointer}
+  .btn-close-panel{width:100%;padding:12px;background:#3498db;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;min-height:44px}
+  .btn-close-panel:hover{background:#2980b9}
+  /* Custom Scale Control */
+.custom-scale-control{background:rgba(255,255,255,0.9);padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace;box-shadow:0 1px 4px rgba(0,0,0,0.3);pointer-events:none}
+  .scale-bar{height:4px;background:#333;border-left:2px solid #333;border-right:2px solid #333;margin-bottom:2px}
+  .scale-label{text-align:center;color:#333;font-weight:bold}
+  @media (max-width:600px){
+  .header h1{font-size:14px}
+  .btn{padding:6px 10px;font-size:12px}
+  .layer-panel{position:fixed;top:auto;bottom:0;left:0;right:0;max-width:100%;max-height:60vh;border-radius:16px 16px 0 0;padding:20px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="map-container">
+  <div class="header">
+    <h1>🗺️ Mappa - {{ sid }}</h1>
+    <a class="btn" href="/survey/{{ sid }}">← Rilievo</a>
+  </div>
+  <div id="map">
+    <!-- Layer Control -->
+    <div class="custom-layer-control">
+      <button class="layer-control-btn" id="btn-layers" title="Layer">🎨</button>
+      <div class="layer-panel hidden" id="layer-panel">
+        <h3>🗺️ Mappa Base</h3>
+        <div class="layer-group" id="basemap-group">
+          <!-- Populated dynamically -->
+        </div>
+        <h3>📍 Overlay</h3>
+        <div class="layer-group" id="overlay-group">
+          <label><input type="checkbox" id="overlay-points" checked> Punti</label>
+          <label><input type="checkbox" id="overlay-polyline" checked> Polyline</label>
+          <label><input type="checkbox" id="overlay-labels" checked> Etichette</label>
+        </div>
+        <button class="btn-close-panel" id="btn-close-panel">Chiudi</button>
+      </div>
+    </div>
+  </div>
+  <div id="loading" class="loading">
+    <p>Caricamento mappa...</p>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btn-fit" title="Adatta vista">⊞ Fit View</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const geojson = {{ geojson|safe }};
+const surveyId = '{{ sid }}';
+
+// ===== Map Initialization =====
+function initMap() {
+  try {
+    console.log('[Map] 🚀 Initializing map for survey:', surveyId);
+
+    const features = geojson.features || [];
+    if (features.length === 0) {
+      document.getElementById('loading').innerHTML = '<p>Nessun punto da visualizzare</p>';
+      return;
+    }
+
+    const latlngs = features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+    const bounds = L.latLngBounds(latlngs);
+    const center = bounds.getCenter();
+
+    // Create map with white background (no tile layer)
+    const map = L.map('map', {
+      center: center,
+      zoom: 16,
+      zoomControl: true,
+      attributionControl: false,
+      scrollWheelZoom: true,
+      wheelDebounceTime: 100,
+      wheelPxPerZoomLevel: 120,
+      zoomSnap: 0.25,
+      zoomDelta: 0.5,
+      touchZoom: true,
+      bounceAtZoomLimits: false,
+      maxZoom: 28,
+      minZoom: 1
+    });
+
+    // White background — no tile layer added
+    document.getElementById('map').style.background = '#ffffff';
+
+    map.fitBounds(bounds, { padding: [50, 50] });
+
+    // Overlay layers
+    const markersLayer = L.layerGroup().addTo(map);
+    const polylineLayer = L.layerGroup().addTo(map);
+    const labelsLayer = L.layerGroup().addTo(map);
+
+    function getMarkerRadiusForZoom(zoom) {
+      const baseZoom = 16;
+      const baseRadius = 5;
+      const scaleFactor = 1.15;
+      const radius = baseRadius * Math.pow(scaleFactor, zoom - baseZoom);
+      return Math.max(4, Math.min(radius, 25));
+    }
+
+    const markers = [];
+
+    features.forEach(feature => {
+      const coords = feature.geometry.coordinates;
+      const lat = coords[1];
+      const lon = coords[0];
+      const props = feature.properties || {};
+      const name = props.name || 'P';
+      const tpv = props.TPV || {};
+      const hp = props.HPPOSLLH || {};
+      const rtkRaw = tpv.rtk || 'none';
+      const rtk = String(rtkRaw).toLowerCase();
+
+      let color = '#e74c3c';
+      if (rtk.includes('fixed')) {
+        color = '#27ae60';
+      } else if (rtk.includes('float')) {
+        color = '#f39c12';
+      } else if (rtk.includes('trilateration') || rtk.includes('cogo')) {
+        color = '#3498db';
+      }
+
+      const marker = L.circleMarker([lat, lon], {
+        radius: getMarkerRadiusForZoom(map.getZoom()),
+        fillColor: color,
+        color: '#333',
+        weight: 1.5,
+        opacity: 1,
+        fillOpacity: 0.85
+      });
+
+      const popupContent = `
+        <strong>${name}</strong><br>
+        Lat: ${lat.toFixed(7)}<br>
+        Lon: ${lon.toFixed(7)}<br>
+        Alt: ${(hp.altMSL || coords[2] || 0).toFixed(2)} m<br>
+        RTK: ${rtkRaw}
+      `;
+      marker.bindPopup(popupContent);
+      marker.addTo(markersLayer);
+      markers.push(marker);
+
+      L.marker([lat, lon], {
+        icon: L.divIcon({
+          className: 'point-label',
+          html: `<div style="background:rgba(0,0,0,0.65);color:white;padding:2px 6px;border-radius:4px;font-size:11px;white-space:nowrap;pointer-events:none;">${name}</div>`,
+          iconSize: null
+        }),
+        interactive: false
+      }).addTo(labelsLayer);
+    });
+
+    map.on('zoomend', () => {
+      const newRadius = getMarkerRadiusForZoom(map.getZoom());
+      markers.forEach(m => m.setRadius(newRadius));
+    });
+
+    if (latlngs.length > 1) {
+      L.polyline(latlngs, {
+        color: '#3b82f6',
+        weight: 2,
+        opacity: 0.7
+      }).addTo(polylineLayer);
+    }
+
+    window.overlayLayers = { points: markersLayer, polyline: polylineLayer, labels: labelsLayer };
+    window.leafletMap = map;
+
+    // Populate layer control (overlay only — no basemap selector)
+    const basemapGroup = document.getElementById('basemap-group');
+    basemapGroup.innerHTML = '<label style="color:#888;font-style:italic;">Sfondo bianco</label>';
+
+    document.getElementById('btn-layers').addEventListener('click', () => {
+      document.getElementById('layer-panel').classList.toggle('hidden');
+    });
+    document.getElementById('btn-close-panel').addEventListener('click', () => {
+      document.getElementById('layer-panel').classList.add('hidden');
+    });
+    document.getElementById('overlay-points').addEventListener('change', e => {
+      e.target.checked ? window.overlayLayers.points.addTo(map) : map.removeLayer(window.overlayLayers.points);
+    });
+    document.getElementById('overlay-polyline').addEventListener('change', e => {
+      e.target.checked ? window.overlayLayers.polyline.addTo(map) : map.removeLayer(window.overlayLayers.polyline);
+    });
+    document.getElementById('overlay-labels').addEventListener('change', e => {
+      e.target.checked ? window.overlayLayers.labels.addTo(map) : map.removeLayer(window.overlayLayers.labels);
+    });
+
+    // Custom Scale Control
+    const CustomScaleControl = L.Control.extend({
+      options: { position: 'bottomleft' },
+      onAdd: function(map) {
+        this._map = map;
+        this._container = L.DomUtil.create('div', 'custom-scale-control');
+        map.on('zoom move', this._update, this);
+        this._update();
+        return this._container;
+      },
+      onRemove: function(map) { map.off('zoom move', this._update, this); },
+      _update: function() {
+        const map = this._map;
+        const centerLat = map.getBounds().getCenter().lat;
+        const metersPerPixel = 40075016.686 * Math.abs(Math.cos(centerLat * Math.PI / 180)) / Math.pow(2, map.getZoom() + 8);
+        const rawMeters = metersPerPixel * 150;
+        let scaleValue, scaleUnit, scalePixels;
+        if (rawMeters >= 1000) {
+          const nice = [1,2,5,10,20,50,100,200,500,1000].find(v => v >= rawMeters/1000) || 1000;
+          scaleValue = nice; scaleUnit = 'km'; scalePixels = (nice*1000)/metersPerPixel;
+        } else if (rawMeters >= 1) {
+          const nice = [1,2,5,10,20,50,100,200,500].find(v => v >= rawMeters) || 500;
+          scaleValue = nice; scaleUnit = 'm'; scalePixels = nice/metersPerPixel;
+        } else {
+          const cm = rawMeters*100;
+          const nice = [1,2,5,10,20,50].find(v => v >= cm) || 50;
+          scaleValue = nice; scaleUnit = 'cm'; scalePixels = (nice/100)/metersPerPixel;
+        }
+        this._container.innerHTML = `<div class="scale-bar" style="width:${scalePixels}px;"></div><div class="scale-label">${scaleValue} ${scaleUnit}</div>`;
+      }
+    });
+    new CustomScaleControl().addTo(map);
+
+    document.getElementById('loading').classList.add('hidden');
+    console.log('[Map] ✅ Map initialized with', features.length, 'points');
+
+  } catch (err) {
+    console.error('[Map] ❌ Initialization failed:', err);
+    document.getElementById('loading').innerHTML = '<p>Errore nel caricamento: ' + err.message + '</p>';
+  }
+}
+
+document.getElementById('btn-fit').addEventListener('click', () => {
+  if (window.leafletMap) {
+    const latlngs = (geojson.features || []).map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+    if (latlngs.length > 0) {
+      window.leafletMap.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
+    }
+  }
+});
+
+initMap();
+</script>
+{% endblock %}

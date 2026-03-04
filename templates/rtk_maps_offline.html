@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% set active = "surveys" %}
+
+{% block title %}Mappe Offline{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
+  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .card h1, .card h2 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
+  .card h2 { font-size: 18px; }
+  .kv { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee; align-items: center; }
+  .kv:last-child { border-bottom: none; }
+  button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
+  button:hover, .btn:hover { background: #2980b9; }
+  .btn-danger { background: #e74c3c; }
+  .btn-danger:hover { background: #c0392b; }
+  .storage-bar { width: 100%; height: 24px; background: #ecf0f1; border-radius: 12px; overflow: hidden; margin: 12px 0; }
+  .storage-fill { height: 100%; background: linear-gradient(90deg, #3498db, #2980b9); transition: width 0.3s; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <p><a class="btn" href="/surveys">← Rilievi</a></p>
+  </div>
+  
+  <div class="card">
+    <h2>Storage Totale</h2>
+    <div id="storage-summary">Caricamento...</div>
+    <div class="storage-bar">
+      <div id="storage-bar-fill" class="storage-fill" style="width:0%"></div>
+    </div>
+  </div>
+  
+  <div class="card">
+    <h2>Mappe per Rilievo</h2>
+    <div id="maps-list">Caricamento...</div>
+  </div>
+  
+  <div class="card">
+    <button class="btn btn-danger" onclick="cleanupAllMaps()">🧹 Pulisci Tutto</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function openIndexedDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('RilievoGNSS', 1);
+    
+    request.onerror = () => {
+      console.error('[IndexedDB] ❌ Failed to open:', request.error);
+      reject(request.error);
+    };
+    
+    request.onsuccess = () => {
+      console.log('[IndexedDB] ✅ Database opened');
+      const db = request.result;
+      
+      resolve({
+        db: db,  // Expose raw DB for advanced queries
+        
+        tiles: {
+          get: (key) => new Promise((res, rej) => {
+            const tx = db.transaction(['tiles'], 'readonly');
+            const store = tx.objectStore('tiles');
+            const req = store.get(key);
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => {
+              console.error('[IndexedDB] ❌ Tile get failed:', req.error);
+              rej(req.error);
+            };
+          }),
+          
+          put: (value) => new Promise((res, rej) => {
+            const tx = db.transaction(['tiles'], 'readwrite');
+            const store = tx.objectStore('tiles');
+            const req = store.put(value);
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          }),
+          
+          toArray: () => new Promise((res, rej) => {
+            const tx = db.transaction(['tiles'], 'readonly');
+            const store = tx.objectStore('tiles');
+            const req = store.getAll();
+            req.onsuccess = () => res(req.result || []);
+            req.onerror = () => rej(req.error);
+          }),
+          
+          where: (indexName) => ({
+            equals: (value) => ({
+              toArray: () => new Promise((res, rej) => {
+                const tx = db.transaction(['tiles'], 'readonly');
+                const store = tx.objectStore('tiles');
+                const index = store.index(indexName);
+                const req = index.getAll(value);
+                req.onsuccess = () => res(req.result || []);
+                req.onerror = () => rej(req.error);
+              })
+            })
+          }),
+          
+          delete: (key) => new Promise((res, rej) => {
+            const tx = db.transaction(['tiles'], 'readwrite');
+            const store = tx.objectStore('tiles');
+            const req = store.delete(key);
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          }),
+          
+          clear: () => new Promise((res, rej) => {
+            const tx = db.transaction(['tiles'], 'readwrite');
+            const store = tx.objectStore('tiles');
+            const req = store.clear();
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          }),
+          
+          count: () => new Promise((res, rej) => {
+            const tx = db.transaction(['tiles'], 'readonly');
+            const store = tx.objectStore('tiles');
+            const req = store.count();
+            req.onsuccess = () => res(req.result || 0);
+            req.onerror = () => {
+              console.error('[IndexedDB] ❌ Tile count failed:', req.error);
+              res(0);
+            };
+          })
+        },
+        
+        metadata: {
+          get: (key) => new Promise((res, rej) => {
+            const tx = db.transaction(['metadata'], 'readonly');
+            const store = tx.objectStore('metadata');
+            const req = store.get(key);
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          }),
+          
+          put: (value) => new Promise((res, rej) => {
+            const tx = db.transaction(['metadata'], 'readwrite');
+            const store = tx.objectStore('metadata');
+            const req = store.put(value);
+            req.onsuccess = () => {
+              console.log('[Metadata] ✅ Saved:', value.surveyId, value.provider);
+              res(req.result);
+            };
+            req.onerror = () => {
+              console.error('[Metadata] ❌ Save failed:', req.error);
+              rej(req.error);
+            };
+          }),
+          
+          toArray: () => new Promise((res, rej) => {
+            const tx = db.transaction(['metadata'], 'readonly');
+            const store = tx.objectStore('metadata');
+            const req = store.getAll();
+            req.onsuccess = () => res(req.result || []);
+            req.onerror = () => rej(req.error);
+          }),
+          
+          delete: (key) => new Promise((res, rej) => {
+            const tx = db.transaction(['metadata'], 'readwrite');
+            const store = tx.objectStore('metadata');
+            const req = store.delete(key);
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          }),
+          
+          clear: () => new Promise((res, rej) => {
+            const tx = db.transaction(['metadata'], 'readwrite');
+            const store = tx.objectStore('metadata');
+            const req = store.clear();
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          }),
+          
+          // NEW: Get all metadata for a specific survey (all providers)
+          getBySurvey: (surveyId) => new Promise((res, rej) => {
+            const tx = db.transaction(['metadata'], 'readonly');
+            const store = tx.objectStore('metadata');
+            const req = store.getAll();
+            req.onsuccess = () => {
+              const all = req.result || [];
+              const filtered = all.filter(m => m.surveyId === surveyId);
+              res(filtered);
+            };
+            req.onerror = () => rej(req.error);
+          })
+        }
+      });
+    };
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      
+      if (!db.objectStoreNames.contains('tiles')) {
+        const tilesStore = db.createObjectStore('tiles', { keyPath: ['z', 'x', 'y', 'provider'] });
+        tilesStore.createIndex('provider', 'provider', { unique: false });
+        tilesStore.createIndex('surveyIds', 'surveyIds', { unique: false, multiEntry: true });
+        console.log('[IndexedDB] 📊 Created tiles object store');
+      }
+      
+      if (!db.objectStoreNames.contains('metadata')) {
+        db.createObjectStore('metadata', { keyPath: ['surveyId', 'provider'] });
+        console.log('[IndexedDB] 📊 Created metadata object store');
+      }
+    };
+  });
+}
+
+async function loadOfflineMaps() {
+  console.log('[Dashboard] 📊 Loading offline maps...');
+  
+  try {
+    const db = await openIndexedDB();
+    
+    const allTiles = await db.tiles.toArray();
+    console.log(`[Dashboard] 📊 Found ${allTiles.length} tiles in storage`);
+    
+    const tilesByProvider = {};
+    let totalSizeMB = 0;
+    
+    allTiles.forEach(tile => {
+      if (!tilesByProvider[tile.provider]) {
+        tilesByProvider[tile.provider] = { count: 0, sizeMB: 0 };
+      }
+      tilesByProvider[tile.provider].count++;
+      
+      tilesByProvider[tile.provider].sizeMB += tile.blob.size / (1024 * 1024);
+      totalSizeMB += tile.blob.size / (1024 * 1024);
+    });
+    
+    const maxStorageMB = 500;
+    const storagePercent = (totalSizeMB / maxStorageMB * 100).toFixed(1);
+    
+    document.getElementById('storage-summary').innerHTML = `
+      <strong>${totalSizeMB.toFixed(1)} MB</strong> / ${maxStorageMB} MB (${storagePercent}%)
+    `;
+    document.getElementById('storage-bar-fill').style.width = Math.min(storagePercent, 100) + '%';
+    
+    const allMetadata = await db.metadata.toArray();
+    console.log(`[Dashboard] 📊 Found ${allMetadata.length} map metadata entries`);
+    
+    // Check for orphaned tiles without metadata
+    if (allMetadata.length === 0 && allTiles.length > 0) {
+      console.warn('[Dashboard] ⚠️ Tiles present but no metadata!');
+      console.warn('[Dashboard] 💡 This indicates metadata save failed during download.');
+      
+      // Mostra warning nella UI
+      document.getElementById('maps-list').innerHTML = `
+        <div style="background:#fff3cd;color:#856404;padding:12px;border-radius:8px;margin-bottom:16px;">
+          <strong>⚠️ Attenzione</strong><br>
+          Trovate ${allTiles.length} tile nel database ma nessun metadata.<br>
+          Le mappe sono state scaricate ma il salvataggio metadata è fallito.<br>
+          <strong>Soluzione:</strong> Riscarica le mappe da ciascun rilievo.
+        </div>
+      `;
+      return;
+    }
+    
+    if (allMetadata.length === 0) {
+      document.getElementById('maps-list').innerHTML = '<p>Nessuna mappa offline salvata.</p>';
+      return;
+    }
+    
+    let html = '';
+    for (const meta of allMetadata) {
+      html += `
+        <div class="kv">
+          <div>
+            <strong>${meta.surveyId}</strong><br>
+            <small>
+              ${meta.provider.toUpperCase()}: ${meta.tilesTotal} tile 
+              (${meta.tilesShared} condivise, ${meta.tilesDownloaded} scaricate)<br>
+              ${meta.sizeMB.toFixed(1)} MB • Zoom ${meta.zoomLevels.join(', ')}<br>
+              Scaricato: ${new Date(meta.downloadedAt).toLocaleString()}
+            </small>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <a class="btn" href="/survey/${meta.surveyId}/map">📍</a>
+            <button class="btn btn-danger" onclick="deleteOfflineMap('${meta.surveyId}', '${meta.provider}')">🗑️</button>
+          </div>
+        </div>
+      `;
+    }
+    
+    document.getElementById('maps-list').innerHTML = html;
+    console.log('[Dashboard] ✅ Loaded successfully');
+    
+  } catch (err) {
+    console.error('[Dashboard] ❌ Load failed:', err);
+    document.getElementById('storage-summary').innerHTML = 'Errore: ' + err.message;
+    document.getElementById('maps-list').innerHTML = 'Errore nel caricamento: ' + err.message;
+  }
+}
+
+async function deleteOfflineMap(surveyId, provider) {
+  if (!confirm(`Eliminare mappa ${provider.toUpperCase()} per ${surveyId}?`)) return;
+  
+  try {
+    const db = await openIndexedDB();
+    
+    await db.metadata.delete([surveyId, provider]);
+    
+    const allTiles = await db.tiles.where('provider').equals(provider).toArray();
+    
+    for (const tile of allTiles) {
+      const idx = tile.surveyIds.indexOf(surveyId);
+      if (idx !== -1) {
+        tile.surveyIds.splice(idx, 1);
+        
+        if (tile.surveyIds.length === 0) {
+          await db.tiles.delete([tile.z, tile.x, tile.y, tile.provider]);
+        } else {
+          await db.tiles.put(tile);
+        }
+      }
+    }
+    
+    loadOfflineMaps();
+  } catch (err) {
+    alert('Errore: ' + err.message);
+  }
+}
+
+async function cleanupAllMaps() {
+  if (!confirm('Eliminare TUTTE le mappe offline? Questa azione è irreversibile.')) return;
+  
+  try {
+    const db = await openIndexedDB();
+    await db.tiles.clear();
+    await db.metadata.clear();
+    
+    alert('✅ Tutte le mappe offline sono state eliminate.');
+    loadOfflineMaps();
+  } catch (err) {
+    alert('Errore: ' + err.message);
+  }
+}
+
+loadOfflineMaps();
+</script>
+{% endblock %}

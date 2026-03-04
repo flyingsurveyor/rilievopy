@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+{% block title %}Convbin — RTKLIB Web PPK{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Convbin</h1>
+    <p>Convert raw receiver data to RINEX</p>
+</div>
+
+{% if not tool_available %}
+<div class="alert alert-error" style="flex-direction:column; align-items:flex-start; gap:8px;">
+    <strong>⚠ convbin binary not found</strong>
+    <p style="margin:0; font-size:13px;">
+        Searched: <code style="background:#fdedec; padding:2px 6px; border-radius:3px;">{{ binary_path }}</code> and system PATH.
+    </p>
+    <p style="margin:0; font-size:13px;">Run <code style="background:#ecf0f1; padding:2px 6px; border-radius:3px;">./install.sh</code> or symlink your convbin binary to <code style="background:#ecf0f1; padding:2px 6px; border-radius:3px;">{{ project_dir }}/tools/convbin</code></p>
+</div>
+{% endif %}
+
+<!-- Input file selection -->
+<div class="card">
+    <div class="card-header">
+        <h2>Input File</h2>
+        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('manualUpload').click()">
+            ⬆ Upload
+        </button>
+        <input type="file" id="manualUpload" hidden accept=".ubx,.raw,.gps,.sbp,.bin,.stq,.jps,.bnx,.binex,.rt17,.sbf,.unc,.rtcm2,.rtcm3">
+    </div>
+    <div id="convUploadProgressWrap" class="hidden mb-1">
+        <div id="convUploadProgressText" style="font-size:12px; color:#7f8c8d; margin-bottom:4px;"></div>
+        <div style="width:100%; background:#ecf0f1; border-radius:8px; overflow:hidden; height:10px;">
+            <div id="convUploadProgressBar" style="width:0%; height:100%; background:#3498db; transition:width 0.2s;"></div>
+        </div>
+    </div>
+
+    {% if raw_files %}
+    <ul class="file-list" id="fileList">
+        {% for f in raw_files %}
+        <li class="file-item" data-path="{{ f.path }}" onclick="selectFile(this)">
+            <div class="file-icon ubx">{{ f.name.rsplit('.', 1)[-1][:3].upper() }}</div>
+            <div class="file-info">
+                <div class="file-name">{{ f.name }}</div>
+                <div class="file-meta">{{ f.size }} · {{ f.modified }}</div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📡</div>
+        <div class="empty-state-text">No raw files found</div>
+        <div class="empty-state-hint">Upload .ubx or other raw receiver files</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Settings -->
+<div class="card">
+    <div class="card-header">
+        <h2>Settings</h2>
+        <span class="badge">convbin</span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab active" data-tab="basic" onclick="switchTab(this)">Basic</button>
+        <button class="tab" data-tab="header" onclick="switchTab(this)">Header</button>
+        <button class="tab" data-tab="filter" onclick="switchTab(this)">Filter</button>
+        <button class="tab" data-tab="output" onclick="switchTab(this)">Output</button>
+    </div>
+
+    <!-- ═══ Basic Tab ═══ -->
+    <div class="tab-content active" id="tab-basic">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Input Format (-r)</label>
+                <select id="optFormat">
+                    <!-- Verified against convbin.c l.566-582 -->
+                    <option value="ubx" selected>u-blox LEA-4T/5T/6T/7T/M8T/F9</option>
+                    <option value="nov">NovAtel OEM4/V/6/7, OEMStar</option>
+                    <option value="sbp">Swift Navigation SBP</option>
+                    <option value="hemis">Hemisphere Eclipse/Crescent</option>
+                    <option value="stq">SkyTraq S1315F</option>
+                    <option value="javad">Javad GREIS</option>
+                    <option value="nvs">NVS NV08C BINR</option>
+                    <option value="binex">BINEX</option>
+                    <option value="rt17">Trimble RT17</option>
+                    <option value="sbf">Septentrio SBF</option>
+                    <option value="unicore">Unicore</option>
+                    <option value="rtcm2">RTCM 2</option>
+                    <option value="rtcm3">RTCM 3</option>
+                    <option value="rinex">RINEX</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>RINEX Version (-v) [default: 3.04]</label>
+                <select id="optRinexVer">
+                    <option value="2.10">2.10</option>
+                    <option value="2.11">2.11</option>
+                    <option value="2.12">2.12</option>
+                    <option value="3.00">3.00</option>
+                    <option value="3.02">3.02</option>
+                    <option value="3.03">3.03</option>
+                    <option value="3.04" selected>3.04</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Frequencies (-f) [default: 5]</label>
+            <select id="optFreq">
+                <option value="1">L1 only</option>
+                <option value="2">L1 + L2</option>
+                <option value="3">L1 + L2 + L5</option>
+                <option value="4">L1 + L2 + L5 + L6</option>
+                <option value="5" selected>All (L1–L7)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>GNSS Systems (unchecked → excluded via -y)</label>
+            <div class="toggle-group" id="sysToggles">
+                <label class="toggle-chip active"><input type="checkbox" value="G" checked>
+                    <span class="sys-dot G"></span> GPS</label>
+                <label class="toggle-chip active"><input type="checkbox" value="R" checked>
+                    <span class="sys-dot R"></span> GLONASS</label>
+                <label class="toggle-chip active"><input type="checkbox" value="E" checked>
+                    <span class="sys-dot E"></span> Galileo</label>
+                <label class="toggle-chip active"><input type="checkbox" value="C" checked>
+                    <span class="sys-dot C"></span> BeiDou</label>
+                <label class="toggle-chip"><input type="checkbox" value="J">
+                    <span class="sys-dot J"></span> QZSS</label>
+                <label class="toggle-chip"><input type="checkbox" value="S">
+                    <span class="sys-dot S"></span> SBAS</label>
+                <label class="toggle-chip active"><input type="checkbox" value="I" checked>
+                    <span class="sys-dot" style="background:#1abc9c"></span> NavIC</label>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Observation Interval, s (-ti) [all]</label>
+                <input type="text" id="optInterval" placeholder="auto">
+            </div>
+            <div class="form-group">
+                <label>Epoch Tolerance, s (-tt) [0.005]</label>
+                <input type="text" id="optEpochTol" placeholder="0.005">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Receiver Options (-ro)</label>
+                <input type="text" id="optReceiverOpts" placeholder="">
+            </div>
+            <div class="form-group">
+                <label>Time Span, hours (-span) [all]</label>
+                <input type="text" id="optSpan" placeholder="all">
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Header Tab ═══ -->
+    <div class="tab-content" id="tab-header">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Marker Name (-hm)</label>
+                <input type="text" id="optMarkerName" placeholder="e.g. BASE01">
+            </div>
+            <div class="form-group">
+                <label>Marker Number (-hn)</label>
+                <input type="text" id="optMarkerNumber" placeholder="">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Marker Type (-ht)</label>
+            <input type="text" id="optMarkerType" placeholder="">
+        </div>
+
+        <div class="form-group">
+            <label>Observer / Agency (-ho) — separated by /</label>
+            <input type="text" id="optObserver" placeholder="e.g. John Doe/Survey Corp">
+        </div>
+
+        <div class="form-group">
+            <label>Receiver: num/type/version (-hr) — separated by /</label>
+            <input type="text" id="optReceiver" placeholder="e.g. 0001/ZED-F9P/1.32">
+        </div>
+
+        <div class="form-group">
+            <label>Antenna: num/type (-ha) — separated by /</label>
+            <input type="text" id="optAntenna" placeholder="e.g. 0001/HARXON CSX627A">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Approx Position: X/Y/Z (-hp)</label>
+                <input type="text" id="optApproxPos" placeholder="e.g. 4388834.56/795203.41/4519568.29">
+            </div>
+            <div class="form-group">
+                <label>Antenna Delta: H/E/N (-hd)</label>
+                <input type="text" id="optAntDelta" placeholder="e.g. 0.0000/0.0000/0.0000">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Comment (-hc)</label>
+            <input type="text" id="optComment" placeholder="Header comment line">
+        </div>
+    </div>
+
+    <!-- ═══ Filter Tab ═══ -->
+    <div class="tab-content" id="tab-filter">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Start Time (-ts) y/m/d h:m:s</label>
+                <input type="text" id="optStartTime" placeholder="e.g. 2024/06/15 08:00:00">
+            </div>
+            <div class="form-group">
+                <label>End Time (-te) y/m/d h:m:s</label>
+                <input type="text" id="optEndTime" placeholder="e.g. 2024/06/15 16:00:00">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Approx Time for RTCM (-tr) y/m/d h:m:s</label>
+            <input type="text" id="optRtcmTime" placeholder="Only needed for RTCM without time-tag file">
+        </div>
+
+        <div class="form-group">
+            <label>Exclude Satellites (-x) — comma-separated PRNs</label>
+            <input type="text" id="optExcludeSats" placeholder="e.g. G03,R15,E24">
+        </div>
+
+        <div class="form-group">
+            <label>Signal Mask (-mask)</label>
+            <input type="text" id="optSignalMask"
+                   placeholder="e.g. GL1C,GL2W,EL1C — see convbin -h for syntax">
+        </div>
+
+        <div class="form-group">
+            <label>Signal No-Mask (-nomask)</label>
+            <input type="text" id="optSignalNomask" placeholder="">
+        </div>
+
+        <div class="form-group">
+            <label>Options</label>
+            <div class="toggle-group">
+                <label class="toggle-chip">
+                    <input type="checkbox" id="optHalfCyc"> Half-cycle correction (-halfc)
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Output Tab ═══ -->
+    <div class="tab-content" id="tab-output">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Output Directory (-d)</label>
+                <select id="optOutputDir">
+                    <option value="rinex">📁 data/rinex/</option>
+                    <option value="same">📁 Same as input</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Station ID for RINEX naming (-c)</label>
+                <input type="text" id="optStationId" placeholder="Leave empty for default naming">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Nav Header Options</label>
+            <div class="toggle-group">
+                <label class="toggle-chip">
+                    <input type="checkbox" id="optInclIono"> Iono correction (-oi)
+                </label>
+                <label class="toggle-chip">
+                    <input type="checkbox" id="optInclTime"> Time correction (-ot)
+                </label>
+                <label class="toggle-chip">
+                    <input type="checkbox" id="optInclLeaps"> Leap seconds (-ol)
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Trace Level (-trace)</label>
+            <select id="optTrace">
+                <option value="0" selected>Off</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Run button -->
+<button class="btn btn-primary btn-block" id="btnRun" onclick="runConvbin()" disabled>
+    Convert to RINEX
+</button>
+
+<!-- Output -->
+<div class="card mt-2 hidden" id="outputCard">
+    <div class="card-header">
+        <h2>Output</h2>
+        <span class="badge" id="outputBadge">—</span>
+    </div>
+    <div class="form-group">
+        <label>Command</label>
+        <div class="console" id="cmdOutput" style="max-height:80px; color:#7f8c8d;">—</div>
+    </div>
+    <div class="console" id="consoleOutput">Waiting...</div>
+    <div class="mt-2" id="outputFiles"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let selectedFile = null;
+
+    // ── File selection ──
+    function selectFile(el) {
+        document.querySelectorAll('.file-item').forEach(i => i.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedFile = el.dataset.path;
+        document.getElementById('btnRun').disabled = false;
+
+        // Auto-detect format from extension (mirrors convbin.c l.586-608)
+        const ext = '.' + selectedFile.split('.').pop().toLowerCase();
+        const formatMap = {
+            '.ubx':'ubx', '.gps':'nov', '.sbp':'sbp', '.bin':'hemis',
+            '.stq':'stq', '.jps':'javad', '.bnx':'binex', '.binex':'binex',
+            '.rt17':'rt17', '.sbf':'sbf', '.unc':'unicore',
+            '.rtcm2':'rtcm2', '.rtcm3':'rtcm3',
+            '.obs':'rinex', '.rnx':'rinex', '.nav':'rinex',
+        };
+        if (formatMap[ext]) {
+            document.getElementById('optFormat').value = formatMap[ext];
+        }
+    }
+
+    // ── Tab switching ──
+    function switchTab(btn) {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    // ── Toggle chip active state ──
+    document.querySelectorAll('.toggle-chip').forEach(chip => {
+        const cb = chip.querySelector('input[type="checkbox"]');
+        if (cb) {
+            cb.addEventListener('change', () => {
+                chip.classList.toggle('active', cb.checked);
+            });
+        }
+    });
+
+    // ── Upload handler (with progress) ──
+    document.getElementById('manualUpload').addEventListener('change', async function() {
+        var file = this.files[0];
+        if (!file) return;
+        setStatus('Uploading...', 'processing');
+        try {
+            await uploadFilesWithProgress([file], {
+                wrap: document.getElementById('convUploadProgressWrap'),
+                bar: document.getElementById('convUploadProgressBar'),
+                text: document.getElementById('convUploadProgressText'),
+            });
+            setStatus('Ready', '');
+            window.location.reload();
+        } catch (err) {
+            setStatus('Upload failed', 'error');
+        }
+    });
+
+    // ── Run convbin ──
+    async function runConvbin() {
+        if (!selectedFile) return;
+
+        const btn = document.getElementById('btnRun');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Converting...';
+        setStatus('Converting...', 'processing');
+
+        const outputCard = document.getElementById('outputCard');
+        outputCard.classList.remove('hidden');
+        const consoleEl = document.getElementById('consoleOutput');
+        consoleEl.textContent = 'Starting convbin...\n';
+
+        // Gather enabled systems (convbin excludes the rest)
+        const enabledSystems = [];
+        document.querySelectorAll('#sysToggles input:checked').forEach(cb => {
+            enabledSystems.push(cb.value);
+        });
+
+        // Parse exclude sats
+        const exSatsRaw = document.getElementById('optExcludeSats').value.trim();
+        const excludeSats = exSatsRaw ? exSatsRaw.split(',').map(s => s.trim()) : [];
+
+        const outputDirSel = document.getElementById('optOutputDir').value;
+
+        const options = {
+            input_file: selectedFile,
+            format: document.getElementById('optFormat').value,
+            rinex_ver: document.getElementById('optRinexVer').value,
+            freq: document.getElementById('optFreq').value,
+            receiver_opts: document.getElementById('optReceiverOpts').value,
+            interval: document.getElementById('optInterval').value,
+            epoch_tol: document.getElementById('optEpochTol').value,
+            span: document.getElementById('optSpan').value,
+            start_time: document.getElementById('optStartTime').value,
+            end_time: document.getElementById('optEndTime').value,
+            rtcm_time: document.getElementById('optRtcmTime').value,
+            marker_name: document.getElementById('optMarkerName').value,
+            marker_number: document.getElementById('optMarkerNumber').value,
+            marker_type: document.getElementById('optMarkerType').value,
+            observer: document.getElementById('optObserver').value,
+            receiver: document.getElementById('optReceiver').value,
+            antenna: document.getElementById('optAntenna').value,
+            approx_pos: document.getElementById('optApproxPos').value,
+            antenna_delta: document.getElementById('optAntDelta').value,
+            comment: document.getElementById('optComment').value,
+            enabled_systems: enabledSystems,
+            exclude_sats: excludeSats,
+            signal_mask: document.getElementById('optSignalMask').value,
+            signal_nomask: document.getElementById('optSignalNomask').value,
+            half_cyc: document.getElementById('optHalfCyc').checked,
+            include_iono: document.getElementById('optInclIono').checked,
+            include_time: document.getElementById('optInclTime').checked,
+            include_leaps: document.getElementById('optInclLeaps').checked,
+            station_id: document.getElementById('optStationId').value,
+            trace: parseInt(document.getElementById('optTrace').value),
+            output_dir: outputDirSel === 'same' ? '' : undefined,
+        };
+
+        try {
+            const resp = await fetch('/api/convbin/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(options),
+            });
+            const result = await resp.json();
+
+            document.getElementById('cmdOutput').textContent = result.command || '—';
+
+            if (result.success || result.returncode === 0) {
+                consoleEl.innerHTML = '';
+                if (result.output) consoleEl.textContent += result.output + '\n';
+                if (result.errors) consoleEl.innerHTML += '<span class="warn">' + escapeHtml(result.errors) + '</span>\n';
+                consoleEl.textContent += '\n✓ Conversion complete.\n';
+
+                document.getElementById('outputBadge').textContent = 'success';
+                document.getElementById('outputBadge').style.cssText = 'background:#eafaf1; color:#27ae60';
+
+                const filesDiv = document.getElementById('outputFiles');
+                filesDiv.innerHTML = '<h3 style="font-size:14px; margin-bottom:8px;">Output Files</h3>';
+                if (result.output_files && result.output_files.length > 0) {
+                    result.output_files.forEach(f => {
+                        const ext = f.name.split('.').pop().substring(0, 4).toUpperCase();
+                        filesDiv.innerHTML += `
+                            <div class="file-item">
+                                <div class="file-icon obs">${ext}</div>
+                                <div class="file-info">
+                                    <div class="file-name">${f.name}</div>
+                                    <div class="file-meta">${formatSize(f.size)}</div>
+                                </div>
+                                <a href="/rinex" class="btn btn-sm btn-secondary">Analyze →</a>
+                            </div>`;
+                    });
+                } else {
+                    filesDiv.innerHTML += '<div class="text-muted">No output files detected</div>';
+                }
+                setStatus('Ready', '');
+            } else {
+                consoleEl.innerHTML = '<span class="error">' + escapeHtml(result.errors || result.error || 'Unknown error') + '</span>';
+                document.getElementById('outputBadge').textContent = 'error';
+                document.getElementById('outputBadge').style.cssText = 'background:#fdedec; color:#c0392b';
+                setStatus('Error', 'error');
+            }
+        } catch (err) {
+            consoleEl.innerHTML = '<span class="error">Request failed: ' + escapeHtml(err.message) + '</span>';
+            setStatus('Error', 'error');
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Convert to RINEX';
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+{% endblock %}

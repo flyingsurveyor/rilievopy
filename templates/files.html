@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Files — RTKLIB Web PPK{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Files</h1>
+    <p>Browse and manage data files</p>
+</div>
+
+<!-- Breadcrumbs -->
+{% if breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="/files">📁 files</a>
+    {% for bc in breadcrumbs[1:] %}
+    <span class="sep">/</span>
+    <a href="/files/{{ bc.path }}">{{ bc.name }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Upload bar + button -->
+<div class="flex-between mb-2" style="flex-wrap:wrap; gap:8px;">
+    <div></div>
+    <button class="btn btn-sm btn-secondary" onclick="document.getElementById('fileUpload').click()">
+        ⬆ Upload File
+    </button>
+    <input type="file" id="fileUpload" hidden multiple>
+</div>
+
+<!-- Upload progress (hidden until active) -->
+<div id="uploadProgressWrap" class="card hidden" style="padding:12px;">
+    <div id="uploadProgressText" style="font-size:12px; color:#7f8c8d; margin-bottom:6px;">Uploading...</div>
+    <div class="progress-bar">
+        <div id="uploadProgressBar" class="progress-fill" style="width:0%"></div>
+    </div>
+</div>
+
+<!-- File listing -->
+<div class="card" style="padding: 8px;">
+    {% if entries %}
+    <ul class="file-list">
+        {% for entry in entries %}
+        <li class="file-item" {% if entry.full_path %}data-path="{{ entry.full_path }}"{% endif %}>
+            {% if entry.is_dir %}
+            {% set dir_icons = {'uploads':'📥', 'rinex':'📡', 'results':'📊', 'pos':'📍', 'conf':'⚙', 'antex':'📶'} %}
+            {% set dir_desc = {'uploads':'Raw GNSS files (UBX, etc)', 'rinex':'RINEX observation & nav files', 'results':'Processing results & KML', 'pos':'Position solution files', 'conf':'Processing configuration presets', 'antex':'Antenna calibration (ANTEX) files'} %}
+            <a href="/files/{{ entry.path }}" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; flex:1;">
+                <div class="file-icon dir">{{ dir_icons.get(entry.name, '📁') }}</div>
+                <div class="file-info">
+                    <div class="file-name">{{ entry.name }}/</div>
+                    <div class="file-meta">{{ dir_desc.get(entry.name, '') }}{% if entry.size %} · {{ entry.size }}{% endif %}</div>
+                </div>
+            </a>
+            {% else %}
+            <div class="file-icon {{ entry.name.rsplit('.', 1)[-1][:3].lower() if '.' in entry.name else 'dir' }}">
+                {{ entry.name.rsplit('.', 1)[-1][:3].upper() if '.' in entry.name else '?' }}
+            </div>
+            <div class="file-info">
+                <div class="file-name">{{ entry.name }}</div>
+                <div class="file-meta">{{ entry.size }} · {{ entry.modified }}</div>
+            </div>
+            <div class="file-actions">
+                {% set ext = entry.name.rsplit('.', 1)[-1].lower() if '.' in entry.name else '' %}
+                {% if ext in ('obs', 'rnx') or (ext|length == 3 and ext[-1] == 'o') %}
+                <a href="/rinex" class="btn btn-sm btn-secondary">QC →</a>
+                {% elif ext in ('ubx', 'raw') %}
+                <a href="/convbin" class="btn btn-sm btn-secondary">Convert →</a>
+                {% elif ext == 'pos' %}
+                <a href="/posview?file={{ entry.full_path }}" class="btn btn-sm btn-secondary">View →</a>
+                {% elif ext in ('conf', 'cfg') %}
+                <a href="/ppk" class="btn btn-sm btn-secondary">PPK →</a>
+                {% elif ext in ('atx', 'antex') %}
+                <span class="badge" style="font-size:10px;">ANTEX</span>
+                {% endif %}
+                <a href="/api/download?path={{ entry.full_path }}" class="btn btn-sm btn-secondary" title="Download">⬇</a>
+                <button class="btn btn-sm btn-danger" onclick="deleteFile('{{ entry.full_path }}', this)">✕</button>
+            </div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📂</div>
+        <div class="empty-state-text">Empty</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ─── Upload (uses global uploadFilesWithProgress from upload.js) ───
+    document.getElementById('fileUpload').addEventListener('change', async function() {
+        var files = Array.from(this.files || []);
+        if (!files.length) return;
+
+        var progressEl = {
+            wrap: document.getElementById('uploadProgressWrap'),
+            bar:  document.getElementById('uploadProgressBar'),
+            text: document.getElementById('uploadProgressText'),
+        };
+
+        setStatus('Uploading...', 'processing');
+
+        try {
+            await uploadFilesWithProgress(files, progressEl);
+            setStatus('Ready', '');
+            setTimeout(function() { window.location.reload(); }, 800);
+        } catch (err) {
+            setStatus('Upload failed', 'error');
+        }
+
+        // Reset input so re-selecting same file works
+        this.value = '';
+    });
+
+    // ─── Delete ───
+    async function deleteFile(path, btn) {
+        if (!confirm('Delete this file?')) return;
+
+        btn.disabled = true;
+        btn.textContent = '…';
+
+        try {
+            var resp = await fetch('/api/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path }),
+            });
+            var data = await resp.json();
+            if (data.success) {
+                var item = btn.closest('.file-item');
+                item.style.transition = 'opacity 0.3s';
+                item.style.opacity = '0';
+                setTimeout(function() { item.remove(); }, 300);
+            } else {
+                alert('Delete failed: ' + (data.error || 'unknown error'));
+                btn.disabled = false;
+                btn.textContent = '✕';
+            }
+        } catch (err) {
+            alert('Delete failed: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = '✕';
+        }
+    }
+</script>
+{% endblock %}

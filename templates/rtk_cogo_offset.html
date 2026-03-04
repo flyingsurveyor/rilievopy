@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% set active = "cogo" %}
+
+{% block title %}COGO - Offset da Allineamento{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width:900px; margin:24px auto; padding:0 16px; }
+  .card { background:white; border:none; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.25); margin-bottom:16px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  h2 { font-size:16px; margin:16px 0 8px; color:#2c3e50; }
+  label { display:block; margin:10px 0 6px; color:#2c3e50; }
+  select { width:100%; padding:10px; border-radius:10px; border:1px solid #ddd; background:white; color:#333; box-sizing:border-box; }
+  .btn { background:#3498db; color:white; padding:10px 14px; border-radius:10px; text-decoration:none; border:1px solid #ddd; cursor:pointer; }
+  .btn:hover { filter:brightness(1.1); }
+  .btn-primary { background:#2d5016; border-color:#3d6826; }
+  .kv { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #eee; }
+  .kv:last-child { border-bottom:none; }
+  .k { color:#666; }
+  .v { font-variant-numeric: tabular-nums; }
+  #result { display:none; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>📏 Offset da Allineamento</h1>
+    <p style="color:#666;line-height:1.6;">Calcola progressiva e offset ortogonale di un punto rispetto a un allineamento definito da due punti A→B.</p>
+    
+    <label>Punto A (inizio allineamento)</label>
+    <select id="pointA" required>
+      <option value="">-- Seleziona punto --</option>
+      {{ options|safe }}
+    </select>
+    
+    <label>Punto B (fine allineamento)</label>
+    <select id="pointB" required>
+      <option value="">-- Seleziona punto --</option>
+      {{ options|safe }}
+    </select>
+    
+    <label>Punto P (da misurare)</label>
+    <select id="pointP" required>
+      <option value="">-- Seleziona punto --</option>
+      {{ options|safe }}
+    </select>
+    
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+      <a class="btn" href="/cogo">← COGO</a>
+      <button class="btn btn-primary" type="button" id="calc-btn">Calcola</button>
+    </div>
+  </div>
+  
+  <div class="card" id="result">
+    <h2>Risultato Offset</h2>
+    <div id="result-data"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('calc-btn').addEventListener('click', async () => {
+  const pA = document.getElementById('pointA').value;
+  const pB = document.getElementById('pointB').value;
+  const pP = document.getElementById('pointP').value;
+  
+  if (!pA || !pB || !pP) {
+    alert('Seleziona tutti i punti');
+    return;
+  }
+  
+  const [sidA, pidA] = pA.split('|');
+  const [sidB, pidB] = pB.split('|');
+  const [sidP, pidP] = pP.split('|');
+  
+  const resp = await fetch('/cogo/offset/calc', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      pointA: {sid: sidA, pid: pidA},
+      pointB: {sid: sidB, pid: pidB},
+      pointP: {sid: sidP, pid: pidP}
+    })
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+    return;
+  }
+  
+  let html = '<div class="kv"><span class="k">Lunghezza allineamento A→B</span><span class="v">' + data.line_length.toFixed(4) + ' m</span></div>';
+  html += '<div class="kv"><span class="k">Progressiva (da A)</span><span class="v">' + data.station.toFixed(4) + ' m</span></div>';
+  html += '<div class="kv"><span class="k">Offset ortogonale</span><span class="v">' + data.offset.toFixed(4) + ' m</span></div>';
+  html += '<p style="color:#666;margin-top:12px;"><small>Offset positivo = destra guardando da A verso B</small></p>';
+  
+  document.getElementById('result-data').innerHTML = html;
+  document.getElementById('result').style.display = 'block';
+});
+</script>
+{% endblock %}

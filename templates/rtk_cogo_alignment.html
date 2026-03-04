@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% set active = "cogo" %}
+
+{% block title %}COGO - Allineamento Multipunto{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width:1200px; margin:24px auto; padding:0 16px; }
+  .card { background:white; border:none; border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.25); margin-bottom:16px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  h2 { font-size:16px; margin:16px 0 8px; color:#2c3e50; }
+  label { display:block; margin:10px 0 6px; color:#2c3e50; font-weight:500; }
+  select, input { width:100%; padding:10px; border-radius:10px; border:1px solid #ddd; background:white; color:#333; box-sizing:border-box; }
+  .btn { background:#3498db; color:white; padding:10px 14px; border-radius:10px; text-decoration:none; border:none; cursor:pointer; display:inline-block; margin-right:10px; }
+  .btn:hover { filter:brightness(1.1); }
+  .btn-primary { background:#2d5016; border-color:#3d6826; }
+  .kv { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #eee; }
+  .k { color:#666; }
+  .v { font-variant-numeric: tabular-nums; font-weight:500; }
+  #result { display:none; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; font-size:14px; }
+  th, td { padding:8px; text-align:left; border-bottom:1px solid #eee; }
+  th { background:#f5f5f5; font-weight:600; color:#2c3e50; }
+  td { font-variant-numeric: tabular-nums; }
+  .out { color:#e74c3c; font-weight:600; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+  table { font-size:12px; }
+  th, td { padding:6px 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>📊 Libretto di Allineamento</h1>
+    <p style="color:#666;line-height:1.6;">Calcola progressiva e offset di N punti rispetto a un allineamento A→B. Genera report topografico con export CSV.</p>
+    
+    <label>Punto A (inizio allineamento)</label>
+    <select id="pointA" required>
+      <option value="">-- Seleziona punto --</option>
+      {{ options|safe }}
+    </select>
+    
+    <label>Punto B (fine allineamento)</label>
+    <select id="pointB" required>
+      <option value="">-- Seleziona punto --</option>
+      {{ options|safe }}
+    </select>
+    
+    <label>Punti da analizzare (tieni premuto Ctrl/Cmd per selezione multipla)</label>
+    <select id="points" multiple size="8" required>
+      {{ options|safe }}
+    </select>
+    
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+      <a class="btn" href="/cogo">← COGO</a>
+      <button class="btn btn-primary" type="button" id="calc-btn">Calcola Allineamento</button>
+    </div>
+  </div>
+  
+  <div class="card" id="result">
+    <h2>Report Allineamento</h2>
+    <div id="alignment-info"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Punto</th>
+          <th>Progressiva (m)</th>
+          <th>Offset (m)</th>
+          <th>Lato</th>
+          <th>ΔH (m)</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <div style="margin-top:14px;">
+      <button class="btn" type="button" id="export-btn">📥 Esporta CSV</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentReport = null;
+
+document.getElementById('calc-btn').addEventListener('click', async () => {
+  const pA = document.getElementById('pointA').value;
+  const pB = document.getElementById('pointB').value;
+  const pointsSelect = document.getElementById('points');
+  const selectedPoints = Array.from(pointsSelect.selectedOptions).map(opt => opt.value);
+  
+  if (!pA || !pB) {
+    alert("Seleziona i punti dell'allineamento A e B");
+    return;
+  }
+  
+  if (selectedPoints.length === 0) {
+    alert('Seleziona almeno un punto da analizzare');
+    return;
+  }
+  
+  const [sidA, pidA] = pA.split('|');
+  const [sidB, pidB] = pB.split('|');
+  
+  const points = selectedPoints.map(p => {
+    const [sid, pid] = p.split('|');
+    return {sid, pid};
+  });
+  
+  const resp = await fetch('/cogo/alignment/calc', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      pointA: {sid: sidA, pid: pidA},
+      pointB: {sid: sidB, pid: pidB},
+      points: points
+    })
+  });
+  
+  const data = await resp.json();
+  
+  if (data.error) {
+    alert('Errore: ' + data.error);
+    return;
+  }
+  
+  currentReport = data;
+  
+  // Display alignment info
+  let info = '<div class="kv"><span class="k">Allineamento</span><span class="v">' + data.alignment.from + ' → ' + data.alignment.to + '</span></div>';
+  info += '<div class="kv"><span class="k">Lunghezza</span><span class="v">' + data.alignment.length.toFixed(4) + ' m</span></div>';
+  info += '<div class="kv"><span class="k">Azimut</span><span class="v">' + data.alignment.bearing_gon.toFixed(4) + ' gon</span></div>';
+  document.getElementById('alignment-info').innerHTML = info;
+  
+  // Build table
+  let tbody = '';
+  for (const pt of data.points) {
+    const out = pt.out_of_alignment ? ' class="out"' : '';
+    const note = pt.out_of_alignment ? 'Fuori allineamento' : '';
+    tbody += '<tr' + out + '>';
+    tbody += '<td>' + pt.name + '</td>';
+    tbody += '<td>' + pt.station.toFixed(4) + '</td>';
+    tbody += '<td>' + pt.offset.toFixed(4) + '</td>';
+    tbody += '<td>' + pt.side + '</td>';
+    tbody += '<td>' + (pt.delta_h >= 0 ? '+' : '') + pt.delta_h.toFixed(4) + '</td>';
+    tbody += '<td>' + note + '</td>';
+    tbody += '</tr>';
+  }
+  document.getElementById('table-body').innerHTML = tbody;
+  document.getElementById('result').style.display = 'block';
+});
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  if (!currentReport) {
+    alert("Calcola prima l'allineamento");
+    return;
+  }
+  
+  // Build CSV
+  let csv = 'Punto,Progressiva (m),Offset (m),Lato,DeltaH (m),Note\\n';
+  for (const pt of currentReport.points) {
+    const note = pt.out_of_alignment ? 'Fuori allineamento' : '';
+    csv += pt.name + ',';
+    csv += pt.station.toFixed(4) + ',';
+    csv += pt.offset.toFixed(4) + ',';
+    csv += pt.side + ',';
+    csv += pt.delta_h.toFixed(4) + ',';
+    csv += note + '\\n';
+  }
+  
+  // Download
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'allineamento_' + currentReport.alignment.from + '_' + currentReport.alignment.to + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+{% endblock %}

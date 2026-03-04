@@ -1,0 +1,619 @@
+{% extends "base.html" %}
+{% block title %}RINEX QC — RTKLIB Web PPK{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>RINEX QC</h1>
+    <p>Observation file quality analysis</p>
+</div>
+
+<!-- File selection -->
+<div class="card">
+    <div class="card-header">
+        <h2>Observation File</h2>
+        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('obsUpload').click()">
+            ⬆ Upload
+        </button>
+        <input type="file" id="obsUpload" hidden accept=".obs,.rnx,.OBS,.RNX">
+        <div id="obsUploadProgressWrap" style="display:none; margin-top:10px;">
+            <div id="obsUploadProgressText" style="font-size: 12px; color:#7f8c8d; margin-bottom:4px;">Uploading...</div>
+            <div style="width:100%; background:#ecf0f1; border-radius:8px; overflow:hidden; height:10px;">
+                <div id="obsUploadProgressBar" style="width:0%; height:10px; background:#3498db;"></div>
+            </div>
+        </div>
+    </div>
+
+    {% if obs_files %}
+    <ul class="file-list" id="obsFileList">
+        {% for f in obs_files %}
+        <li class="file-item" data-path="{{ f.path }}" onclick="selectObsFile(this)">
+            <div class="file-icon obs">OBS</div>
+            <div class="file-info">
+                <div class="file-name">{{ f.name }}</div>
+                <div class="file-meta">{{ f.size }} · {{ f.modified }}</div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <div class="empty-state-text">No RINEX observation files found</div>
+        <div class="empty-state-hint">Convert raw data with Convbin or upload .obs files</div>
+    </div>
+    {% endif %}
+
+    <div class="form-row mt-2">
+        <div class="form-group">
+            <label>Decimation (show every Nth epoch)</label>
+            <select id="decimate">
+                <option value="1">Every epoch</option>
+                <option value="2">Every 2nd</option>
+                <option value="5">Every 5th</option>
+                <option value="10" selected>Every 10th</option>
+                <option value="30">Every 30th</option>
+                <option value="60">Every 60th</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Max epochs (0 = all)</label>
+            <input type="number" id="maxEpochs" value="0" min="0" step="500">
+        </div>
+    </div>
+
+    <button class="btn btn-primary btn-block mt-1" id="btnParse" onclick="parseRinex()" disabled>
+        Analyze File
+    </button>
+</div>
+
+<!-- Progress -->
+<div class="hidden" id="parseProgress">
+    <div class="alert alert-info">
+        <span class="spinner"></span>
+        <span id="parseStatusText">Parsing RINEX file... This may take a while on slow hardware.</span>
+    </div>
+</div>
+
+<!-- Results -->
+<div class="hidden" id="results">
+
+    <!-- Header Info -->
+    <div class="card">
+        <div class="card-header">
+            <h2>File Info</h2>
+            <span class="badge" id="rinexVersion">—</span>
+        </div>
+        <div id="headerInfo"></div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid grid-4 mt-1">
+        <div class="stat-box">
+            <div class="stat-value" id="statDuration">—</div>
+            <div class="stat-label">Duration</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="statEpochs">—</div>
+            <div class="stat-label">Epochs</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="statSatellites">—</div>
+            <div class="stat-label">Satellites</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="statInterval">—</div>
+            <div class="stat-label">Interval</div>
+        </div>
+    </div>
+
+    <!-- Systems breakdown -->
+    <div class="card mt-2" id="systemsCard">
+        <div class="card-header">
+            <h2>Constellations</h2>
+        </div>
+        <div id="systemsBreakdown" class="grid grid-3"></div>
+    </div>
+
+    <!-- Satellite Timeline -->
+    <div class="card mt-2">
+        <div class="card-header">
+            <h2>Satellite Visibility</h2>
+            <div class="toggle-group" id="timelineFilters"></div>
+        </div>
+        <div class="sat-timeline">
+            <canvas id="timelineCanvas"></canvas>
+        </div>
+    </div>
+
+    <!-- SNR Chart -->
+    <div class="card mt-2">
+        <div class="card-header">
+            <h2>SNR — L1</h2>
+        </div>
+        <div class="chart-container" style="height:300px; padding:10px;">
+            <canvas id="snrChart"></canvas>
+        </div>
+    </div>
+
+    <!-- SNR L2 Chart -->
+    <div class="card mt-2" id="snrL2Card">
+        <div class="card-header">
+            <h2>SNR — L2</h2>
+        </div>
+        <div class="chart-container" style="height:300px; padding:10px;">
+            <canvas id="snrL2Chart"></canvas>
+        </div>
+    </div>
+
+    <!-- Cycle Slips -->
+    <div class="card mt-2">
+        <div class="card-header">
+            <h2>Cycle Slips</h2>
+            <span class="badge" id="csCount">—</span>
+        </div>
+        <div id="cycleSlipInfo"></div>
+    </div>
+
+    <!-- Satellite Table -->
+    <div class="card mt-2">
+        <div class="card-header">
+            <h2>Satellite Details</h2>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="data-table" id="satTable">
+                <thead>
+                    <tr>
+                        <th>PRN</th>
+                        <th>System</th>
+                        <th>Epochs</th>
+                        <th>SNR L1</th>
+                        <th>SNR L2</th>
+                        <th>Slips</th>
+                    </tr>
+                </thead>
+                <tbody id="satTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let selectedObsFile = null;
+    let parsedData = null;
+    let timelineChart = null;
+    let snrChartInstance = null;
+    let snrL2ChartInstance = null;
+
+    const SYS_COLORS = {
+        'G': '#3498db', 'R': '#e74c3c', 'E': '#27ae60',
+        'C': '#f39c12', 'J': '#9b59b6', 'S': '#95a5a6', 'I': '#1abc9c'
+    };
+
+    const SYS_NAMES = {
+        'G': 'GPS', 'R': 'GLONASS', 'E': 'Galileo',
+        'C': 'BeiDou', 'J': 'QZSS', 'S': 'SBAS', 'I': 'IRNSS'
+    };
+
+    function selectObsFile(el) {
+        document.querySelectorAll('#obsFileList .file-item').forEach(i => i.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedObsFile = el.dataset.path;
+        document.getElementById('btnParse').disabled = false;
+    }
+
+    // Upload handler (uses shared upload.js)
+    document.getElementById('obsUpload').addEventListener('change', async function() {
+        var file = this.files[0];
+        if (!file) return;
+
+        setStatus('Uploading...', 'processing');
+        try {
+            await uploadFilesWithProgress([file], {
+                wrap: document.getElementById('obsUploadProgressWrap'),
+                bar: document.getElementById('obsUploadProgressBar'),
+                text: document.getElementById('obsUploadProgressText'),
+            });
+            setStatus('Ready', '');
+            window.location.reload();
+        } catch (err) {
+            setStatus('Upload failed: ' + (err.message || 'error'), 'error');
+        }
+    });
+
+    async function parseRinex() {
+        if (!selectedObsFile) return;
+
+        const btn = document.getElementById('btnParse');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Parsing...';
+        document.getElementById('parseProgress').classList.remove('hidden');
+        document.getElementById('results').classList.add('hidden');
+        setStatus('Parsing RINEX...', 'processing');
+
+        try {
+            const resp = await fetch('/api/rinex/parse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    file: selectedObsFile,
+                    decimate: parseInt(document.getElementById('decimate').value),
+                    max_epochs: parseInt(document.getElementById('maxEpochs').value),
+                }),
+            });
+
+            const data = await resp.json();
+
+            if (data.error) {
+                alert('Error: ' + data.error);
+                setStatus('Error', 'error');
+                return;
+            }
+
+            parsedData = data;
+            renderResults(data);
+            document.getElementById('results').classList.remove('hidden');
+            setStatus('Ready', '');
+
+        } catch (err) {
+            alert('Parse failed: ' + err.message);
+            setStatus('Error', 'error');
+        } finally {
+            document.getElementById('parseProgress').classList.add('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Analyze File';
+        }
+    }
+
+    function renderResults(data) {
+        const header = data.header;
+        const obs = data.observations;
+        const summary = obs.summary;
+
+        // Header info
+        document.getElementById('rinexVersion').textContent = 'RINEX ' + (header.version || '?');
+        let headerHtml = `
+            <div class="grid grid-2">
+                <div><span class="text-muted">Marker:</span> <span class="text-mono">${header.marker_name || '—'}</span></div>
+                <div><span class="text-muted">Receiver:</span> <span class="text-mono">${header.receiver_type || '—'}</span></div>
+                <div><span class="text-muted">Antenna:</span> <span class="text-mono">${header.antenna_type || '—'}</span></div>
+                <div><span class="text-muted">File:</span> <span class="text-mono">${header.file_name || '—'}</span></div>
+            </div>
+        `;
+        document.getElementById('headerInfo').innerHTML = headerHtml;
+
+        // Stats
+        document.getElementById('statDuration').textContent = summary.duration_human || '—';
+        document.getElementById('statEpochs').textContent = summary.num_epochs.toLocaleString();
+        document.getElementById('statSatellites').textContent = summary.num_satellites;
+        document.getElementById('statInterval').textContent = summary.interval ? summary.interval + 's' : '—';
+
+        // Systems breakdown
+        let sysHtml = '';
+        for (const [code, info] of Object.entries(summary.sats_per_system)) {
+            sysHtml += `
+                <div class="stat-box">
+                    <div class="stat-value" style="color:${SYS_COLORS[code] || '#fff'}">${info.count}</div>
+                    <div class="stat-label">${info.name}</div>
+                </div>
+            `;
+        }
+        document.getElementById('systemsBreakdown').innerHTML = sysHtml;
+
+        // Draw charts
+        drawTimeline(obs);
+        drawSNRChart(obs, 'snr_l1_series', 'snrChart', 'L1');
+        drawSNRChart(obs, 'snr_l2_series', 'snrL2Chart', 'L2');
+
+        // Check if L2 data exists
+        let hasL2 = Object.values(obs.satellites).some(s => s.has_l2);
+        document.getElementById('snrL2Card').style.display = hasL2 ? '' : 'none';
+
+        // Cycle slips
+        let totalSlips = 0;
+        let csHtml = '';
+        const slipSats = [];
+        for (const [prn, sat] of Object.entries(obs.satellites)) {
+            if (sat.num_cycle_slips > 0) {
+                totalSlips += sat.num_cycle_slips;
+                slipSats.push({ prn, count: sat.num_cycle_slips });
+            }
+        }
+        document.getElementById('csCount').textContent = totalSlips + ' total';
+
+        if (slipSats.length > 0) {
+            slipSats.sort((a, b) => b.count - a.count);
+            csHtml = '<div class="toggle-group">';
+            slipSats.forEach(s => {
+                const sys = s.prn[0];
+                csHtml += `<span class="toggle-chip" style="cursor:default;">
+                    <span class="sys-dot ${sys}"></span>
+                    ${s.prn}: <strong>${s.count}</strong>
+                </span>`;
+            });
+            csHtml += '</div>';
+        } else {
+            csHtml = '<div class="text-muted">No cycle slips detected (LLI flag)</div>';
+        }
+        document.getElementById('cycleSlipInfo').innerHTML = csHtml;
+
+        // Satellite table
+        const tbody = document.getElementById('satTableBody');
+        tbody.innerHTML = '';
+        const sortedPrns = Object.keys(obs.satellites).sort((a, b) => {
+            if (a[0] !== b[0]) return a[0].localeCompare(b[0]);
+            return parseInt(a.slice(1)) - parseInt(b.slice(1));
+        });
+
+        for (const prn of sortedPrns) {
+            const sat = obs.satellites[prn];
+            const sys = sat.system_code;
+            const pct = ((sat.num_epochs / summary.num_epochs) * 100).toFixed(0);
+            tbody.innerHTML += `
+                <tr>
+                    <td style="color:${SYS_COLORS[sys] || '#fff'}">${prn}</td>
+                    <td>${sat.system_code}</td>
+                    <td>${sat.num_epochs} <span class="text-muted">(${pct}%)</span></td>
+                    <td>${sat.snr_l1_mean > 0 ? sat.snr_l1_mean.toFixed(1) : '—'}</td>
+                    <td>${sat.snr_l2_mean > 0 ? sat.snr_l2_mean.toFixed(1) : '—'}</td>
+                    <td>${sat.num_cycle_slips > 0 ? '<span class="text-orange">' + sat.num_cycle_slips + '</span>' : '0'}</td>
+                </tr>
+            `;
+        }
+    }
+
+    // ─────────────────────────────────────
+    // Satellite Visibility Timeline
+    // ─────────────────────────────────────
+    function drawTimeline(obs) {
+        const canvas = document.getElementById('timelineCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const satellites = obs.satellites;
+        const epochs = obs.epochs;
+        const prns = Object.keys(satellites).sort((a, b) => {
+            if (a[0] !== b[0]) return a[0].localeCompare(b[0]);
+            return parseInt(a.slice(1)) - parseInt(b.slice(1));
+        });
+
+        const rowHeight = 16;
+        const leftMargin = 60;
+        const topMargin = 30;
+        const rightMargin = 20;
+        const bottomMargin = 40;
+        const numEpochs = epochs.length;
+
+        canvas.width = Math.max(800, leftMargin + numEpochs * 2 + rightMargin);
+        canvas.height = topMargin + prns.length * rowHeight + bottomMargin;
+
+        // Scale for high-DPI
+        const dpr = window.devicePixelRatio || 1;
+        canvas.style.width = canvas.width + 'px';
+        canvas.style.height = canvas.height + 'px';
+        canvas.width *= dpr;
+        canvas.height *= dpr;
+        ctx.scale(dpr, dpr);
+
+        const plotWidth = canvas.width / dpr - leftMargin - rightMargin;
+        const pxPerEpoch = plotWidth / Math.max(numEpochs, 1);
+
+        // Background
+        ctx.fillStyle = '#fafafa';
+        ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+
+        // PRN labels
+        ctx.font = '11px -apple-system, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        prns.forEach((prn, i) => {
+            const y = topMargin + i * rowHeight + rowHeight / 2;
+            const sys = prn[0];
+            ctx.fillStyle = SYS_COLORS[sys] || '#95a5a6';
+            ctx.fillText(prn, leftMargin - 8, y);
+        });
+
+        // Draw dots
+        prns.forEach((prn, i) => {
+            const sat = satellites[prn];
+            const sys = sat.system_code;
+            const color = SYS_COLORS[sys] || '#95a5a6';
+            const y = topMargin + i * rowHeight + rowHeight / 2;
+
+            ctx.fillStyle = color;
+
+            sat.epoch_indices.forEach(ei => {
+                const x = leftMargin + ei * pxPerEpoch;
+                // Use SNR for opacity if available
+                const snrIdx = sat.epoch_indices.indexOf(ei);
+                let snr = 0;
+                if (snrIdx >= 0 && snrIdx < sat.snr_l1_series.length) {
+                    snr = sat.snr_l1_series[snrIdx];
+                }
+
+                if (snr > 0) {
+                    const alpha = Math.min(1, Math.max(0.2, (snr - 10) / 40));
+                    ctx.globalAlpha = alpha;
+                } else {
+                    ctx.globalAlpha = 0.5;
+                }
+
+                const dotW = Math.max(1, pxPerEpoch * 0.8);
+                ctx.fillRect(x, y - 3, dotW, 6);
+            });
+
+            // Cycle slips as red marks
+            if (sat.cycle_slips && sat.cycle_slips.length > 0) {
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = '#e74c3c';
+                sat.cycle_slips.forEach(ei => {
+                    const x = leftMargin + ei * pxPerEpoch;
+                    ctx.fillRect(x - 1, y - 5, 3, 10);
+                });
+                ctx.fillStyle = color;
+            }
+        });
+
+        ctx.globalAlpha = 1;
+
+        // Time labels
+        ctx.fillStyle = '#7f8c8d';
+        ctx.font = '10px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+
+        const labelCount = Math.min(8, numEpochs);
+        for (let i = 0; i <= labelCount; i++) {
+            const ei = Math.floor((i / labelCount) * (numEpochs - 1));
+            if (ei >= 0 && ei < epochs.length) {
+                const x = leftMargin + ei * pxPerEpoch;
+                const y = topMargin + prns.length * rowHeight + 16;
+                const t = epochs[ei];
+                // Show HH:MM
+                const timePart = t.split('T')[1] || '';
+                ctx.fillText(timePart.substring(0, 5), x, y);
+            }
+        }
+
+        // Grid lines
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= labelCount; i++) {
+            const ei = Math.floor((i / labelCount) * (numEpochs - 1));
+            const x = leftMargin + ei * pxPerEpoch;
+            ctx.beginPath();
+            ctx.moveTo(x, topMargin);
+            ctx.lineTo(x, topMargin + prns.length * rowHeight);
+            ctx.stroke();
+        }
+    }
+
+    // ─────────────────────────────────────
+    // SNR Chart
+    // ─────────────────────────────────────
+    function drawSNRChart(obs, seriesKey, canvasId, label) {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext('2d');
+
+        // Destroy previous instance
+        if (canvasId === 'snrChart' && snrChartInstance) snrChartInstance.destroy();
+        if (canvasId === 'snrL2Chart' && snrL2ChartInstance) snrL2ChartInstance.destroy();
+
+        const satellites = obs.satellites;
+        const epochs = obs.epochs;
+
+        // Build datasets — pick top satellites by epoch count for readability
+        const prns = Object.keys(satellites)
+            .filter(p => satellites[p][seriesKey] && satellites[p][seriesKey].some(v => v > 0))
+            .sort((a, b) => satellites[b].num_epochs - satellites[a].num_epochs)
+            .slice(0, 12); // Limit for performance
+
+        const datasets = prns.map(prn => {
+            const sat = satellites[prn];
+            const sys = sat.system_code;
+            const color = SYS_COLORS[sys] || '#95a5a6';
+
+            // Build sparse data
+            const data = [];
+            sat.epoch_indices.forEach((ei, idx) => {
+                if (idx < sat[seriesKey].length && sat[seriesKey][idx] > 0) {
+                    data.push({ x: ei, y: sat[seriesKey][idx] });
+                }
+            });
+
+            return {
+                label: prn,
+                data: data,
+                borderColor: color,
+                backgroundColor: color,
+                borderWidth: 1,
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                pointHitRadius: 6,
+                showLine: true,
+                tension: 0.1,
+                fill: false,
+            };
+        });
+
+        // Time labels
+        const timeLabels = epochs.map((e, i) => {
+            const t = e.split('T')[1] || '';
+            return t.substring(0, 5);
+        });
+
+        const chartConfig = {
+            type: 'scatter',
+            data: { datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                interaction: {
+                    mode: 'nearest',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#7f8c8d',
+                            font: { family: "-apple-system, sans-serif", size: 10 },
+                            boxWidth: 8,
+                            padding: 8,
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'white',
+                        titleColor: '#2c3e50',
+                        bodyColor: '#7f8c8d',
+                        borderColor: '#ddd',
+                        borderWidth: 1,
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        title: { display: false },
+                        ticks: {
+                            color: '#7f8c8d',
+                            font: { family: "-apple-system, sans-serif", size: 10 },
+                            callback: function(val) {
+                                const idx = Math.round(val);
+                                return timeLabels[idx] || '';
+                            },
+                            maxTicksLimit: 8,
+                        },
+                        grid: { color: '#ecf0f1' },
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'SNR (dB-Hz)',
+                            color: '#7f8c8d',
+                            font: { size: 11 },
+                        },
+                        ticks: {
+                            color: '#7f8c8d',
+                            font: { family: "-apple-system, sans-serif", size: 10 },
+                        },
+                        grid: { color: '#ecf0f1' },
+                        min: 0,
+                        max: 60,
+                    },
+                },
+            },
+        };
+
+        const instance = new Chart(ctx, chartConfig);
+        if (canvasId === 'snrChart') snrChartInstance = instance;
+        if (canvasId === 'snrL2Chart') snrL2ChartInstance = instance;
+    }
+</script>
+{% endblock %}

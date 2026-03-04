@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% set active = "surveys" %}
+
+{% block title %}Punto salvato{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
+  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .card h1, .card h3 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
+  .card h3 { font-size: 18px; margin-top: 20px; }
+  button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
+  button:hover, .btn:hover { background: #2980b9; }
+  .btn-success { background: #2ecc71; }
+  .btn-success:hover { background: #27ae60; }
+  pre { white-space: pre-wrap; background: #f8f9fa; border: 1px solid #ddd; padding: 12px; border-radius: 4px; color: #333; }
+  @media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card">
+    <h1>✅ Punto salvato con successo</h1>
+    <p><a class="btn btn-success" href="{{ txthref }}">⬇ {{ fname }}</a></p>
+    <p>
+      <a class="btn" href="{{ viewhref }}">← Torna al rilievo</a>
+      <a class="btn" href="/">Dashboard</a>
+    </p>
+    <h3>Anteprima TXT</h3>
+    <pre>{{ summary|safe }}</pre>
+  </div>
+</div>
+{% endblock %}
