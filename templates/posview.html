@@ -187,7 +187,7 @@
     <div class="card chart-panel hidden" id="panel-analyser">
 
         <details id="filterDetails" open>
-            <summary class="analyser-section-title">&#127913; Filtri &amp; Statistiche</summary>
+            <summary class="analyser-section-title">&#9881; Filtri &amp; Statistiche</summary>
             <div class="analyser-filters">
                 <div class="filter-row">
                     <label class="filter-toggle">
@@ -1118,10 +1118,10 @@ function renderStationsList() {
             : '<button class="btn btn-sm btn-primary" onclick="importStation('+i+')">\u2192 Importa nel rilievo attivo</button>';
         html+='<div class="station-card" id="stcard-'+i+'">' +
             '<div class="flex-between" style="align-items:flex-start;">' +
-            '<h4>\ud83d\udccd '+escHtml(st._name)+'</h4>' +
+            '<h4>&#128205; '+escHtml(st._name)+'</h4>' +
             '<div style="display:flex;gap:6px;">' +
             '<button class="btn btn-sm btn-secondary" onclick="renameStation('+i+')">\u270e Rinomina</button>' +
-            '<button class="btn btn-sm btn-secondary" onclick="removeStation('+i+')">\ud83d\uddd1 Rimuovi</button></div></div>' +
+            '<button class="btn btn-sm btn-secondary" onclick="removeStation('+i+'">&#128465; Rimuovi</button></div></div>' +
             '<div class="station-coords">' +
             '<div>'+st.n_epochs+' epoche &nbsp;| '+escHtml(st.t_start||'\u2014')+' \u2192 '+escHtml(st.t_end||'\u2014')+'</div>' +
             '<div>Lat: <b>'+st.lat.toFixed(9)+'</b> &nbsp;\xb1'+(st.sigma_N*1000).toFixed(1)+' mm</div>' +
