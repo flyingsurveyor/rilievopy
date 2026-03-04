@@ -26,7 +26,8 @@ from modules.conf_manager import (
     get_defaults, validate_conf, merge_conf, bitmask_to_navsys
 )
 from modules.pos_parser import (
-    parse_pos, decimate_for_charts, Q_LABELS, Q_COLORS
+    parse_pos, decimate_for_charts, Q_LABELS, Q_COLORS,
+    compute_session_stats, weighted_mean_station,
 )
 
 bp = Blueprint('ppk', __name__)
@@ -799,3 +800,158 @@ def api_pos_list():
             seen.add(f['name'])
             unique.append(f)
     return jsonify({'files': unique})
+
+
+@bp.route('/api/pos/epochs', methods=['POST'])
+def api_pos_epochs():
+    """Return all epochs (full data, not decimated) for a .pos file."""
+    data = request.get_json()
+    filepath = data.get('filepath', '')
+
+    if not filepath or not os.path.isfile(filepath):
+        return jsonify({'error': 'File not found'}), 404
+
+    real = os.path.realpath(filepath)
+    allowed = [os.path.realpath(Cfg.POS_DIR),
+               os.path.realpath(Cfg.RESULTS_DIR)]
+    if not any(real.startswith(d) for d in allowed):
+        return jsonify({'error': 'Access denied'}), 403
+
+    try:
+        result = parse_pos(filepath)
+        epochs = result['data']
+        session_stats = compute_session_stats(epochs)
+        # Serialise epoch list for transfer
+        epoch_list = []
+        for i, e in enumerate(epochs):
+            epoch_list.append({
+                'i': i,
+                'ts': e.get('time_str', ''),
+                'lat': e['lat'],
+                'lon': e['lon'],
+                'h': e['height'],
+                'q': e.get('quality', 0),
+                'ns': e.get('ns', 0),
+                'ratio': e.get('ratio', 0.0),
+                'sdn': e.get('sdn', 0.0),
+                'sde': e.get('sde', 0.0),
+                'sdu': e.get('sdu', 0.0),
+            })
+        return jsonify({
+            'ok': True,
+            'filepath': filepath,
+            'filename': os.path.basename(filepath),
+            'epochs': epoch_list,
+            'session_stats': session_stats,
+        })
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+@bp.route('/ppk/station', methods=['POST'])
+def ppk_compute_station():
+    """
+    Receive a list of epoch indices and a .pos filepath,
+    compute weighted mean station, return as JSON.
+    Body: {"pos_file": "...", "epoch_indices": [12, 13, ...]}
+    """
+    body = request.get_json() or {}
+    pos_file = body.get('pos_file', '')
+    indices = body.get('epoch_indices', [])
+
+    if not pos_file or not os.path.isfile(pos_file):
+        return jsonify({'ok': False, 'error': 'File not found'}), 404
+
+    real = os.path.realpath(pos_file)
+    allowed = [os.path.realpath(Cfg.POS_DIR),
+               os.path.realpath(Cfg.RESULTS_DIR)]
+    if not any(real.startswith(d) for d in allowed):
+        return jsonify({'ok': False, 'error': 'Access denied'}), 403
+
+    if not indices:
+        return jsonify({'ok': False, 'error': 'No epoch indices provided'}), 400
+
+    try:
+        result = parse_pos(pos_file)
+        epochs = result['data']
+        selected = [epochs[i] for i in indices if 0 <= i < len(epochs)]
+        if not selected:
+            return jsonify({'ok': False, 'error': 'No valid epochs selected'}), 400
+
+        station = weighted_mean_station(selected)
+        return jsonify({'ok': True, 'station': station})
+    except Exception as exc:
+        return jsonify({'ok': False, 'error': str(exc)}), 500
+
+
+@bp.route('/ppk/import_station', methods=['POST'])
+def ppk_import_station():
+    """
+    Import a PPK station into the active survey as a GeoJSON point.
+    Body: {"station": {...}, "name": "PPK_001"}
+    """
+    from modules.active_survey import get_active_survey_id
+    from modules.survey import load_survey, save_survey, backup_survey
+    from modules.utils import now_iso
+
+    body = request.get_json() or {}
+    station = body.get('station', {})
+    name = body.get('name', '').strip()
+
+    if not station:
+        return jsonify({'ok': False, 'error': 'No station data provided'}), 400
+
+    sid = get_active_survey_id()
+    if not sid:
+        return jsonify({'ok': False, 'error': 'no_active_survey'})
+
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        return jsonify({'ok': False, 'error': 'no_active_survey'})
+
+    # Count existing PPK points to auto-generate name
+    features = svy.get('features', [])
+    ppk_count = sum(
+        1 for f in features
+        if f.get('properties', {}).get('source') == 'ppk'
+    )
+
+    if not name:
+        name = f'PPK_{ppk_count + 1:03d}'
+
+    pid = name  # Use name as ID for uniqueness
+
+    feature = {
+        'type': 'Feature',
+        'id': pid,
+        'geometry': {
+            'type': 'Point',
+            'coordinates': [station['lon'], station['lat'], station['h']],
+        },
+        'properties': {
+            'name': name,
+            'source': 'ppk',
+            'codice': '',
+            'note': '',
+            'lat': station['lat'],
+            'lon': station['lon'],
+            'h': station['h'],
+            'sigma_N': station.get('sigma_N'),
+            'sigma_E': station.get('sigma_E'),
+            'sigma_U': station.get('sigma_U'),
+            'n_epochs': station.get('n_epochs'),
+            'ratio_mean': station.get('ratio_mean'),
+            'ratio_max': station.get('ratio_max'),
+            'ns_mean': station.get('ns_mean'),
+            't_start': station.get('t_start'),
+            't_end': station.get('t_end'),
+            'ts': now_iso(),
+        },
+    }
+
+    backup_survey(sid)
+    svy.setdefault('features', []).append(feature)
+    save_survey(sid, svy)
+
+    return jsonify({'ok': True, 'pid': pid, 'name': name})
