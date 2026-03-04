@@ -112,6 +112,7 @@ def point_feature(pid: str,
         "geometry": geom,
         "properties": {
             "name": meta.get("name") or pid,
+            "codice": meta.get("codice", ""),
             "desc": meta.get("desc") or "",
             "timestamp": now_iso(),
             "TPV": {"mode": stats.get("mode"), "rtk": stats.get("rtk"), "numSV": stats.get("numSV")},

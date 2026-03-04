@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+data/active_survey.json
+data/pos/
+data/results/
+data/rinex/
+data/uploads/
+surveys/
+*.tmp
