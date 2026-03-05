@@ -426,3 +426,117 @@ def _format_duration(seconds):
     elif m > 0:
         return f'{m}m {s}s'
     return f'{s}s'
+
+
+# ═══════════════════════════════════════════════════════
+# PPK Analyser functions
+# ═══════════════════════════════════════════════════════
+
+def compute_session_stats(epochs: list) -> dict:
+    """
+    Compute session-level statistics from a list of epoch dicts.
+
+    Returns dict with fix count/%, ratio stats, satellite stats, sigma means.
+    Only stdlib Python — no numpy/pandas.
+    """
+    n = len(epochs)
+    if n == 0:
+        return {
+            'total_epochs': 0, 'fix_epochs': 0, 'fix_pct': 0.0,
+            'ratio_mean': 0.0, 'ratio_max': 0.0,
+            'ns_mean': 0.0, 'sdu_mean': 0.0, 'sdn_mean': 0.0, 'sde_mean': 0.0,
+        }
+
+    fix_epochs = [e for e in epochs if e.get('quality') == 1]
+    n_fix = len(fix_epochs)
+
+    ratio_vals = [e['ratio'] for e in fix_epochs if e.get('ratio', 0) > 0]
+    ns_vals = [e['ns'] for e in epochs if e.get('ns', 0) > 0]
+    sdu_vals = [e['sdu'] for e in fix_epochs if e.get('sdu', 0) > 0]
+    sdn_vals = [e['sdn'] for e in fix_epochs if e.get('sdn', 0) > 0]
+    sde_vals = [e['sde'] for e in fix_epochs if e.get('sde', 0) > 0]
+
+    def _mean(vals):
+        return round(sum(vals) / len(vals), 4) if vals else 0.0
+
+    return {
+        'total_epochs': n,
+        'fix_epochs': n_fix,
+        'fix_pct': round(100.0 * n_fix / n, 1),
+        'ratio_mean': _mean(ratio_vals),
+        'ratio_max': round(max(ratio_vals), 1) if ratio_vals else 0.0,
+        'ns_mean': _mean(ns_vals),
+        'sdu_mean': _mean(sdu_vals),
+        'sdn_mean': _mean(sdn_vals),
+        'sde_mean': _mean(sde_vals),
+    }
+
+
+def weighted_mean_station(epochs: list) -> dict:
+    """
+    Compute weighted mean position from a list of epoch dicts.
+
+    Weight = 1/σ² for each coordinate independently.
+    σ floor = 0.0001 m to avoid division by zero with malformed data.
+    Propagated sigma of mean: σ_mean = sqrt(1 / Σ(1/σ_i²))
+
+    Returns dict with lat, lon, h, sigma_N, sigma_E, sigma_U,
+    n_epochs, ratio_mean, ratio_max, ns_mean, t_start, t_end.
+    """
+    _SIGMA_FLOOR = 0.0001
+
+    if not epochs:
+        return {}
+
+    sum_w_lat = sum_w_lon = sum_w_h = 0.0
+    sum_wlat = sum_wlon = sum_wh = 0.0
+
+    for e in epochs:
+        sdn = max(e.get('sdn', 0) or 0, _SIGMA_FLOOR)
+        sde = max(e.get('sde', 0) or 0, _SIGMA_FLOOR)
+        sdu = max(e.get('sdu', 0) or 0, _SIGMA_FLOOR)
+
+        wn = 1.0 / (sdn * sdn)
+        we = 1.0 / (sde * sde)
+        wh = 1.0 / (sdu * sdu)
+
+        sum_w_lat += wn
+        sum_wlat += wn * e['lat']
+
+        sum_w_lon += we
+        sum_wlon += we * e['lon']
+
+        sum_w_h += wh
+        sum_wh += wh * e['height']
+
+    lat_mean = sum_wlat / sum_w_lat
+    lon_mean = sum_wlon / sum_w_lon
+    h_mean = sum_wh / sum_w_h
+
+    sigma_N = math.sqrt(1.0 / sum_w_lat)
+    sigma_E = math.sqrt(1.0 / sum_w_lon)
+    sigma_U = math.sqrt(1.0 / sum_w_h)
+
+    ratio_vals = [e['ratio'] for e in epochs if e.get('ratio', 0) > 0]
+    ns_vals = [e['ns'] for e in epochs if e.get('ns', 0) > 0]
+
+    def _mean(vals):
+        return round(sum(vals) / len(vals), 2) if vals else 0.0
+
+    t_start = epochs[0].get('time_str', '')
+    t_end = epochs[-1].get('time_str', '')
+
+    return {
+        'lat': lat_mean,
+        'lon': lon_mean,
+        'h': h_mean,
+        'sigma_N': round(sigma_N, 4),
+        'sigma_E': round(sigma_E, 4),
+        'sigma_U': round(sigma_U, 4),
+        'n_epochs': len(epochs),
+        'ratio_mean': _mean(ratio_vals),
+        'ratio_max': round(max(ratio_vals), 1) if ratio_vals else 0.0,
+        'ns_mean': _mean(ns_vals),
+        't_start': t_start,
+        't_end': t_end,
+    }

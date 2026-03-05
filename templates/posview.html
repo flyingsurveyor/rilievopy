@@ -1,28 +1,28 @@
 {% extends "base.html" %}
-{% block title %}PosView — RTKLIB Web PPK{% endblock %}
+{% block title %}PPK Analyser &amp; Editor{% endblock %}
 
 {% block content %}
 <div class="page-header flex-between">
     <div>
-        <h1>PosView</h1>
-        <p>Position solution viewer — rtkplot style</p>
+        <h1>PPK Analyser &amp; Editor</h1>
+        <p id="pageSubtitle">Position solution viewer &amp; station extractor</p>
     </div>
     <div id="loadingStatus" class="status-indicator hidden">
-        <span class="spinner"></span> Parsing...
+        <span class="spinner"></span> <span id="loadingMsg">Parsing...</span>
     </div>
 </div>
 
-<!-- ═══ FILE SELECTION ═══ -->
+<!-- FILE SELECTION -->
 <div class="card">
     <div class="card-header flex-between">
-        <h2>📍 Solution File</h2>
-        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('posUpload').click()">⬆ Upload .pos</button>
+        <h2>&#128205; Solution File</h2>
+        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('posUpload').click()">&#11014; Upload .pos</button>
         <input type="file" id="posUpload" hidden accept=".pos">
     </div>
     <div class="form-row">
         <div class="form-group" style="flex:1;">
             <select id="posFileSelect" onchange="loadFile(this.value)">
-                <option value="">— select .pos file —</option>
+                <option value="">&#8212; select .pos file &#8212;</option>
                 {% for f in pos_files %}
                 <option value="{{ f.path }}" {% if f.path == selected_file %}selected{% endif %}>{{ f.name }} ({{ f.size }})</option>
                 {% endfor %}
@@ -31,48 +31,47 @@
     </div>
 </div>
 
-<!-- ═══ SUMMARY STATS ═══ -->
+<!-- SUMMARY STATS -->
 <div id="summarySection" class="hidden">
     <div class="grid grid-4">
         <div class="stat-box" id="statFix">
-            <div class="stat-value" style="color:#2ecc71;">—</div>
+            <div class="stat-value" style="color:#2ecc71;">&#8212;</div>
             <div class="stat-label">Fix %</div>
         </div>
         <div class="stat-box" id="statFloat">
-            <div class="stat-value" style="color:#f39c12;">—</div>
+            <div class="stat-value" style="color:#f39c12;">&#8212;</div>
             <div class="stat-label">Float %</div>
         </div>
         <div class="stat-box" id="statSingle">
-            <div class="stat-value" style="color:#e74c3c;">—</div>
+            <div class="stat-value" style="color:#e74c3c;">&#8212;</div>
             <div class="stat-label">Single %</div>
         </div>
         <div class="stat-box" id="statEpochs">
-            <div class="stat-value">—</div>
+            <div class="stat-value">&#8212;</div>
             <div class="stat-label">Epochs</div>
         </div>
     </div>
 
-    <!-- Detail stats row -->
     <div class="grid grid-4" style="margin-top:8px;">
         <div class="stat-box" id="statDuration">
-            <div class="stat-value" style="font-size:16px;">—</div>
+            <div class="stat-value" style="font-size:16px;">&#8212;</div>
             <div class="stat-label">Duration</div>
         </div>
         <div class="stat-box" id="statHRMS">
-            <div class="stat-value" style="font-size:16px;">—</div>
+            <div class="stat-value" style="font-size:16px;">&#8212;</div>
             <div class="stat-label">H-RMS (fix)</div>
         </div>
         <div class="stat-box" id="statVRMS">
-            <div class="stat-value" style="font-size:16px;">—</div>
+            <div class="stat-value" style="font-size:16px;">&#8212;</div>
             <div class="stat-label">V-StDev (fix)</div>
         </div>
         <div class="stat-box" id="statSats">
-            <div class="stat-value" style="font-size:16px;">—</div>
+            <div class="stat-value" style="font-size:16px;">&#8212;</div>
             <div class="stat-label">Avg Satellites</div>
         </div>
     </div>
 
-    <!-- ═══ TAB BAR ═══ -->
+    <!-- TAB BAR -->
     <div class="card mt-1" style="padding:0;">
         <div class="tab-bar" id="chartTabs">
             <button class="tab-btn active" onclick="switchTab('groundtrack')">Ground Track</button>
@@ -82,10 +81,11 @@
             <button class="tab-btn" onclick="switchTab('stdev')">Std Dev</button>
             <button class="tab-btn" onclick="switchTab('ratio')">Ratio / Age</button>
             <button class="tab-btn" onclick="switchTab('table')">Data</button>
+            <button class="tab-btn" onclick="switchTab('analyser')">&#128302; Analyser</button>
         </div>
     </div>
 
-    <!-- ═══ GROUND TRACK ═══ -->
+    <!-- GROUND TRACK -->
     <div class="card chart-panel" id="panel-groundtrack">
         <div class="flex-between mb-1">
             <h3 style="font-size:14px; font-weight:600;">Ground Track (E-N)</h3>
@@ -98,16 +98,15 @@
         </div>
         <div style="position:relative; width:100%; aspect-ratio:1/1; max-height:500px;">
             <canvas id="canvasGT" style="width:100%; height:100%;"></canvas>
-            <!-- Ground Track controls (overlay) -->
             <div class="gt-controls" aria-label="Ground Track Controls">
                 <button class="gt-btn" type="button" title="Zoom in" onclick="gtZoomIn()">+</button>
-                <button class="gt-btn" type="button" title="Zoom out" onclick="gtZoomOut()">−</button>
-                <button class="gt-btn" type="button" title="Reset view" onclick="gtResetView()">⤾</button>
+                <button class="gt-btn" type="button" title="Zoom out" onclick="gtZoomOut()">&#8722;</button>
+                <button class="gt-btn" type="button" title="Reset view" onclick="gtResetView()">&#10558;</button>
             </div>
         </div>
     </div>
 
-    <!-- ═══ ENU TIME SERIES ═══ -->
+    <!-- ENU TIME SERIES -->
     <div class="card chart-panel hidden" id="panel-enu">
         <div class="flex-between mb-1">
             <h3 style="font-size:14px; font-weight:600;">E / N / U vs Time</h3>
@@ -122,7 +121,7 @@
         <canvas id="canvasU" style="width:100%; height:140px;"></canvas>
     </div>
 
-    <!-- ═══ QUALITY ═══ -->
+    <!-- QUALITY -->
     <div class="card chart-panel hidden" id="panel-quality">
         <h3 style="font-size:14px; font-weight:600; margin-bottom:8px;">Solution Quality vs Time</h3>
         <canvas id="canvasQ" style="width:100%; height:120px;"></canvas>
@@ -132,26 +131,26 @@
         </div>
     </div>
 
-    <!-- ═══ SATELLITES ═══ -->
+    <!-- SATELLITES -->
     <div class="card chart-panel hidden" id="panel-sats">
         <h3 style="font-size:14px; font-weight:600; margin-bottom:8px;">Number of Satellites vs Time</h3>
         <canvas id="canvasNS" style="width:100%; height:220px;"></canvas>
     </div>
 
-    <!-- ═══ STD DEV ═══ -->
+    <!-- STD DEV -->
     <div class="card chart-panel hidden" id="panel-stdev">
         <div class="flex-between mb-1">
             <h3 style="font-size:14px; font-weight:600;">Position Std Dev vs Time</h3>
             <div>
-                <span class="legend-dot" style="background:#e74c3c;"></span> σE
-                <span class="legend-dot" style="background:#2ecc71;"></span> σN
-                <span class="legend-dot" style="background:#3498db;"></span> σU
+                <span class="legend-dot" style="background:#e74c3c;"></span> &#963;E
+                <span class="legend-dot" style="background:#2ecc71;"></span> &#963;N
+                <span class="legend-dot" style="background:#3498db;"></span> &#963;U
             </div>
         </div>
         <canvas id="canvasSD" style="width:100%; height:250px;"></canvas>
     </div>
 
-    <!-- ═══ RATIO / AGE ═══ -->
+    <!-- RATIO / AGE -->
     <div class="card chart-panel hidden" id="panel-ratio">
         <h3 style="font-size:14px; font-weight:600; margin-bottom:8px;">AR Ratio vs Time</h3>
         <canvas id="canvasR" style="width:100%; height:180px;"></canvas>
@@ -161,13 +160,13 @@
         </div>
     </div>
 
-    <!-- ═══ DATA TABLE ═══ -->
+    <!-- DATA TABLE -->
     <div class="card chart-panel hidden" id="panel-table">
         <div class="flex-between mb-1">
             <h3 style="font-size:14px; font-weight:600;">Position Data</h3>
             <div>
-                <span style="font-size:11px; color:#95a5a6;" id="tableInfo">—</span>
-                <button class="btn btn-sm btn-secondary" onclick="exportCSV()">⬇ CSV</button>
+                <span style="font-size:11px; color:#95a5a6;" id="tableInfo">&#8212;</span>
+                <button class="btn btn-sm btn-secondary" onclick="exportCSV()">&#11015; CSV</button>
             </div>
         </div>
         <div style="overflow-x:auto; max-height:500px; overflow-y:auto;">
@@ -175,7 +174,7 @@
                 <thead>
                     <tr>
                         <th>Time</th><th>Lat</th><th>Lon</th><th>Hgt(m)</th>
-                        <th>Q</th><th>ns</th><th>σN(m)</th><th>σE(m)</th><th>σU(m)</th>
+                        <th>Q</th><th>ns</th><th>&#963;N(m)</th><th>&#963;E(m)</th><th>&#963;U(m)</th>
                         <th>Age(s)</th><th>Ratio</th>
                     </tr>
                 </thead>
@@ -184,10 +183,109 @@
         </div>
     </div>
 
-    <!-- ═══ HEADER INFO ═══ -->
+    <!-- ANALYSER TAB -->
+    <div class="card chart-panel hidden" id="panel-analyser">
+
+        <details id="filterDetails" open>
+            <summary class="analyser-section-title">&#9881; Filtri &amp; Statistiche</summary>
+            <div class="analyser-filters">
+                <div class="filter-row">
+                    <label class="filter-toggle">
+                        <input type="checkbox" id="fQ1" checked onchange="applyFilters()">
+                        <span class="q-badge" style="background:#2ecc71;">Fix Q=1</span>
+                    </label>
+                    <label class="filter-toggle">
+                        <input type="checkbox" id="fQ2" onchange="applyFilters()">
+                        <span class="q-badge" style="background:#f39c12;">Float Q=2</span>
+                    </label>
+                    <label class="filter-toggle">
+                        <input type="checkbox" id="fQother" onchange="applyFilters()">
+                        <span class="q-badge" style="background:#95a5a6;">Altro Q&#8805;3</span>
+                    </label>
+                </div>
+                <div class="filter-row">
+                    <label class="filter-label">Ratio min</label>
+                    <input type="number" id="fRatioMin" value="3" min="0" step="0.5" style="width:70px;" onchange="applyFilters()">
+                    <label class="filter-label" style="margin-left:12px;">ns min</label>
+                    <input type="number" id="fNsMin" value="0" min="0" step="1" style="width:60px;" onchange="applyFilters()">
+                </div>
+                <div id="filterStats" class="filter-stats-box">
+                    <span id="fStatVisible">&#8212;</span> epoche visibili su <span id="fStatTotal">&#8212;</span>
+                    &nbsp;|&nbsp; Fix: <span id="fStatFix">&#8212;</span>%
+                    &nbsp;|&nbsp; Ratio medio: <span id="fStatRatio">&#8212;</span>
+                </div>
+            </div>
+        </details>
+
+        <div style="margin-top:12px;">
+            <div class="flex-between mb-1">
+                <h3 style="font-size:14px; font-weight:600;">Quota (m) vs Tempo <span style="font-size:11px; font-weight:400; color:#95a5a6;">&#8212; &#177;&#963;U banda</span></h3>
+                <div>
+                    <span class="legend-dot" style="background:#2ecc71;"></span> Fix
+                    <span class="legend-dot" style="background:#f39c12;"></span> Float
+                    <span class="legend-dot" style="background:#95a5a6;"></span> Altro
+                </div>
+            </div>
+            <canvas id="canvasAH" style="width:100%; height:200px; cursor:pointer;" onclick="handleAHClick(event)"></canvas>
+        </div>
+
+        <div style="margin-top:16px;">
+            <div class="flex-between mb-1" style="flex-wrap:wrap; gap:6px;">
+                <h3 style="font-size:14px; font-weight:600;">Epoche</h3>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                    <button class="btn btn-sm btn-secondary" onclick="selectAllFiltered()">&#9745; Seleziona tutti (filtrati)</button>
+                    <button class="btn btn-sm btn-secondary" onclick="deselectAll()">&#9744; Deseleziona</button>
+                    <button class="btn btn-sm btn-secondary" onclick="invertSelection()">&#8597; Inverti</button>
+                    <span id="selCount" style="font-size:12px; color:#7f8c8d;">0 selezionate</span>
+                </div>
+            </div>
+
+            <div style="overflow-x:auto; max-height:400px; overflow-y:auto;" id="epochTableWrap">
+                <table class="data-table" id="epochTable">
+                    <thead>
+                        <tr>
+                            <th style="width:30px;">&#9744;</th>
+                            <th>#</th>
+                            <th>Timestamp</th>
+                            <th>Q</th>
+                            <th>ns</th>
+                            <th>ratio</th>
+                            <th>lat</th>
+                            <th>lon</th>
+                            <th>h (m)</th>
+                            <th class="hide-mobile">&#963;N (m)</th>
+                            <th class="hide-mobile">&#963;E (m)</th>
+                            <th>&#963;U (m)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="epochTableBody"></tbody>
+                </table>
+            </div>
+
+            <div class="epoch-pagination" id="epochPager">
+                <button class="btn btn-sm btn-secondary" onclick="epochPrev()" id="btnPrev">&#9664; Prec</button>
+                <span id="pagerInfo" style="font-size:12px; color:#7f8c8d;"></span>
+                <button class="btn btn-sm btn-secondary" onclick="epochNext()" id="btnNext">Succ &#9654;</button>
+            </div>
+        </div>
+
+        <div style="margin-top:20px;" id="stationsSection">
+            <div class="flex-between mb-1">
+                <h3 style="font-size:14px; font-weight:600;">&#128205; Stazioni Estratte</h3>
+                <button class="btn btn-sm btn-primary" id="btnCreateStation" onclick="createStation()" disabled>
+                    &#128205; Crea stazione da selezione
+                </button>
+            </div>
+            <div id="stationsList" style="display:flex; flex-direction:column; gap:10px;">
+                <p id="noStationsMsg" style="color:#95a5a6; font-size:13px;">Nessuna stazione estratta. Seleziona epoche e clicca "Crea stazione".</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- HEADER INFO -->
     <div class="card mt-1">
         <details>
-            <summary style="cursor:pointer; font-size:13px; font-weight:600;">📋 File Header & Reference Position</summary>
+            <summary style="cursor:pointer; font-size:13px; font-weight:600;">&#128203; File Header &amp; Reference Position</summary>
             <div class="console" id="headerInfo" style="margin-top:8px; max-height:200px; font-size:11px;">
                 Select a file...
             </div>
@@ -261,8 +359,6 @@
         font-size: 10px;
         font-weight: 600;
     }
-
-    /* Ground Track (canvasGT) zoom/pan controls */
     .gt-controls {
         position: absolute;
         right: 8px;
@@ -288,72 +384,131 @@
         -webkit-tap-highlight-color: transparent;
     }
     .gt-btn:active { transform: translateY(1px); }
+
+    /* Analyser styles */
+    .analyser-section-title {
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        color: #2c3e50;
+        padding: 4px 0;
+    }
+    .analyser-filters {
+        padding: 10px 0 4px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .filter-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .filter-toggle {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+    }
+    .filter-label { font-size: 12px; color: #7f8c8d; }
+    .filter-stats-box {
+        font-size: 12px;
+        color: #2c3e50;
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 6px 10px;
+    }
+    .epoch-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 8px;
+    }
+    .epoch-q1 { background: rgba(46,204,113,0.10); }
+    .epoch-q2 { background: rgba(243,156,18,0.10); }
+    .epoch-qother { background: rgba(149,165,166,0.10); }
+    .epoch-selected { background: rgba(52,152,219,0.18) !important; }
+    .epoch-selected td { font-weight: 600; }
+    .ratio-bad  { color: #e74c3c; font-weight: 600; }
+    .ratio-ok   { color: #f39c12; }
+    .ratio-good { color: #27ae60; }
+    .ratio-great{ color: #1e8449; font-weight: 600; }
+
+    .station-card {
+        border: 1px solid #dde1e7;
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: #fafafa;
+    }
+    .station-card h4 { font-size: 13px; font-weight: 700; color: #2c3e50; margin-bottom: 6px; }
+    .station-coords {
+        font-family: 'SF Mono', 'Consolas', monospace;
+        font-size: 12px;
+        color: #2c3e50;
+        line-height: 1.7;
+    }
+    .station-meta { font-size: 11px; color: #7f8c8d; margin-top: 4px; }
+    .station-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .btn-import-ok {
+        background: #27ae60 !important;
+        color: white !important;
+        cursor: default !important;
+    }
+
+    @media (max-width: 640px) {
+        .hide-mobile { display: none; }
+        #canvasAH { height: 160px !important; }
+    }
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ═══════════════════════════════════════════════
 // State
-// ═══════════════════════════════════════════════
-var posData = null;   // parsed result from API
+var posData = null;
+var allEpochs = null;
+var currentFilePath = '';
 var activeTab = 'groundtrack';
 
-const Q_COLORS = {1:'#2ecc71', 2:'#f39c12', 3:'#3498db', 4:'#3498db', 5:'#e74c3c', 6:'#9b59b6'};
-const Q_LABELS = {1:'Fix', 2:'Float', 3:'SBAS', 4:'DGPS', 5:'Single', 6:'PPP'};
+var Q_COLORS = {1:'#2ecc71', 2:'#f39c12', 3:'#3498db', 4:'#3498db', 5:'#e74c3c', 6:'#9b59b6'};
+var Q_LABELS = {1:'Fix', 2:'Float', 3:'SBAS', 4:'DGPS', 5:'Single', 6:'PPP'};
 
-// ═══════════════════════════════════════════════
-// Ground Track (canvasGT) view state (zoom/pan)
-// - scale: 1 = fit all data (auto). >1 zoom in.
-// - panE/panN: meters offset from base center.
-// Double-click / double-tap resets.
-// ═══════════════════════════════════════════════
-var gtBase = null; // {centerE, centerN, range}
+// Analyser state
+var filteredIndices = [];
+var selectedSet = new Set();
+var lastChecked = -1;
+var epochPage = 0;
+var epochPageSize = 200;
+var stations = [];
+
+// Ground Track view state
+var gtBase = null;
 var gtView = { scale: 1.0, panE: 0.0, panN: 0.0 };
 var gtDragging = false;
 var gtLastPt = null;
-var gtPointers = new Map(); // pointerId -> {x,y}
-var gtPinch = null; // {startDist, startScale, startCenter:{x,y}, startPanE, startPanN}
+var gtPointers = new Map();
+var gtPinch = null;
 
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-function resetGroundTrackView() {
-    gtView.scale = 1.0;
-    gtView.panE = 0.0;
-    gtView.panN = 0.0;
-}
-
-function gtResetView() {
-    resetGroundTrackView();
-    drawActiveChart();
-}
+function resetGroundTrackView() { gtView.scale = 1.0; gtView.panE = 0.0; gtView.panN = 0.0; }
+function gtResetView() { resetGroundTrackView(); drawActiveChart(); }
 
 function gtApplyZoomAt(canvas, mx, my, newScale) {
     var rect = canvas.getBoundingClientRect();
-    var w = rect.width, h = rect.height;
-    var margin = 40;
-    var pw = Math.max(1, w - margin * 2);
-    var ph = Math.max(1, h - margin * 2);
-
-    // Current view
+    var w = rect.width, h = rect.height, margin = 40;
+    var pw = Math.max(1, w - margin * 2), ph = Math.max(1, h - margin * 2);
     var viewRange = gtBase.range / gtView.scale;
-    var centerE = gtBase.centerE + gtView.panE;
-    var centerN = gtBase.centerN + gtView.panN;
-    var emin = centerE - viewRange / 2;
-    var nmax = centerN + viewRange / 2;
-
-    // Data point under cursor (in EN)
+    var centerE = gtBase.centerE + gtView.panE, centerN = gtBase.centerN + gtView.panN;
+    var emin = centerE - viewRange / 2, nmax = centerN + viewRange / 2;
     var eAt = emin + ((mx - margin) / pw) * viewRange;
     var nAt = nmax - ((my - margin) / ph) * viewRange;
-
-    // New view, keep (eAt,nAt) under cursor
     var newViewRange = gtBase.range / newScale;
-    var newCenterE = eAt - (((mx - margin) / pw) * newViewRange) + newViewRange / 2;
-    var newCenterN = nAt + (((my - margin) / ph) * newViewRange) - newViewRange / 2;
-
     gtView.scale = newScale;
-    gtView.panE = newCenterE - gtBase.centerE;
-    gtView.panN = newCenterN - gtBase.centerN;
+    gtView.panE = (eAt - (((mx - margin) / pw) * newViewRange) + newViewRange / 2) - gtBase.centerE;
+    gtView.panN = (nAt + (((my - margin) / ph) * newViewRange) - newViewRange / 2) - gtBase.centerN;
 }
 
 function gtZoomBy(factor) {
@@ -361,13 +516,10 @@ function gtZoomBy(factor) {
     var canvas = document.getElementById('canvasGT');
     if (!canvas) return;
     var rect = canvas.getBoundingClientRect();
-    var mx = rect.width / 2;
-    var my = rect.height / 2;
     var newScale = clamp(gtView.scale * factor, 1.0, 50.0);
-    gtApplyZoomAt(canvas, mx, my, newScale);
+    gtApplyZoomAt(canvas, rect.width / 2, rect.height / 2, newScale);
     drawActiveChart();
 }
-
 function gtZoomIn() { gtZoomBy(1.25); }
 function gtZoomOut() { gtZoomBy(0.80); }
 
@@ -375,254 +527,180 @@ function initGroundTrackInteractions() {
     var canvas = document.getElementById('canvasGT');
     if (!canvas || canvas._gtInterInit) return;
     canvas._gtInterInit = true;
-
-    // Prevent page scroll/zoom gestures while interacting with the plot.
     canvas.style.touchAction = 'none';
-
-    // Double click / double tap to reset
-    canvas.addEventListener('dblclick', function() {
-        resetGroundTrackView();
-        drawActiveChart();
-    });
-
-    // Wheel zoom (desktop trackpad/mouse)
+    canvas.addEventListener('dblclick', function() { resetGroundTrackView(); drawActiveChart(); });
     canvas.addEventListener('wheel', function(e) {
         if (!posData || !gtBase) return;
         e.preventDefault();
-
         var rect = canvas.getBoundingClientRect();
-        var mx = e.clientX - rect.left;
-        var my = e.clientY - rect.top;
-
-        // Zoom factor: smooth on trackpads, reasonable on wheels
-        var delta = -e.deltaY;
-        var z = Math.exp(delta * 0.0015);
-        var newScale = clamp(gtView.scale * z, 1.0, 50.0);
-        gtApplyZoomAt(canvas, mx, my, newScale);
-
+        var z = Math.exp(-e.deltaY * 0.0015);
+        gtApplyZoomAt(canvas, e.clientX - rect.left, e.clientY - rect.top, clamp(gtView.scale * z, 1.0, 50.0));
         drawActiveChart();
     }, {passive:false});
-
-    // Pointer-based panning + pinch zoom (mouse + touch)
     canvas.addEventListener('pointerdown', function(e) {
         if (!posData || !gtBase) return;
         canvas.setPointerCapture(e.pointerId);
         gtPointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
-
-        if (gtPointers.size === 1) {
-            gtDragging = true;
-            gtLastPt = {x: e.clientX, y: e.clientY};
-        }
-
+        if (gtPointers.size === 1) { gtDragging = true; gtLastPt = {x: e.clientX, y: e.clientY}; }
         if (gtPointers.size === 2) {
             var pts = Array.from(gtPointers.values());
-            var dx = pts[0].x - pts[1].x;
-            var dy = pts[0].y - pts[1].y;
-            var dist = Math.sqrt(dx*dx + dy*dy);
-            var cx = (pts[0].x + pts[1].x) / 2;
-            var cy = (pts[0].y + pts[1].y) / 2;
-            gtPinch = {
-                startDist: dist,
-                startScale: gtView.scale,
-                startCenter: {x: cx, y: cy},
-                startPanE: gtView.panE,
-                startPanN: gtView.panN
-            };
-            gtDragging = false;
-            gtLastPt = null;
+            var dx = pts[0].x - pts[1].x, dy = pts[0].y - pts[1].y;
+            gtPinch = { startDist: Math.sqrt(dx*dx+dy*dy), startScale: gtView.scale,
+                startCenter: {x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2},
+                startPanE: gtView.panE, startPanN: gtView.panN };
+            gtDragging = false; gtLastPt = null;
         }
     });
-
     canvas.addEventListener('pointermove', function(e) {
-        if (!posData || !gtBase) return;
-        if (!gtPointers.has(e.pointerId)) return;
+        if (!posData || !gtBase || !gtPointers.has(e.pointerId)) return;
         gtPointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
-
         var rect = canvas.getBoundingClientRect();
-        var w = rect.width, h = rect.height;
-        var margin = 40;
-        var pw = Math.max(1, w - margin * 2);
-        var ph = Math.max(1, h - margin * 2);
-
+        var pw = Math.max(1, rect.width - 80), ph = Math.max(1, rect.height - 80);
         if (gtPinch && gtPointers.size === 2) {
             var pts = Array.from(gtPointers.values());
-            var dx = pts[0].x - pts[1].x;
-            var dy = pts[0].y - pts[1].y;
-            var dist = Math.sqrt(dx*dx + dy*dy);
+            var dx = pts[0].x - pts[1].x, dy = pts[0].y - pts[1].y;
+            var dist = Math.sqrt(dx*dx+dy*dy);
             if (gtPinch.startDist > 0) {
-                var z = dist / gtPinch.startDist;
-                var newScale = clamp(gtPinch.startScale * z, 1.0, 50.0);
-
-                var mx = gtPinch.startCenter.x - rect.left;
-                var my = gtPinch.startCenter.y - rect.top;
-
-                var viewRange0 = gtBase.range / gtPinch.startScale;
-                var centerE0 = gtBase.centerE + gtPinch.startPanE;
-                var centerN0 = gtBase.centerN + gtPinch.startPanN;
-                var emin0 = centerE0 - viewRange0 / 2;
-                var nmax0 = centerN0 + viewRange0 / 2;
-                var eAt = emin0 + ((mx - margin) / pw) * viewRange0;
-                var nAt = nmax0 - ((my - margin) / ph) * viewRange0;
-
-                var viewRange1 = gtBase.range / newScale;
-                var newCenterE = eAt - (((mx - margin) / pw) * viewRange1) + viewRange1 / 2;
-                var newCenterN = nAt + (((my - margin) / ph) * viewRange1) - viewRange1 / 2;
-
+                var newScale = clamp(gtPinch.startScale * dist / gtPinch.startDist, 1.0, 50.0);
                 gtView.scale = newScale;
-                gtView.panE = newCenterE - gtBase.centerE;
-                gtView.panN = newCenterN - gtBase.centerN;
-
+                var margin = 40, mx = gtPinch.startCenter.x - rect.left, my = gtPinch.startCenter.y - rect.top;
+                var vr0 = gtBase.range / gtPinch.startScale;
+                var eAt = (gtBase.centerE + gtPinch.startPanE - vr0/2) + ((mx-margin)/pw)*vr0;
+                var nAt = (gtBase.centerN + gtPinch.startPanN + vr0/2) - ((my-margin)/ph)*vr0;
+                var vr1 = gtBase.range / newScale;
+                gtView.panE = (eAt - ((mx-margin)/pw)*vr1 + vr1/2) - gtBase.centerE;
+                gtView.panN = (nAt + ((my-margin)/ph)*vr1 - vr1/2) - gtBase.centerN;
                 drawActiveChart();
             }
             return;
         }
-
         if (gtDragging && gtLastPt) {
-            var dx = e.clientX - gtLastPt.x;
-            var dy = e.clientY - gtLastPt.y;
+            var dx = e.clientX - gtLastPt.x, dy = e.clientY - gtLastPt.y;
             gtLastPt = {x: e.clientX, y: e.clientY};
-
             var viewRange = gtBase.range / gtView.scale;
-            var mPerPxX = viewRange / pw;
-            var mPerPxY = viewRange / ph;
-            gtView.panE -= dx * mPerPxX;
-            gtView.panN += dy * mPerPxY;
-
+            gtView.panE -= dx * viewRange / pw;
+            gtView.panN += dy * viewRange / ph;
             drawActiveChart();
         }
     });
-
     function endPointer(e) {
-        if (gtPointers.has(e.pointerId)) gtPointers.delete(e.pointerId);
+        gtPointers.delete(e.pointerId);
         if (gtPointers.size < 2) gtPinch = null;
-        if (gtPointers.size === 0) {
-            gtDragging = false;
-            gtLastPt = null;
-        }
+        if (gtPointers.size === 0) { gtDragging = false; gtLastPt = null; }
     }
     canvas.addEventListener('pointerup', endPointer);
     canvas.addEventListener('pointercancel', endPointer);
     canvas.addEventListener('pointerleave', endPointer);
 }
 
-// ═══════════════════════════════════════════════
 // File loading
-// ═══════════════════════════════════════════════
 function loadFile(filepath) {
     if (!filepath) return;
-
+    currentFilePath = filepath;
+    allEpochs = null; filteredIndices = []; selectedSet = new Set(); stations = [];
+    renderStationsList();
     var statusEl = document.getElementById('loadingStatus');
+    document.getElementById('loadingMsg').textContent = 'Parsing...';
     statusEl.classList.remove('hidden');
-
-    fetch('/api/pos/parse', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({filepath: filepath})
-    })
+    fetch('/api/pos/parse', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({filepath: filepath})})
     .then(function(r) { return r.json(); })
     .then(function(data) {
         statusEl.classList.add('hidden');
-        if (data.error) {
-            alert('Error: ' + data.error);
-            return;
-        }
+        if (data.error) { alert('Error: ' + data.error); return; }
         posData = data;
         document.getElementById('summarySection').classList.remove('hidden');
-        updateSummary();
-        updateHeader();
-        drawActiveChart();
+        updateSummary(); updateHeader(); drawActiveChart();
+        var s = data.summary;
+        document.getElementById('pageSubtitle').textContent =
+            (data.filename || '') + ' \u2014 ' + s.total_epochs + ' epoche, Fix ' + s.fix_pct + '%, Ratio medio ' +
+            (s.ratio_stats && s.ratio_stats.mean ? s.ratio_stats.mean : '\u2014');
     })
-    .catch(function(err) {
-        statusEl.classList.add('hidden');
-        alert('Parse error: ' + err);
-    });
+    .catch(function(err) { statusEl.classList.add('hidden'); alert('Parse error: ' + err); });
 }
 
-// Auto-load if pre-selected
+function loadAllEpochs(cb) {
+    if (allEpochs !== null) { if (cb) cb(); return; }
+    if (!currentFilePath) return;
+    var statusEl = document.getElementById('loadingStatus');
+    document.getElementById('loadingMsg').textContent = 'Caricamento epoche...';
+    statusEl.classList.remove('hidden');
+    fetch('/api/pos/epochs', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({filepath: currentFilePath})})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        statusEl.classList.add('hidden');
+        if (!data.ok) { alert('Errore: ' + data.error); return; }
+        allEpochs = data.epochs;
+        applyFilters();
+        if (cb) cb();
+    })
+    .catch(function(err) { statusEl.classList.add('hidden'); alert('Errore caricamento epoche: ' + err); });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     initGroundTrackInteractions();
     var sel = document.getElementById('posFileSelect');
     if (sel.value) loadFile(sel.value);
 });
 
-// Upload handler
 document.getElementById('posUpload').addEventListener('change', function() {
     var file = this.files[0];
     if (!file) return;
     var fd = new FormData();
-    fd.append('file', file);
-    fd.append('target_dir', 'pos');
-    fetch('/api/upload', {method: 'POST', body: fd})
+    fd.append('file', file); fd.append('target_dir', 'pos');
+    fetch('/api/upload', {method:'POST', body:fd})
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.path) {
-            var opt = new Option(file.name, data.path, true, true);
-            document.getElementById('posFileSelect').add(opt);
+            document.getElementById('posFileSelect').add(new Option(file.name, data.path, true, true));
             loadFile(data.path);
         }
     });
 });
 
-// ═══════════════════════════════════════════════
-// Summary update
-// ═══════════════════════════════════════════════
+// Summary
 function updateSummary() {
     var s = posData.summary;
     setStat('statFix', s.fix_pct + '%');
     setStat('statFloat', s.float_pct + '%');
     setStat('statSingle', s.single_pct + '%');
     setStat('statEpochs', s.total_epochs.toLocaleString());
-
     var ts = posData.time_span;
-    setStat('statDuration', ts && ts.duration_str ? ts.duration_str : '—');
-
+    setStat('statDuration', ts && ts.duration_str ? ts.duration_str : '\u2014');
     var enu = s.enu_stats || {};
-    setStat('statHRMS', enu.h_rms != null ? (enu.h_rms * 1000).toFixed(1) + ' mm' : '—');
-    setStat('statVRMS', enu.u_std != null ? (enu.u_std * 1000).toFixed(1) + ' mm' : '—');
-
+    setStat('statHRMS', enu.h_rms != null ? (enu.h_rms * 1000).toFixed(1) + ' mm' : '\u2014');
+    setStat('statVRMS', enu.u_std != null ? (enu.u_std * 1000).toFixed(1) + ' mm' : '\u2014');
     var ns = s.ns_stats || {};
-    setStat('statSats', ns.mean != null ? ns.mean.toFixed(0) : '—');
+    setStat('statSats', ns.mean != null ? ns.mean.toFixed(0) : '\u2014');
 }
-
 function setStat(id, val) {
     var el = document.getElementById(id);
     if (el) el.querySelector('.stat-value').textContent = val;
 }
-
 function updateHeader() {
-    var h = posData.header || [];
-    var ref = posData.ref_pos;
+    var h = posData.header || [], ref = posData.ref_pos;
     var txt = h.join('\n');
     if (ref) {
-        txt += '\n\n── Reference Position ──\n';
-        txt += 'Lat: ' + ref.lat.toFixed(8) + '°  Lon: ' + ref.lon.toFixed(8) + '°  Hgt: ' + ref.height.toFixed(3) + ' m\n';
+        txt += '\n\n\u2500\u2500 Reference Position \u2500\u2500\n';
+        txt += 'Lat: ' + ref.lat.toFixed(8) + '\xb0  Lon: ' + ref.lon.toFixed(8) + '\xb0  Hgt: ' + ref.height.toFixed(3) + ' m\n';
         txt += 'From: ' + (ref.from_fix ? 'Fix solutions' : 'All solutions') + ' (n=' + ref.n_averaged + ')';
     }
     document.getElementById('headerInfo').textContent = txt;
-
-    if (ref) {
-        document.getElementById('gtRef').textContent =
-            'Ref: ' + ref.lat.toFixed(6) + '°, ' + ref.lon.toFixed(6) + '°';
-    }
+    if (ref) document.getElementById('gtRef').textContent = 'Ref: ' + ref.lat.toFixed(6) + '\xb0, ' + ref.lon.toFixed(6) + '\xb0';
 }
 
-// ═══════════════════════════════════════════════
 // Tab switching
-// ═══════════════════════════════════════════════
 function switchTab(tab) {
     activeTab = tab;
-    document.querySelectorAll('.tab-btn').forEach(function(b, i) {
-        var tabs = ['groundtrack','enu','quality','sats','stdev','ratio','table'];
-        b.classList.toggle('active', tabs[i] === tab);
-    });
-    document.querySelectorAll('.chart-panel').forEach(function(p) {
-        p.classList.add('hidden');
-    });
+    var tabNames = ['groundtrack','enu','quality','sats','stdev','ratio','table','analyser'];
+    document.querySelectorAll('.tab-btn').forEach(function(b, i) { b.classList.toggle('active', tabNames[i] === tab); });
+    document.querySelectorAll('.chart-panel').forEach(function(p) { p.classList.add('hidden'); });
     var panel = document.getElementById('panel-' + tab);
     if (panel) panel.classList.remove('hidden');
-    drawActiveChart();
+    if (tab === 'analyser') { loadAllEpochs(function() { drawAnalyserChart(); }); }
+    else { drawActiveChart(); }
 }
-
 function drawActiveChart() {
     if (!posData) return;
     var c = posData.charts;
@@ -634,513 +712,451 @@ function drawActiveChart() {
         case 'stdev': drawStdDev(c); break;
         case 'ratio': drawRatio(c); drawAge(c); break;
         case 'table': fillTable(c); break;
+        case 'analyser': drawAnalyserChart(); break;
     }
 }
 
-// ═══════════════════════════════════════════════
-// Canvas helpers
-// ═══════════════════════════════════════════════
+// Canvas helper
 function setupCanvas(id) {
     var canvas = document.getElementById(id);
     var rect = canvas.getBoundingClientRect();
     var dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
     var ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.scale(dpr, dpr); ctx.clearRect(0, 0, rect.width, rect.height);
     return {ctx: ctx, w: rect.width, h: rect.height};
 }
-
-// Chart margin/padding
 var M = {top: 8, right: 12, bottom: 24, left: 52};
 
 function drawTimeSeries(canvasId, times, values, color, label, unit, qualities) {
-    var s = setupCanvas(canvasId);
-    var ctx = s.ctx, w = s.w, h = s.h;
-    var pw = w - M.left - M.right;
-    var ph = h - M.top - M.bottom;
-    var n = values.length;
+    var s = setupCanvas(canvasId), ctx = s.ctx, w = s.w, h = s.h;
+    var pw = w - M.left - M.right, ph = h - M.top - M.bottom, n = values.length;
     if (n === 0) return;
-
-    // Y range
     var ymin = Infinity, ymax = -Infinity;
-    for (var i = 0; i < n; i++) {
-        if (values[i] < ymin) ymin = values[i];
-        if (values[i] > ymax) ymax = values[i];
-    }
-    var pad = (ymax - ymin) * 0.1 || 1;
-    ymin -= pad; ymax += pad;
-
-    // Grid
-    ctx.strokeStyle = '#ecf0f1';
-    ctx.lineWidth = 0.5;
-    var nGrid = 5;
-    for (var g = 0; g <= nGrid; g++) {
-        var gy = M.top + ph - (g / nGrid) * ph;
+    for (var i = 0; i < n; i++) { if (values[i] < ymin) ymin = values[i]; if (values[i] > ymax) ymax = values[i]; }
+    var pad = (ymax - ymin) * 0.1 || 1; ymin -= pad; ymax += pad;
+    ctx.strokeStyle = '#ecf0f1'; ctx.lineWidth = 0.5;
+    for (var g = 0; g <= 5; g++) {
+        var gy = M.top + ph - (g / 5) * ph;
         ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(w - M.right, gy); ctx.stroke();
-        // Label
-        ctx.fillStyle = '#95a5a6';
-        ctx.font = '10px system-ui';
-        ctx.textAlign = 'right';
-        var gv = ymin + (g / nGrid) * (ymax - ymin);
-        ctx.fillText(gv.toFixed(unit === 'mm' ? 1 : 3), M.left - 4, gy + 3);
+        ctx.fillStyle = '#95a5a6'; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
+        ctx.fillText((ymin + (g/5)*(ymax-ymin)).toFixed(unit === 'mm' ? 1 : 3), M.left - 4, gy + 3);
     }
-
-    // Label
-    ctx.fillStyle = '#7f8c8d';
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText(label + (unit ? ' (' + unit + ')' : ''), M.left, M.top - 0);
-
-    // Data
+    ctx.fillStyle = '#7f8c8d'; ctx.font = '11px system-ui'; ctx.textAlign = 'left';
+    ctx.fillText(label + (unit ? ' (' + unit + ')' : ''), M.left, M.top);
     if (qualities) {
-        // Colored dots by quality
         for (var i = 0; i < n; i++) {
-            var x = M.left + (i / (n - 1 || 1)) * pw;
-            var y = M.top + ph - ((values[i] - ymin) / (ymax - ymin)) * ph;
+            var x = M.left + (i / (n-1||1)) * pw, y = M.top + ph - ((values[i]-ymin)/(ymax-ymin)) * ph;
             ctx.fillStyle = Q_COLORS[qualities[i]] || '#bdc3c7';
             ctx.fillRect(x - 0.8, y - 0.8, 1.6, 1.6);
         }
     } else {
-        // Line
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
+        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();
         for (var i = 0; i < n; i++) {
-            var x = M.left + (i / (n - 1 || 1)) * pw;
-            var y = M.top + ph - ((values[i] - ymin) / (ymax - ymin)) * ph;
+            var x = M.left + (i/(n-1||1))*pw, y = M.top+ph-((values[i]-ymin)/(ymax-ymin))*ph;
             if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.stroke();
     }
-
-    // Time axis labels
     drawTimeAxis(ctx, times, M.left, w - M.right, h - 4);
 }
 
 function drawTimeAxis(ctx, times, x0, x1, y) {
-    if (!times || times.length === 0) return;
-    ctx.fillStyle = '#95a5a6';
-    ctx.font = '9px system-ui';
-    ctx.textAlign = 'center';
-
-    var n = times.length;
-    var nLabels = Math.min(5, n);
-    for (var i = 0; i < nLabels; i++) {
-        var idx = Math.floor(i * (n - 1) / (nLabels - 1 || 1));
-        var t = times[idx] || '';
-        // Show only HH:MM:SS
-        var short = t.split(' ')[1] || t;
-        if (short.length > 8) short = short.substring(0, 8);
-        var x = x0 + (idx / (n - 1 || 1)) * (x1 - x0);
-        ctx.fillText(short, x, y);
+    if (!times || !times.length) return;
+    ctx.fillStyle = '#95a5a6'; ctx.font = '9px system-ui'; ctx.textAlign = 'center';
+    var n = times.length, nL = Math.min(5, n);
+    for (var i = 0; i < nL; i++) {
+        var idx = Math.floor(i * (n-1) / (nL-1||1));
+        var t = (times[idx] || '').split(' ')[1] || times[idx] || '';
+        if (t.length > 8) t = t.substring(0, 8);
+        ctx.fillText(t, x0 + (idx/(n-1||1))*(x1-x0), y);
     }
 }
 
-// ═══════════════════════════════════════════════
 // Ground Track
-// ═══════════════════════════════════════════════
 function drawGroundTrack(c) {
-    var s = setupCanvas('canvasGT');
-    var ctx = s.ctx, w = s.w, h = s.h;
-    var n = c.e.length;
+    var s = setupCanvas('canvasGT'), ctx = s.ctx, w = s.w, h = s.h, n = c.e.length;
     if (n === 0) return;
-
-    var margin = 40;
-    var pw = w - margin * 2;
-    var ph = h - margin * 2;
-
-    // Find range
-    var emin = Infinity, emax = -Infinity, nmin = Infinity, nmax = -Infinity;
-    for (var i = 0; i < n; i++) {
-        if (c.e[i] < emin) emin = c.e[i]; if (c.e[i] > emax) emax = c.e[i];
-        if (c.n[i] < nmin) nmin = c.n[i]; if (c.n[i] > nmax) nmax = c.n[i];
-    }
-
-    // Enforce square aspect ratio (base view fits all data)
-    var erange = emax - emin || 0.001;
-    var nrange = nmax - nmin || 0.001;
-    var baseRange = Math.max(erange, nrange) * 1.1;
-    var baseCenterE = (emin + emax) / 2;
-    var baseCenterN = (nmin + nmax) / 2;
-    gtBase = {centerE: baseCenterE, centerN: baseCenterN, range: baseRange};
-
-    // Apply interactive view
-    var viewRange = baseRange / (gtView.scale || 1.0);
+    var margin = 40, pw = w - margin*2, ph = h - margin*2;
+    var emin=Infinity, emax=-Infinity, nmin=Infinity, nmax=-Infinity;
+    for (var i=0; i<n; i++) { if (c.e[i]<emin) emin=c.e[i]; if (c.e[i]>emax) emax=c.e[i]; if (c.n[i]<nmin) nmin=c.n[i]; if (c.n[i]>nmax) nmax=c.n[i]; }
+    var baseRange = Math.max(emax-emin||0.001, nmax-nmin||0.001) * 1.1;
+    gtBase = {centerE:(emin+emax)/2, centerN:(nmin+nmax)/2, range:baseRange};
+    var viewRange = baseRange / (gtView.scale||1.0);
     if (viewRange < 1e-6) viewRange = 1e-6;
-
-    // Clamp pan so the view doesn't drift too far away (still allows looking at edges)
-    var maxPan = Math.max(0, (baseRange - viewRange) / 2);
+    var maxPan = Math.max(0, (baseRange-viewRange)/2);
     gtView.panE = clamp(gtView.panE, -maxPan, maxPan);
     gtView.panN = clamp(gtView.panN, -maxPan, maxPan);
-
-    var centerE = baseCenterE + gtView.panE;
-    var centerN = baseCenterN + gtView.panN;
-
-    emin = centerE - viewRange / 2; emax = centerE + viewRange / 2;
-    nmin = centerN - viewRange / 2; nmax = centerN + viewRange / 2;
-
-    function toX(e) { return margin + ((e - emin) / (emax - emin)) * pw; }
-    function toY(nn) { return margin + ph - ((nn - nmin) / (nmax - nmin)) * ph; }
-
-    // Grid
-    ctx.strokeStyle = '#ecf0f1';
-    ctx.lineWidth = 0.5;
-    var nGrid = 6;
-    for (var g = 0; g <= nGrid; g++) {
-        var gx = margin + (g / nGrid) * pw;
-        var gy = margin + (g / nGrid) * ph;
-        ctx.beginPath(); ctx.moveTo(gx, margin); ctx.lineTo(gx, margin + ph); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(margin, gy); ctx.lineTo(margin + pw, gy); ctx.stroke();
+    var cE = gtBase.centerE+gtView.panE, cN = gtBase.centerN+gtView.panN;
+    emin = cE-viewRange/2; emax = cE+viewRange/2; nmin = cN-viewRange/2; nmax = cN+viewRange/2;
+    function toX(e) { return margin+((e-emin)/(emax-emin))*pw; }
+    function toY(n) { return margin+ph-((n-nmin)/(nmax-nmin))*ph; }
+    ctx.strokeStyle='#ecf0f1'; ctx.lineWidth=0.5;
+    for (var g=0; g<=6; g++) {
+        ctx.beginPath(); ctx.moveTo(margin+(g/6)*pw, margin); ctx.lineTo(margin+(g/6)*pw, margin+ph); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(margin, margin+(g/6)*ph); ctx.lineTo(margin+pw, margin+(g/6)*ph); ctx.stroke();
     }
-
-    // Axis labels
-    ctx.fillStyle = '#95a5a6';
-    ctx.font = '10px system-ui';
-    ctx.textAlign = 'center';
-    for (var g = 0; g <= nGrid; g += 2) {
-        var ev = emin + (g / nGrid) * (emax - emin);
-        var nv = nmin + (1 - g / nGrid) * (nmax - nmin);
-        ctx.fillText(ev.toFixed(3) + 'm', margin + (g / nGrid) * pw, h - 4);
-        ctx.textAlign = 'right';
-        ctx.fillText(nv.toFixed(3) + 'm', margin - 4, margin + (g / nGrid) * ph + 3);
-        ctx.textAlign = 'center';
+    ctx.fillStyle='#95a5a6'; ctx.font='10px system-ui'; ctx.textAlign='center';
+    for (var g=0; g<=6; g+=2) {
+        ctx.fillText((emin+(g/6)*(emax-emin)).toFixed(3)+'m', margin+(g/6)*pw, h-4);
+        ctx.textAlign='right';
+        ctx.fillText((nmin+(1-g/6)*(nmax-nmin)).toFixed(3)+'m', margin-4, margin+(g/6)*ph+3);
+        ctx.textAlign='center';
     }
-
-    // Axis titles
-    ctx.fillStyle = '#7f8c8d';
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText('East (m)', w / 2, h - 14 + margin / 2);
-    ctx.save();
-    ctx.translate(12, h / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText('North (m)', 0, 0);
-    ctx.restore();
-
-    // Crosshair at origin (0,0)
-    ctx.strokeStyle = '#bdc3c7';
-    ctx.lineWidth = 0.5;
-    ctx.setLineDash([4, 4]);
-    var ox = toX(0), oy = toY(0);
-    ctx.beginPath(); ctx.moveTo(ox, margin); ctx.lineTo(ox, margin + ph); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(margin, oy); ctx.lineTo(margin + pw, oy); ctx.stroke();
+    ctx.fillStyle='#7f8c8d'; ctx.font='11px system-ui'; ctx.textAlign='center';
+    ctx.fillText('East (m)', w/2, h-14+margin/2);
+    ctx.save(); ctx.translate(12, h/2); ctx.rotate(-Math.PI/2); ctx.fillText('North (m)', 0, 0); ctx.restore();
+    ctx.strokeStyle='#bdc3c7'; ctx.lineWidth=0.5; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(toX(0), margin); ctx.lineTo(toX(0), margin+ph); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(margin, toY(0)); ctx.lineTo(margin+pw, toY(0)); ctx.stroke();
     ctx.setLineDash([]);
-
-    // Plot points — draw single/float first, fix on top
-    var order = [5, 6, 3, 4, 2, 1]; // draw fix last (on top)
-    for (var qi = 0; qi < order.length; qi++) {
-        var q = order[qi];
+    [5,6,3,4,2,1].forEach(function(q) {
         ctx.fillStyle = Q_COLORS[q] || '#bdc3c7';
-        for (var i = 0; i < n; i++) {
-            if (c.quality[i] !== q) continue;
-            var x = toX(c.e[i]);
-            var y = toY(c.n[i]);
-            ctx.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);
-        }
-    }
-
-    // Range annotation
-    ctx.fillStyle = '#95a5a6';
-    ctx.font = '10px system-ui';
-    ctx.textAlign = 'right';
-    var zoomLbl = gtView.scale > 1.001 ? ('  Zoom: ' + gtView.scale.toFixed(2) + '×') : '';
-    ctx.fillText('Range: ' + viewRange.toFixed(3) + ' m' + zoomLbl, w - margin, margin - 4);
+        for (var i=0; i<n; i++) { if (c.quality[i]===q) ctx.fillRect(toX(c.e[i])-1.2, toY(c.n[i])-1.2, 2.4, 2.4); }
+    });
+    ctx.fillStyle='#95a5a6'; ctx.font='10px system-ui'; ctx.textAlign='right';
+    ctx.fillText('Range: '+viewRange.toFixed(3)+' m'+(gtView.scale>1.001?'  Zoom: '+gtView.scale.toFixed(2)+'\xd7':''), w-margin, margin-4);
 }
 
-// ═══════════════════════════════════════════════
-// ENU vs Time
-// ═══════════════════════════════════════════════
+// ENU
 function drawENU(c) {
-    // Convert to mm for display
-    var emm = c.e.map(function(v) { return v * 1000; });
-    var nmm = c.n.map(function(v) { return v * 1000; });
-    var umm = c.u.map(function(v) { return v * 1000; });
-
-    drawTimeSeries('canvasE', c.time, emm, '#e74c3c', 'East', 'mm', c.quality);
-    drawTimeSeries('canvasN', c.time, nmm, '#2ecc71', 'North', 'mm', c.quality);
-    drawTimeSeries('canvasU', c.time, umm, '#3498db', 'Up', 'mm', c.quality);
+    drawTimeSeries('canvasE', c.time, c.e.map(function(v){return v*1000;}), '#e74c3c', 'East', 'mm', c.quality);
+    drawTimeSeries('canvasN', c.time, c.n.map(function(v){return v*1000;}), '#2ecc71', 'North', 'mm', c.quality);
+    drawTimeSeries('canvasU', c.time, c.u.map(function(v){return v*1000;}), '#3498db', 'Up', 'mm', c.quality);
 }
 
-// ═══════════════════════════════════════════════
-// Quality bar
-// ═══════════════════════════════════════════════
+// Quality
 function drawQuality(c) {
-    var s = setupCanvas('canvasQ');
-    var ctx = s.ctx, w = s.w, h = s.h;
-    var n = c.quality.length;
-    if (n === 0) return;
-
-    var barH = h - M.top - M.bottom;
-
-    // Draw colored bars
-    var barW = Math.max(1, (w - M.left - M.right) / n);
-    for (var i = 0; i < n; i++) {
-        ctx.fillStyle = Q_COLORS[c.quality[i]] || '#bdc3c7';
-        var x = M.left + (i / n) * (w - M.left - M.right);
-        ctx.fillRect(x, M.top, barW + 0.5, barH);
+    var s=setupCanvas('canvasQ'), ctx=s.ctx, w=s.w, h=s.h, n=c.quality.length;
+    if (!n) return;
+    var barH=h-M.top-M.bottom, barW=Math.max(1,(w-M.left-M.right)/n);
+    for (var i=0; i<n; i++) {
+        ctx.fillStyle=Q_COLORS[c.quality[i]]||'#bdc3c7';
+        ctx.fillRect(M.left+(i/n)*(w-M.left-M.right), M.top, barW+0.5, barH);
     }
-
-    // Y axis labels
-    ctx.fillStyle = '#7f8c8d';
-    ctx.font = '10px system-ui';
-    ctx.textAlign = 'right';
-    var labels = ['Fix', 'Float', '', '', 'Single'];
-    var yPositions = [0.1, 0.35, 0.5, 0.65, 0.9];
-    for (var i = 0; i < labels.length; i++) {
-        if (labels[i]) {
-            ctx.fillText(labels[i], M.left - 4, M.top + yPositions[i] * barH + 4);
-        }
-    }
-
-    drawTimeAxis(ctx, c.time, M.left, w - M.right, h - 4);
+    ['Fix','Float','','','Single'].forEach(function(l,i) {
+        if (l) { ctx.fillStyle='#7f8c8d'; ctx.font='10px system-ui'; ctx.textAlign='right'; ctx.fillText(l, M.left-4, M.top+[0.1,0.35,0.5,0.65,0.9][i]*barH+4); }
+    });
+    drawTimeAxis(ctx, c.time, M.left, w-M.right, h-4);
 }
+function drawHeight(c) { drawTimeSeries('canvasH', c.time, c.height, '#8e44ad', 'Height', 'm', c.quality); }
 
-// Height vs time
-function drawHeight(c) {
-    drawTimeSeries('canvasH', c.time, c.height, '#8e44ad', 'Height', 'm', c.quality);
-}
-
-// ═══════════════════════════════════════════════
-// Satellites vs Time
-// ═══════════════════════════════════════════════
+// Satellites
 function drawSats(c) {
-    var s = setupCanvas('canvasNS');
-    var ctx = s.ctx, w = s.w, h = s.h;
-    var n = c.ns.length;
-    if (n === 0) return;
-
-    var pw = w - M.left - M.right;
-    var ph = h - M.top - M.bottom;
-
-    // Y range
-    var ymax = 0;
-    for (var i = 0; i < n; i++) { if (c.ns[i] > ymax) ymax = c.ns[i]; }
-    ymax = Math.max(ymax + 2, 10);
-
-    // Grid
-    ctx.strokeStyle = '#ecf0f1';
-    ctx.lineWidth = 0.5;
-    for (var g = 0; g <= ymax; g += 5) {
-        var gy = M.top + ph - (g / ymax) * ph;
-        ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(w - M.right, gy); ctx.stroke();
-        ctx.fillStyle = '#95a5a6';
-        ctx.font = '10px system-ui';
-        ctx.textAlign = 'right';
-        ctx.fillText(g, M.left - 4, gy + 3);
+    var s=setupCanvas('canvasNS'), ctx=s.ctx, w=s.w, h=s.h, n=c.ns.length;
+    if (!n) return;
+    var pw=w-M.left-M.right, ph=h-M.top-M.bottom, ymax=Math.max(10, Math.max.apply(null,c.ns)+2);
+    ctx.strokeStyle='#ecf0f1'; ctx.lineWidth=0.5;
+    for (var g=0; g<=ymax; g+=5) {
+        var gy=M.top+ph-(g/ymax)*ph;
+        ctx.beginPath(); ctx.moveTo(M.left,gy); ctx.lineTo(w-M.right,gy); ctx.stroke();
+        ctx.fillStyle='#95a5a6'; ctx.font='10px system-ui'; ctx.textAlign='right'; ctx.fillText(g, M.left-4, gy+3);
     }
-
-    // Bars colored by quality
-    var barW = Math.max(1, pw / n);
-    for (var i = 0; i < n; i++) {
-        var x = M.left + (i / n) * pw;
-        var barH = (c.ns[i] / ymax) * ph;
-        ctx.fillStyle = Q_COLORS[c.quality[i]] || '#bdc3c7';
-        ctx.fillRect(x, M.top + ph - barH, barW + 0.5, barH);
+    var bw=Math.max(1,pw/n);
+    for (var i=0; i<n; i++) {
+        ctx.fillStyle=Q_COLORS[c.quality[i]]||'#bdc3c7';
+        ctx.fillRect(M.left+(i/n)*pw, M.top+ph-(c.ns[i]/ymax)*ph, bw+0.5, (c.ns[i]/ymax)*ph);
     }
-
-    ctx.fillStyle = '#7f8c8d';
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText('Satellites', M.left, M.top - 0);
-
-    drawTimeAxis(ctx, c.time, M.left, w - M.right, h - 4);
+    ctx.fillStyle='#7f8c8d'; ctx.font='11px system-ui'; ctx.textAlign='left'; ctx.fillText('Satellites', M.left, M.top);
+    drawTimeAxis(ctx, c.time, M.left, w-M.right, h-4);
 }
 
-// ═══════════════════════════════════════════════
-// Std Dev vs Time
-// ═══════════════════════════════════════════════
+// Std Dev
 function drawStdDev(c) {
-    var s = setupCanvas('canvasSD');
-    var ctx = s.ctx, w = s.w, h = s.h;
-    var n = c.sdn.length;
-    if (n === 0) return;
-
-    var pw = w - M.left - M.right;
-    var ph = h - M.top - M.bottom;
-
-    // Convert to mm
-    var sdn = c.sdn.map(function(v) { return v * 1000; });
-    var sde = c.sde.map(function(v) { return v * 1000; });
-    var sdu = c.sdu.map(function(v) { return v * 1000; });
-
-    // Y range (cap at 95th percentile to avoid outlier stretching)
-    var all = sdn.concat(sde, sdu).filter(function(v) { return v > 0; }).sort(function(a,b) { return a-b; });
-    var ymax = all.length > 0 ? all[Math.min(Math.floor(all.length * 0.95), all.length - 1)] * 1.2 : 10;
-    ymax = Math.max(ymax, 1);
-
-    // Grid
-    ctx.strokeStyle = '#ecf0f1';
-    ctx.lineWidth = 0.5;
-    var nGrid = 5;
-    for (var g = 0; g <= nGrid; g++) {
-        var gy = M.top + ph - (g / nGrid) * ph;
-        ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(w - M.right, gy); ctx.stroke();
-        ctx.fillStyle = '#95a5a6';
-        ctx.font = '10px system-ui';
-        ctx.textAlign = 'right';
-        ctx.fillText((g / nGrid * ymax).toFixed(1), M.left - 4, gy + 3);
+    var s=setupCanvas('canvasSD'), ctx=s.ctx, w=s.w, h=s.h, n=c.sdn.length;
+    if (!n) return;
+    var pw=w-M.left-M.right, ph=h-M.top-M.bottom;
+    var sdn=c.sdn.map(function(v){return v*1000;}), sde=c.sde.map(function(v){return v*1000;}), sdu=c.sdu.map(function(v){return v*1000;});
+    var all=sdn.concat(sde,sdu).filter(function(v){return v>0;}).sort(function(a,b){return a-b;});
+    var ymax=Math.max(1, all.length>0?all[Math.min(Math.floor(all.length*0.95),all.length-1)]*1.2:10);
+    ctx.strokeStyle='#ecf0f1'; ctx.lineWidth=0.5;
+    for (var g=0; g<=5; g++) {
+        var gy=M.top+ph-(g/5)*ph;
+        ctx.beginPath(); ctx.moveTo(M.left,gy); ctx.lineTo(w-M.right,gy); ctx.stroke();
+        ctx.fillStyle='#95a5a6'; ctx.font='10px system-ui'; ctx.textAlign='right'; ctx.fillText((g/5*ymax).toFixed(1), M.left-4, gy+3);
     }
-
-    // Lines
     function drawLine(vals, color) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (var i = 0; i < n; i++) {
-            var x = M.left + (i / (n - 1 || 1)) * pw;
-            var v = Math.min(vals[i], ymax);
-            var y = M.top + ph - (v / ymax) * ph;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        ctx.strokeStyle=color; ctx.lineWidth=1; ctx.beginPath();
+        for (var i=0; i<n; i++) {
+            var x=M.left+(i/(n-1||1))*pw, y=M.top+ph-(Math.min(vals[i],ymax)/ymax)*ph;
+            if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
         }
         ctx.stroke();
     }
-
-    drawLine(sdu, '#3498db');
-    drawLine(sdn, '#2ecc71');
-    drawLine(sde, '#e74c3c');
-
-    ctx.fillStyle = '#7f8c8d';
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText('Std Dev (mm)', M.left, M.top - 0);
-
-    drawTimeAxis(ctx, c.time, M.left, w - M.right, h - 4);
+    drawLine(sdu,'#3498db'); drawLine(sdn,'#2ecc71'); drawLine(sde,'#e74c3c');
+    ctx.fillStyle='#7f8c8d'; ctx.font='11px system-ui'; ctx.textAlign='left'; ctx.fillText('Std Dev (mm)', M.left, M.top);
+    drawTimeAxis(ctx, c.time, M.left, w-M.right, h-4);
 }
 
-// ═══════════════════════════════════════════════
-// AR Ratio vs Time
-// ═══════════════════════════════════════════════
+// Ratio
 function drawRatio(c) {
-    var s = setupCanvas('canvasR');
-    var ctx = s.ctx, w = s.w, h = s.h;
-    var n = c.ratio.length;
-    if (n === 0) return;
-
-    var pw = w - M.left - M.right;
-    var ph = h - M.top - M.bottom;
-
-    // Cap ratio display at reasonable max
-    var sorted = c.ratio.filter(function(v) { return v > 0; }).sort(function(a,b) { return a-b; });
-    var ymax = sorted.length > 0 ? Math.min(sorted[Math.floor(sorted.length * 0.95)] * 1.3, 999.9) : 10;
-    ymax = Math.max(ymax, 5);
-
-    // Grid
-    ctx.strokeStyle = '#ecf0f1';
-    ctx.lineWidth = 0.5;
-    var nGrid = 5;
-    for (var g = 0; g <= nGrid; g++) {
-        var gy = M.top + ph - (g / nGrid) * ph;
-        ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(w - M.right, gy); ctx.stroke();
-        ctx.fillStyle = '#95a5a6';
-        ctx.font = '10px system-ui';
-        ctx.textAlign = 'right';
-        ctx.fillText((g / nGrid * ymax).toFixed(1), M.left - 4, gy + 3);
+    var s=setupCanvas('canvasR'), ctx=s.ctx, w=s.w, h=s.h, n=c.ratio.length;
+    if (!n) return;
+    var pw=w-M.left-M.right, ph=h-M.top-M.bottom;
+    var sorted=c.ratio.filter(function(v){return v>0;}).sort(function(a,b){return a-b;});
+    var ymax=Math.max(5, sorted.length>0?Math.min(sorted[Math.floor(sorted.length*0.95)]*1.3,999.9):10);
+    ctx.strokeStyle='#ecf0f1'; ctx.lineWidth=0.5;
+    for (var g=0; g<=5; g++) {
+        var gy=M.top+ph-(g/5)*ph;
+        ctx.beginPath(); ctx.moveTo(M.left,gy); ctx.lineTo(w-M.right,gy); ctx.stroke();
+        ctx.fillStyle='#95a5a6'; ctx.font='10px system-ui'; ctx.textAlign='right'; ctx.fillText((g/5*ymax).toFixed(1), M.left-4, gy+3);
     }
-
-    // AR threshold line (default 3.0)
-    var thY = M.top + ph - (3.0 / ymax) * ph;
-    if (thY > M.top && thY < M.top + ph) {
-        ctx.strokeStyle = '#e74c3c';
-        ctx.lineWidth = 0.5;
-        ctx.setLineDash([4, 3]);
-        ctx.beginPath(); ctx.moveTo(M.left, thY); ctx.lineTo(w - M.right, thY); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#e74c3c';
-        ctx.font = '9px system-ui';
-        ctx.textAlign = 'left';
-        ctx.fillText('AR=3.0', w - M.right + 2, thY + 3);
+    var thY=M.top+ph-(3.0/ymax)*ph;
+    if (thY>M.top && thY<M.top+ph) {
+        ctx.strokeStyle='#e74c3c'; ctx.lineWidth=0.5; ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(M.left,thY); ctx.lineTo(w-M.right,thY); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle='#e74c3c'; ctx.font='9px system-ui'; ctx.textAlign='left'; ctx.fillText('AR=3.0', w-M.right+2, thY+3);
     }
-
-    // Bars colored by quality
-    var barW = Math.max(1, pw / n);
-    for (var i = 0; i < n; i++) {
-        var x = M.left + (i / n) * pw;
-        var v = Math.min(c.ratio[i], ymax);
-        var barH = (v / ymax) * ph;
-        ctx.fillStyle = Q_COLORS[c.quality[i]] || '#bdc3c7';
-        ctx.fillRect(x, M.top + ph - barH, barW + 0.5, barH);
+    var bw=Math.max(1,pw/n);
+    for (var i=0; i<n; i++) {
+        ctx.fillStyle=Q_COLORS[c.quality[i]]||'#bdc3c7';
+        ctx.fillRect(M.left+(i/n)*pw, M.top+ph-(Math.min(c.ratio[i],ymax)/ymax)*ph, bw+0.5, (Math.min(c.ratio[i],ymax)/ymax)*ph);
     }
-
-    ctx.fillStyle = '#7f8c8d';
-    ctx.font = '11px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText('AR Ratio', M.left, M.top - 0);
-
-    drawTimeAxis(ctx, c.time, M.left, w - M.right, h - 4);
+    ctx.fillStyle='#7f8c8d'; ctx.font='11px system-ui'; ctx.textAlign='left'; ctx.fillText('AR Ratio', M.left, M.top);
+    drawTimeAxis(ctx, c.time, M.left, w-M.right, h-4);
 }
+function drawAge(c) { drawTimeSeries('canvasAge', c.time, c.age, '#e67e22', 'Age', 's'); }
 
-// Age of differential
-function drawAge(c) {
-    drawTimeSeries('canvasAge', c.time, c.age, '#e67e22', 'Age', 's');
-}
-
-// ═══════════════════════════════════════════════
-// Data Table
-// ═══════════════════════════════════════════════
+// Data table
 function fillTable(c) {
-    var tbody = document.getElementById('posTableBody');
-    var n = c.time.length;
-    // Limit table rows
-    var maxRows = 500;
-    var step = Math.max(1, Math.floor(n / maxRows));
-
-    var html = '';
-    var shown = 0;
-    for (var i = 0; i < n; i += step) {
-        var q = c.quality[i];
-        var qColor = Q_COLORS[q] || '#bdc3c7';
-        var qLabel = Q_LABELS[q] || q;
-        html += '<tr>' +
-            '<td>' + (c.time[i] || '') + '</td>' +
-            '<td>' + c.lat[i].toFixed(8) + '</td>' +
-            '<td>' + c.lon[i].toFixed(8) + '</td>' +
-            '<td>' + c.height[i].toFixed(3) + '</td>' +
-            '<td><span class="q-badge" style="background:' + qColor + '">' + qLabel + '</span></td>' +
-            '<td>' + c.ns[i] + '</td>' +
-            '<td>' + c.sdn[i].toFixed(4) + '</td>' +
-            '<td>' + c.sde[i].toFixed(4) + '</td>' +
-            '<td>' + c.sdu[i].toFixed(4) + '</td>' +
-            '<td>' + c.age[i].toFixed(1) + '</td>' +
-            '<td>' + c.ratio[i].toFixed(1) + '</td>' +
-            '</tr>';
+    var tbody=document.getElementById('posTableBody'), n=c.time.length;
+    var maxRows=500, step=Math.max(1,Math.floor(n/maxRows)), html='', shown=0;
+    for (var i=0; i<n; i+=step) {
+        var q=c.quality[i], qColor=Q_COLORS[q]||'#bdc3c7', qLabel=Q_LABELS[q]||q;
+        html+='<tr><td>'+(c.time[i]||'')+'</td><td>'+c.lat[i].toFixed(8)+'</td><td>'+c.lon[i].toFixed(8)+'</td><td>'+c.height[i].toFixed(3)+'</td>' +
+            '<td><span class="q-badge" style="background:'+qColor+'">'+qLabel+'</span></td>' +
+            '<td>'+c.ns[i]+'</td><td>'+c.sdn[i].toFixed(4)+'</td><td>'+c.sde[i].toFixed(4)+'</td><td>'+c.sdu[i].toFixed(4)+'</td>' +
+            '<td>'+c.age[i].toFixed(1)+'</td><td>'+c.ratio[i].toFixed(1)+'</td></tr>';
         shown++;
     }
     tbody.innerHTML = html;
-
-    document.getElementById('tableInfo').textContent =
-        shown + ' of ' + c.total_epochs + ' epochs' +
-        (step > 1 ? ' (every ' + step + 'th)' : '');
+    document.getElementById('tableInfo').textContent = shown+' of '+c.total_epochs+' epochs'+(step>1?' (every '+step+'th)':'');
 }
 
-// ═══════════════════════════════════════════════
-// CSV Export
-// ═══════════════════════════════════════════════
+// CSV export
 function exportCSV() {
     if (!posData) return;
-    var c = posData.charts;
-    var n = c.time.length;
-    var csv = 'Time,Lat,Lon,Height,Q,ns,sdN,sdE,sdU,Age,Ratio,E,N,U\n';
-    for (var i = 0; i < n; i++) {
-        csv += [c.time[i], c.lat[i], c.lon[i], c.height[i], c.quality[i],
-                c.ns[i], c.sdn[i], c.sde[i], c.sdu[i], c.age[i], c.ratio[i],
-                c.e[i], c.n[i], c.u[i]].join(',') + '\n';
-    }
-    var blob = new Blob([csv], {type: 'text/csv'});
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = (posData.filename || 'solution').replace('.pos', '') + '.csv';
+    var c=posData.charts, n=c.time.length, csv='Time,Lat,Lon,Height,Q,ns,sdN,sdE,sdU,Age,Ratio,E,N,U\n';
+    for (var i=0; i<n; i++) csv+=[c.time[i],c.lat[i],c.lon[i],c.height[i],c.quality[i],c.ns[i],c.sdn[i],c.sde[i],c.sdu[i],c.age[i],c.ratio[i],c.e[i],c.n[i],c.u[i]].join(',')+'\n';
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download=(posData.filename||'solution').replace('.pos','')+'.csv';
     a.click();
 }
 
-// ═══════════════════════════════════════════════
-// Resize handler
-// ═══════════════════════════════════════════════
+// Analyser filters
+function applyFilters() {
+    if (!allEpochs) return;
+    var q1=document.getElementById('fQ1').checked, q2=document.getElementById('fQ2').checked;
+    var qother=document.getElementById('fQother').checked;
+    var ratioMin=parseFloat(document.getElementById('fRatioMin').value)||0;
+    var nsMin=parseInt(document.getElementById('fNsMin').value)||0;
+    filteredIndices=[]; var nFix=0, ratioSum=0, ratioCount=0;
+    for (var i=0; i<allEpochs.length; i++) {
+        var e=allEpochs[i], q=e.q, pass=false;
+        if (q===1&&q1) pass=true; else if (q===2&&q2) pass=true; else if (q>=3&&qother) pass=true;
+        if (!pass) continue;
+        if (ratioMin>0 && e.ratio<ratioMin) continue;
+        if (nsMin>0 && e.ns<nsMin) continue;
+        filteredIndices.push(i);
+        if (q===1) nFix++;
+        if (e.ratio>0) { ratioSum+=e.ratio; ratioCount++; }
+    }
+    var nVis=filteredIndices.length, nTot=allEpochs.length;
+    document.getElementById('fStatVisible').textContent=nVis;
+    document.getElementById('fStatTotal').textContent=nTot;
+    document.getElementById('fStatFix').textContent=nVis>0?(100*nFix/nVis).toFixed(1):'0';
+    document.getElementById('fStatRatio').textContent=ratioCount>0?(ratioSum/ratioCount).toFixed(1):'\u2014';
+    epochPage=0; renderEpochTable(); drawAnalyserChart();
+}
+
+// Analyser height chart
+function drawAnalyserChart() {
+    if (!allEpochs || !filteredIndices.length) return;
+    var canvas=document.getElementById('canvasAH'); if (!canvas) return;
+    var s=setupCanvas('canvasAH'), ctx=s.ctx, w=s.w, h=s.h;
+    var pw=w-M.left-M.right, ph=h-M.top-M.bottom;
+    var epochs=filteredIndices.map(function(i){return allEpochs[i];}), n=epochs.length;
+    var ymin=Infinity, ymax=-Infinity;
+    for (var i=0; i<n; i++) {
+        var lo=epochs[i].h-(epochs[i].sdu||0), hi=epochs[i].h+(epochs[i].sdu||0);
+        if (lo<ymin) ymin=lo; if (hi>ymax) ymax=hi;
+    }
+    var pad=Math.max((ymax-ymin)*0.1,0.01); ymin-=pad; ymax+=pad;
+    if (ymax===ymin) { ymax+=0.5; ymin-=0.5; }
+    function toX(i) { return M.left+(i/(n-1||1))*pw; }
+    function toY(v) { return M.top+ph-((v-ymin)/(ymax-ymin))*ph; }
+    ctx.strokeStyle='#ecf0f1'; ctx.lineWidth=0.5;
+    for (var g=0; g<=5; g++) {
+        var gy=M.top+ph-(g/5)*ph;
+        ctx.beginPath(); ctx.moveTo(M.left,gy); ctx.lineTo(w-M.right,gy); ctx.stroke();
+        ctx.fillStyle='#95a5a6'; ctx.font='10px system-ui'; ctx.textAlign='right';
+        ctx.fillText((ymin+(g/5)*(ymax-ymin)).toFixed(3), M.left-4, gy+3);
+    }
+    ctx.fillStyle='#7f8c8d'; ctx.font='11px system-ui'; ctx.textAlign='left'; ctx.fillText('Height (m)', M.left, M.top);
+    // Selection highlight
+    if (selectedSet.size>0) {
+        ctx.fillStyle='rgba(241,196,15,0.22)';
+        var inSel=false, xStart=0;
+        for (var i=0; i<=n; i++) {
+            var idx=i<n?filteredIndices[i]:-1, sel=idx>=0&&selectedSet.has(idx);
+            if (sel&&!inSel) { xStart=toX(i); inSel=true; }
+            if (!sel&&inSel) { ctx.fillRect(xStart,M.top,toX(i)-xStart,ph); inSel=false; }
+        }
+    }
+    // sdu band
+    ctx.fillStyle='rgba(52,152,219,0.15)'; ctx.beginPath();
+    for (var i=0; i<n; i++) { var x=toX(i),y=toY(epochs[i].h+(epochs[i].sdu||0)); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+    for (var i=n-1; i>=0; i--) ctx.lineTo(toX(i), toY(epochs[i].h-(epochs[i].sdu||0)));
+    ctx.closePath(); ctx.fill();
+    // Points
+    for (var i=0; i<n; i++) {
+        var e=epochs[i], qc=e.q===1?'#2ecc71':e.q===2?'#f39c12':'#95a5a6';
+        ctx.fillStyle=qc; ctx.fillRect(toX(i)-1,toY(e.h)-1,2,2);
+    }
+    drawTimeAxis(ctx, epochs.map(function(e){return e.ts;}), M.left, w-M.right, h-4);
+}
+
+function handleAHClick(event) {
+    if (!allEpochs || !filteredIndices.length) return;
+    var canvas=document.getElementById('canvasAH'), rect=canvas.getBoundingClientRect();
+    var x=event.clientX-rect.left, pw=rect.width-M.left-M.right, n=filteredIndices.length;
+    var idx=Math.round(((x-M.left)/pw)*(n-1));
+    idx=Math.max(0,Math.min(n-1,idx));
+    epochPage=Math.floor(idx/epochPageSize);
+    renderEpochTable();
+    setTimeout(function() {
+        var rows=document.querySelectorAll('#epochTableBody tr'), ri=idx%epochPageSize;
+        if (rows[ri]) { rows[ri].scrollIntoView({behavior:'smooth',block:'center'}); rows[ri].style.outline='2px solid #3498db'; setTimeout(function(){rows[ri].style.outline='';},1200); }
+    }, 50);
+}
+
+// Epoch table
+function renderEpochTable() {
+    var tbody=document.getElementById('epochTableBody');
+    if (!allEpochs || !filteredIndices.length) {
+        tbody.innerHTML='<tr><td colspan="12" style="text-align:center;color:#95a5a6;">Nessuna epoca corrisponde ai filtri.</td></tr>';
+        document.getElementById('pagerInfo').textContent=''; return;
+    }
+    var total=filteredIndices.length, pages=Math.ceil(total/epochPageSize);
+    if (epochPage>=pages) epochPage=pages-1;
+    if (epochPage<0) epochPage=0;
+    var start=epochPage*epochPageSize, end=Math.min(start+epochPageSize,total), html='';
+    for (var fi=start; fi<end; fi++) {
+        var gi=filteredIndices[fi], e=allEpochs[gi], q=e.q;
+        var rc=q===1?'epoch-q1':q===2?'epoch-q2':'epoch-qother';
+        if (selectedSet.has(gi)) rc+=' epoch-selected';
+        var qc=q===1?'#2ecc71':q===2?'#f39c12':'#95a5a6', ql=Q_LABELS[q]||q;
+        var r=e.ratio, rCls=r<3?'ratio-bad':r<10?'ratio-ok':r<100?'ratio-good':'ratio-great';
+        html+='<tr class="'+rc+'" data-fi="'+fi+'" data-gi="'+gi+'">' +
+            '<td><input type="checkbox"'+(selectedSet.has(gi)?' checked':'')+' onchange="handleCheck(event,'+fi+','+gi+')"></td>' +
+            '<td style="color:#95a5a6;">'+(gi+1)+'</td><td>'+(e.ts||'')+'</td>' +
+            '<td><span class="q-badge" style="background:'+qc+'">'+ql+'</span></td>' +
+            '<td>'+e.ns+'</td><td class="'+rCls+'">'+r.toFixed(1)+'</td>' +
+            '<td>'+e.lat.toFixed(8)+'</td><td>'+e.lon.toFixed(8)+'</td><td>'+e.h.toFixed(4)+'</td>' +
+            '<td class="hide-mobile">'+e.sdn.toFixed(4)+'</td><td class="hide-mobile">'+e.sde.toFixed(4)+'</td>' +
+            '<td>'+e.sdu.toFixed(4)+'</td></tr>';
+    }
+    tbody.innerHTML=html;
+    document.getElementById('pagerInfo').textContent='Pagina '+(epochPage+1)+' di '+pages+'  ('+total+' epoche filtrate)';
+    document.getElementById('btnPrev').disabled=epochPage===0;
+    document.getElementById('btnNext').disabled=epochPage>=pages-1;
+    updateSelCount();
+}
+
+function handleCheck(event, fi, gi) {
+    if (event.shiftKey && lastChecked>=0) {
+        var lo=Math.min(fi,lastChecked), hi=Math.max(fi,lastChecked), ns=event.target.checked;
+        for (var i=lo; i<=hi; i++) { var g=filteredIndices[i]; if(g!==undefined){if(ns)selectedSet.add(g);else selectedSet.delete(g);} }
+        renderEpochTable();
+    } else {
+        if (event.target.checked) selectedSet.add(gi); else selectedSet.delete(gi);
+        lastChecked=fi; updateSelCount();
+    }
+    updateCreateBtn(); drawAnalyserChart();
+}
+function updateSelCount() { document.getElementById('selCount').textContent=selectedSet.size+' selezionate'; }
+function updateCreateBtn() { document.getElementById('btnCreateStation').disabled=selectedSet.size===0; }
+function selectAllFiltered() { filteredIndices.forEach(function(i){selectedSet.add(i);}); renderEpochTable(); updateCreateBtn(); drawAnalyserChart(); }
+function deselectAll() { selectedSet.clear(); lastChecked=-1; renderEpochTable(); updateCreateBtn(); drawAnalyserChart(); }
+function invertSelection() {
+    filteredIndices.forEach(function(gi){if(selectedSet.has(gi))selectedSet.delete(gi);else selectedSet.add(gi);});
+    renderEpochTable(); updateCreateBtn(); drawAnalyserChart();
+}
+function epochPrev() { epochPage--; renderEpochTable(); }
+function epochNext() { epochPage++; renderEpochTable(); }
+
+// Station creation
+function createStation() {
+    if (!selectedSet.size || !currentFilePath) return;
+    var indices=Array.from(selectedSet).sort(function(a,b){return a-b;});
+    var statusEl=document.getElementById('loadingStatus');
+    document.getElementById('loadingMsg').textContent='Calcolo stazione...';
+    statusEl.classList.remove('hidden');
+    document.getElementById('btnCreateStation').disabled=true;
+    fetch('/ppk/station', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({pos_file:currentFilePath, epoch_indices:indices})})
+    .then(function(r){return r.json();})
+    .then(function(data){
+        statusEl.classList.add('hidden');
+        document.getElementById('btnCreateStation').disabled=false;
+        if (!data.ok) { alert('Errore: '+data.error); return; }
+        var st=data.station; st._id=Date.now(); st._imported=false; st._name='STZ_'+(stations.length+1);
+        stations.push(st); renderStationsList();
+    })
+    .catch(function(err){ statusEl.classList.add('hidden'); document.getElementById('btnCreateStation').disabled=false; alert('Errore: '+err); });
+}
+
+function renderStationsList() {
+    var container=document.getElementById('stationsList'), noMsg=document.getElementById('noStationsMsg');
+    if (!stations.length) { noMsg.style.display=''; container.innerHTML=''; container.appendChild(noMsg); return; }
+    noMsg.style.display='none';
+    var html='';
+    stations.forEach(function(st,i) {
+        var importBtn=st._imported
+            ? '<button class="btn btn-sm btn-import-ok" disabled>\u2713 Importato come '+escHtml(st._importedAs||st._name)+'</button>'
+            : '<button class="btn btn-sm btn-primary" onclick="importStation('+i+')">\u2192 Importa nel rilievo attivo</button>';
+        html+='<div class="station-card" id="stcard-'+i+'">' +
+            '<div class="flex-between" style="align-items:flex-start;">' +
+            '<h4>&#128205; '+escHtml(st._name)+'</h4>' +
+            '<div style="display:flex;gap:6px;">' +
+            '<button class="btn btn-sm btn-secondary" onclick="renameStation('+i+')">\u270e Rinomina</button>' +
+            '<button class="btn btn-sm btn-secondary" onclick="removeStation('+i+'">&#128465; Rimuovi</button></div></div>' +
+            '<div class="station-coords">' +
+            '<div>'+st.n_epochs+' epoche &nbsp;| '+escHtml(st.t_start||'\u2014')+' \u2192 '+escHtml(st.t_end||'\u2014')+'</div>' +
+            '<div>Lat: <b>'+st.lat.toFixed(9)+'</b> &nbsp;\xb1'+(st.sigma_N*1000).toFixed(1)+' mm</div>' +
+            '<div>Lon: <b>'+st.lon.toFixed(9)+'</b> &nbsp;\xb1'+(st.sigma_E*1000).toFixed(1)+' mm</div>' +
+            '<div>H: &nbsp;<b>'+st.h.toFixed(4)+'</b> m &nbsp;\xb1'+(st.sigma_U*1000).toFixed(1)+' mm</div></div>' +
+            '<div class="station-meta">ratio medio: '+st.ratio_mean+' &nbsp;| ns medio: '+st.ns_mean+'</div>' +
+            '<div class="station-actions">'+importBtn+'</div></div>';
+    });
+    container.innerHTML=html;
+}
+
+function renameStation(i) {
+    var n=prompt('Nuovo nome stazione:', stations[i]._name);
+    if (n&&n.trim()) { stations[i]._name=n.trim(); renderStationsList(); }
+}
+function removeStation(i) { stations.splice(i,1); renderStationsList(); }
+function importStation(i) {
+    var st=stations[i];
+    fetch('/ppk/import_station', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({station:st, name:st._name})})
+    .then(function(r){return r.json();})
+    .then(function(data){
+        if (!data.ok) {
+            if (data.error==='no_active_survey') alert('Nessun rilievo attivo.\nVai su Rilievi e apri un rilievo prima di importare.');
+            else alert('Errore: '+data.error);
+            return;
+        }
+        stations[i]._imported=true; stations[i]._importedAs=data.name; renderStationsList();
+    })
+    .catch(function(err){alert('Errore: '+err);});
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 var resizeTimer;
-window.addEventListener('resize', function() {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(function() { drawActiveChart(); }, 200);
-});
+window.addEventListener('resize', function() { clearTimeout(resizeTimer); resizeTimer=setTimeout(function(){drawActiveChart();},200); });
 </script>
 {% endblock %}

@@ -11,3 +11,4 @@ surveys/
 *.tmp
 surveys/*.bak
 data/session_log.jsonl
+templates/posview.html.bak
