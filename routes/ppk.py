@@ -314,7 +314,13 @@ def run_convbin():
     if not os.path.isfile(input_file):
         return jsonify({'error': f'Input file not found: {input_file}'}), 400
 
-    output_dir = data.get('output_dir', Cfg.RINEX_DIR)
+    output_dir_raw = data.get('output_dir', 'rinex')
+    if output_dir_raw in ('rinex', '', None):
+        output_dir = Cfg.RINEX_DIR
+    elif output_dir_raw == 'same':
+        output_dir = os.path.dirname(input_file) or Cfg.RINEX_DIR
+    else:
+        output_dir = output_dir_raw
     os.makedirs(output_dir, exist_ok=True)
 
     options = {
@@ -456,12 +462,12 @@ def _list_obs_files():
 def _list_nav_files():
     nav_files = list_files(Cfg.RINEX_DIR,
                            ('.nav', '.gnav', '.hnav', '.qnav', '.lnav',
-                            '.cnav', '.inav', '.sp3', '.eph', '.clk'))
+                            '.cnav', '.inav', '.mnav', '.sp3', '.eph', '.clk', '.rnx'))
     for f in os.listdir(Cfg.RINEX_DIR):
         full = os.path.join(Cfg.RINEX_DIR, f)
         if os.path.isfile(full) and len(f) > 3:
             ext = f[-3:].lower()
-            if ext.endswith(('n', 'g', 'h', 'l', 'p')) and ext[:-1].isdigit():
+            if ext.endswith(('n', 'g', 'h', 'l', 'p', 'q', 'c')) and ext[:-1].isdigit():
                 entry = {
                     'name': f, 'path': full,
                     'size': format_size(os.path.getsize(full)),
@@ -513,6 +519,16 @@ def ppk_page():
         binary_path=Cfg.RNX2RTKP_BIN,
         project_dir=os.path.dirname(os.path.abspath(__file__)),
     )
+
+
+@bp.route('/api/ppk/obs_files')
+def api_obs_files():
+    return jsonify({'files': _list_obs_files()})
+
+
+@bp.route('/api/ppk/nav_files')
+def api_nav_files():
+    return jsonify({'files': _list_nav_files()})
 
 
 # ─── Conf API ────────────────────────────────

@@ -86,7 +86,11 @@
         <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
             Upload Files
             <input type="file" id="fileUpload" style="display:none" multiple
-                   accept=".obs,.rnx,.nav,.gnav,.hnav,.sp3,.eph,.clk,.conf,.atx,.24o,.24n,.24g,.24p">
+                   accept=".obs,.rnx,.nav,.gnav,.hnav,.sp3,.eph,.clk,.conf,.atx,
+                           .24o,.24n,.24g,.24p,.24q,.24c,
+                           .25o,.25n,.25g,.25p,.25q,.25c,
+                           .26o,.26n,.26g,.26p,.26q,.26c,
+                           .OBS,.RNX,.NAV">
         </label>
     </div>
 </div>
@@ -477,9 +481,56 @@ function resetToDefaults() {
 }
 
 // ═══ File uploads ═══
+async function refreshFileLists() {
+    try {
+        const [obsResp, navResp] = await Promise.all([
+            fetch('/api/ppk/obs_files').then(r => r.json()),
+            fetch('/api/ppk/nav_files').then(r => r.json()),
+        ]);
+
+        // Update Rover and Base selects
+        ['roverObs', 'baseObs'].forEach((selId, i) => {
+            const sel = document.getElementById(selId);
+            const current = sel.value;
+            const placeholder = sel.options[0];
+            sel.innerHTML = '';
+            sel.appendChild(placeholder);
+            (obsResp.files || []).forEach(f => {
+                const opt = new Option(`${f.name} (${f.size})`, f.path);
+                sel.appendChild(opt);
+            });
+            if (current) sel.value = current;
+        });
+
+        // Update nav file list
+        const navList = document.getElementById('navFileList');
+        const checkedPaths = new Set(
+            [...navList.querySelectorAll('.nav-file-check:checked')].map(cb => cb.value)
+        );
+        navList.innerHTML = '';
+        const navFiles = navResp.files || [];
+        if (navFiles.length === 0) {
+            navList.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-state-text">No navigation files found</div><div class="empty-state-hint">Convert raw files or upload RINEX nav files</div></div>';
+        } else {
+            navFiles.forEach(f => {
+                const checked = checkedPaths.size === 0 || checkedPaths.has(f.path);
+                const label = document.createElement('label');
+                label.className = 'file-item';
+                label.style.cssText = 'cursor:pointer; padding:8px 12px;';
+                label.innerHTML = `<input type="checkbox" class="nav-file-check" value="${f.path}"${checked ? ' checked' : ''}><div class="file-icon nav">NAV</div><div class="file-info"><div class="file-name">${f.name}</div><div class="file-meta">${f.size}</div></div>`;
+                navList.appendChild(label);
+            });
+        }
+    } catch (err) {
+        console.error('refreshFileLists error:', err);
+    }
+}
+
 function setupUploads() {
     document.getElementById('fileUpload').addEventListener('change', function() {
-        uploadFiles(this.files, '/api/upload');
+        uploadFiles(this.files, '/api/upload', () => {
+            refreshFileLists();
+        });
     });
     document.getElementById('confUpload').addEventListener('change', function() {
         uploadFiles(this.files, '/api/rnx2rtkp/conf/upload', () => {
