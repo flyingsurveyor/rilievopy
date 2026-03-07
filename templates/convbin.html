@@ -271,6 +271,18 @@
         </div>
 
         <div class="form-group">
+            <label>Observation Options</label>
+            <div class="toggle-group">
+                <label class="toggle-chip">
+                    <input type="checkbox" id="optInclDoppler" checked> Include Doppler (-od)
+                </label>
+                <label class="toggle-chip">
+                    <input type="checkbox" id="optInclSnr" checked> Include SNR (-os)
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
             <label>Nav Header Options</label>
             <div class="toggle-group">
                 <label class="toggle-chip">
@@ -434,12 +446,14 @@
             signal_mask: document.getElementById('optSignalMask').value,
             signal_nomask: document.getElementById('optSignalNomask').value,
             half_cyc: document.getElementById('optHalfCyc').checked,
+            include_doppler: document.getElementById('optInclDoppler').checked,
+            include_snr: document.getElementById('optInclSnr').checked,
             include_iono: document.getElementById('optInclIono').checked,
             include_time: document.getElementById('optInclTime').checked,
             include_leaps: document.getElementById('optInclLeaps').checked,
             station_id: document.getElementById('optStationId').value,
             trace: parseInt(document.getElementById('optTrace').value),
-            output_dir: outputDirSel === 'same' ? '' : undefined,
+            output_dir: outputDirSel,  // manda 'rinex' o 'same' come stringa esplicita
         };
 
         try {
