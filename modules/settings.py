@@ -46,6 +46,14 @@ DEFAULTS: Dict[str, Any] = {
     "max_pdop": 3.0,
     "min_sv": 8,
     "rtk_quality_gate": True,  # se False, disabilita tutti i check
+
+    # BLE (RTKINO)
+    "ble_enabled": False,
+    "ble_device_name": "RTKino",
+    "ble_passkey": 123456,
+    "ble_autoconnect": False,
+    "ble_tts": True,
+    "ble_tts_lang": "it",
 }
 
 # ---------- File path ----------
