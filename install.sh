@@ -535,6 +535,94 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════
+# 9. Termux extras (BLE, notifications, widget)
+# ═══════════════════════════════════════════════════════════════════
+
+if [ "${PLATFORM}" = "termux" ]; then
+
+    echo ""
+    echo -e "${BOLD}═══ Termux extras ═══${NC}"
+
+    # ── 9a. bleak (BLE for RTKINO) ──────────────────────────────────
+    echo ""
+    info "Installazione bleak (BLE per RTKINO)..."
+    if pip install bleak; then
+        log "bleak installato"
+        python3 -c "import bleak" 2>/dev/null && log "bleak OK" \
+            || warn "bleak non importabile"
+    else
+        warn "bleak non installato — connessione BLE non disponibile"
+    fi
+
+    # ── 9b. Termux:API ──────────────────────────────────────────────
+    echo ""
+    if command -v termux-notification &>/dev/null; then
+        log "Termux:API già installata"
+    else
+        warn "Termux:API non trovata — notifiche Android non disponibili"
+        echo ""
+        echo "  Termux:API è necessaria per:"
+        echo "  • Notifiche push (perdita fix RTK)"
+        echo "  • Vibrazione"
+        echo "  • Text-to-speech"
+        echo ""
+        echo "  Scarica e installa:"
+        echo "  https://f-droid.org/packages/com.termux.api/"
+        echo ""
+        if ask_yn "Apro il link di download nel browser?"; then
+            termux-open-url "https://f-droid.org/packages/com.termux.api/" 2>/dev/null \
+                || am start -a android.intent.action.VIEW \
+                   -d "https://f-droid.org/packages/com.termux.api/" 2>/dev/null \
+                || info "Apri manualmente: https://f-droid.org/packages/com.termux.api/"
+        fi
+    fi
+
+    # ── 9c. Termux:Widget ───────────────────────────────────────────
+    SHORTCUTS_DIR="$HOME/.shortcuts"
+    echo ""
+    if [ -d "$SHORTCUTS_DIR" ] || command -v termux-widget &>/dev/null; then
+        log "Termux:Widget disponibile"
+    else
+        warn "Termux:Widget non trovato"
+        echo ""
+        echo "  Termux:Widget ti permette di avviare Rilievo con un tap dalla home screen."
+        echo ""
+        echo "  Scarica e installa:"
+        echo "  https://f-droid.org/packages/com.termux.widget/"
+        echo ""
+        if ask_yn "Apro il link di download nel browser?"; then
+            termux-open-url "https://f-droid.org/packages/com.termux.widget/" 2>/dev/null \
+                || am start -a android.intent.action.VIEW \
+                   -d "https://f-droid.org/packages/com.termux.widget/" 2>/dev/null \
+                || info "Apri manualmente: https://f-droid.org/packages/com.termux.widget/"
+        fi
+    fi
+
+    # ── 9d. Install widget scripts ──────────────────────────────────
+    echo ""
+    mkdir -p "$SHORTCUTS_DIR"
+    chmod 700 "$SHORTCUTS_DIR"
+
+    if [ -f "${SCRIPT_DIR}/scripts/termux_widget_start.sh" ]; then
+        cp "${SCRIPT_DIR}/scripts/termux_widget_start.sh" \
+            "$SHORTCUTS_DIR/rilievo_avvia.sh"
+        cp "${SCRIPT_DIR}/scripts/termux_widget_stop.sh" \
+            "$SHORTCUTS_DIR/rilievo_ferma.sh"
+        chmod +x "$SHORTCUTS_DIR/rilievo_avvia.sh"
+        chmod +x "$SHORTCUTS_DIR/rilievo_ferma.sh"
+        log "Script widget installati in $SHORTCUTS_DIR"
+        echo ""
+        info "Per usare i widget:"
+        echo "  1. Tieni premuto sulla home screen → Widget"
+        echo "  2. Cerca 'Termux' → Termux:Widget"
+        echo "  3. Seleziona 'rilievo_avvia' per avviare, 'rilievo_ferma' per fermare"
+    else
+        warn "Script widget non trovati in ${SCRIPT_DIR}/scripts/ — salto installazione"
+    fi
+
+fi
+
+# ═══════════════════════════════════════════════════════════════════
 # 7. Data directories & default configs
 # ═══════════════════════════════════════════════════════════════════
 
@@ -672,6 +760,13 @@ echo -e "${BOLD}How to start:${NC}"
 if [ "${PLATFORM}" = "termux" ]; then
     echo "    cd ${SCRIPT_DIR}"
     echo "    python3 app.py"
+    echo ""
+    echo -e "${BOLD}Avvio rapido con Termux:Widget:${NC}"
+    echo "    Tap su widget 'rilievo_avvia' dalla home screen"
+    echo ""
+    echo -e "${BOLD}Connessione BLE a RTKINO:${NC}"
+    echo "    Abilitare BLE nelle impostazioni: http://127.0.0.1:${DEFAULT_PORT}/settings"
+    echo "    Dispositivo: RTKino | PIN: 123456 (default)"
 elif [ -n "${VENV_DIR}" ] && [ -d "${VENV_DIR}" ]; then
     echo "    cd ${SCRIPT_DIR}"
     echo "    source venv/bin/activate"
