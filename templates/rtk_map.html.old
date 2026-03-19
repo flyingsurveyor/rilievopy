@@ -11,7 +11,6 @@
 .map-page{
   display:flex;flex-direction:column;
   height:calc(100vh - 52px);  /* topbar is 52px */
-  height:calc(100dvh - 52px); /* modern browsers: accounts for mobile chrome */
   overflow:hidden;
 }
 #map{flex:1;min-height:0;background:#fff;position:relative;z-index:0}
@@ -30,14 +29,18 @@
 
 /* Bottom toolbar */
 .map-toolbar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:#34495e;flex-shrink:0;flex-wrap:wrap;min-height:32px}
-/* Toolbar checkbox labels */
-.tb-chk{display:flex;align-items:center;gap:3px;font-size:11px;color:#ecf0f1;cursor:pointer;white-space:nowrap}
-.tb-chk input{width:14px;height:14px}
-.tb-sep{width:1px;height:18px;background:rgba(255,255,255,.2);flex-shrink:0}
 
 /* Info bar */
 .info-bar{display:flex;gap:10px;padding:2px 8px;font:11px/1.3 monospace;color:#7f8c8d;background:#f8f9fa;flex-shrink:0;min-height:16px}
 .info-bar .snap-info{color:#e67e22;font-weight:700}
+
+/* Layer control */
+.layer-ctl{position:absolute;top:8px;right:8px;z-index:1000}
+.layer-btn{width:34px;height:34px;border:none;background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.layer-panel{position:absolute;top:0;right:42px;background:#fff;border-radius:8px;padding:10px;min-width:180px;box-shadow:0 2px 10px rgba(0,0,0,.3);color:#333;font-size:13px;display:none}
+.layer-panel.open{display:block}
+.layer-panel label{display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer}
+.layer-panel input{width:16px;height:16px}
 
 /* Custom scale */
 .custom-scale{background:rgba(255,255,255,.88);padding:3px 8px;border-radius:4px;font:11px/1.2 monospace;box-shadow:0 1px 4px rgba(0,0,0,.3);pointer-events:none}
@@ -56,11 +59,12 @@
 
 /* Mobile adjustments */
 @media(max-width:768px){
-  .map-page{height:calc(100vh - 52px);height:calc(100dvh - 52px)}
+  .map-page{height:calc(100vh - 52px)}
   .map-hdr{padding:3px 6px;min-height:28px}
   .map-hdr h1{font-size:12px}
   .map-toolbar{padding:3px 6px;min-height:28px}
   .btn-sm{padding:3px 8px;font-size:11px}
+  .layer-panel{position:fixed;top:auto;bottom:0;left:0;right:0;max-height:50vh;border-radius:12px 12px 0 0;padding:14px;z-index:2000}
   #meas-panel{max-height:18vh}
 }
 </style>
@@ -79,6 +83,16 @@
 
   <!-- Map -->
   <div id="map">
+    <div class="layer-ctl">
+      <button class="layer-btn" id="btn-layers" title="Layer">🎨</button>
+      <div class="layer-panel" id="layer-panel">
+        <label><input type="checkbox" id="ov-points" checked> Punti</label>
+        <label><input type="checkbox" id="ov-labels" checked> Etichette</label>
+        <div style="margin-top:6px">
+          <button class="btn-sm" onclick="document.getElementById('layer-panel').classList.remove('open')">Chiudi</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Info bar -->
@@ -98,11 +112,10 @@
   <div class="map-toolbar">
     <button class="btn-sm" id="btn-fit" title="Adatta vista">⊞ Fit</button>
     <button class="btn-sm" id="btn-measure" title="Misura distanza fra punti">📏 Misura</button>
-    <label class="tb-chk"><input type="checkbox" id="chk-osnap" checked> OSnap</label>
+    <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#ecf0f1;cursor:pointer">
+      <input type="checkbox" id="chk-osnap" checked style="width:14px;height:14px"> OSnap
+    </label>
     <button class="btn-sm danger" id="btn-clear-meas" style="display:none" title="Cancella misure">🗑</button>
-    <span class="tb-sep"></span>
-    <label class="tb-chk"><input type="checkbox" id="ov-points" checked> Punti</label>
-    <label class="tb-chk"><input type="checkbox" id="ov-labels" checked> Etichette</label>
   </div>
 </div>
 {% endblock %}
@@ -368,8 +381,10 @@ function fmtAz(deg){
   document.getElementById('chk-osnap').addEventListener('change',function(e){snapEnabled=e.target.checked;if(!snapEnabled){showSnapRing(null);snappedPt=null;}});
   document.getElementById('btn-clear-meas').addEventListener('click',clearMeas);
   document.getElementById('btn-fit').addEventListener('click',function(){map.fitBounds(bounds,{padding:[30,30]});});
+  document.getElementById('btn-layers').addEventListener('click',function(){document.getElementById('layer-panel').classList.toggle('open');});
   document.getElementById('ov-points').addEventListener('change',function(e){e.target.checked?markersLayer.addTo(map):map.removeLayer(markersLayer);});
   document.getElementById('ov-labels').addEventListener('change',function(e){e.target.checked?labelsLayer.addTo(map):map.removeLayer(labelsLayer);});
+  map.on('click',function(){document.getElementById('layer-panel').classList.remove('open');});
 
   window.leafletMap=map;
 })();
