@@ -4,72 +4,107 @@
 {% block title %}Mappa - {{ sid }}{% endblock %}
 
 {% block head %}
-<!-- Leaflet CSS and JS — required for the map -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
-.map-container {max-width:100%;height:100vh;margin:0;padding:0;display:flex;flex-direction:column}
-  #map{flex:1;position:relative;z-index:0}
-  .controls{background:#34495e;padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;flex-shrink:0;box-shadow:0 -2px 4px rgba(0,0,0,0.1)}
-  .btn{background:#3498db;color:white;padding:8px 12px;border-radius:4px;text-decoration:none;border:none;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:4px;transition:background 0.3s}
-  .btn:hover{background:#2980b9}
-  .btn:disabled{opacity:0.5;cursor:not-allowed}
-  .loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.95);border:1px solid #ddd;border-radius:8px;padding:20px;text-align:center;z-index:2000;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.2)}
-  .hidden{display:none}
-  /* Layer Control */
-.custom-layer-control{position:absolute;top:10px;right:10px;z-index:1000}
-  .layer-control-btn{width:44px;height:44px;border:none;background:white;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.3);cursor:pointer;font-size:22px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
-  .layer-control-btn:hover{background:#f0f0f0}
-  .layer-panel{position:absolute;top:0;right:54px;background:white;border-radius:8px;padding:16px;min-width:240px;max-width:calc(100vw - 80px);max-height:calc(100vh - 120px);overflow-y:auto;box-shadow:0 2px 12px rgba(0,0,0,0.3);-webkit-overflow-scrolling:touch;color:#333}
-  .layer-panel.hidden{display:none}
-  .layer-panel h3{font-size:14px;margin:12px 0 6px 0;color:#333;font-weight:bold}
-  .layer-group{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
-  .layer-group label{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;padding:8px;border-radius:6px;min-height:44px;-webkit-tap-highlight-color:transparent}
-  .layer-group label:hover,.layer-group label:active{background:#f0f7ff}
-  .layer-group input[type="checkbox"],.layer-group input[type="radio"]{width:20px;height:20px;cursor:pointer}
-  .btn-close-panel{width:100%;padding:12px;background:#3498db;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;min-height:44px}
-  .btn-close-panel:hover{background:#2980b9}
-  /* Custom Scale Control */
-.custom-scale-control{background:rgba(255,255,255,0.9);padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace;box-shadow:0 1px 4px rgba(0,0,0,0.3);pointer-events:none}
-  .scale-bar{height:4px;background:#333;border-left:2px solid #333;border-right:2px solid #333;margin-bottom:2px}
-  .scale-label{text-align:center;color:#333;font-weight:bold}
-  @media (max-width:600px){
-  .header h1{font-size:14px}
-  .btn{padding:6px 10px;font-size:12px}
-  .layer-panel{position:fixed;top:auto;bottom:0;left:0;right:0;max-width:100%;max-height:60vh;border-radius:16px 16px 0 0;padding:20px}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;overflow:hidden}
+.map-wrap{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden}
+#map{flex:1;min-height:0;background:#fff;position:relative;z-index:0}
+/* Top bar */
+.top-bar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:#2c3e50;color:#fff;flex-shrink:0;font-size:13px;min-height:36px;flex-wrap:wrap}
+.top-bar h1{font-size:14px;margin:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40vw}
+.top-bar .spacer{flex:1}
+.top-bar .info{font-family:monospace;font-size:11px;color:#bdc3c7;white-space:nowrap}
+/* Buttons */
+.btn-sm{background:#3498db;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;line-height:1.4;-webkit-tap-highlight-color:transparent}
+.btn-sm:hover{background:#2980b9}
+.btn-sm.active{background:#e67e22}
+.btn-sm.danger{background:#e74c3c}
+/* Bottom toolbar */
+.bottom-bar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:#34495e;flex-shrink:0;flex-wrap:wrap;min-height:36px}
+/* Layer panel */
+.layer-ctl{position:absolute;top:8px;right:8px;z-index:1000}
+.layer-btn{width:36px;height:36px;border:none;background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
+.layer-panel{position:absolute;top:0;right:44px;background:#fff;border-radius:8px;padding:12px;min-width:200px;box-shadow:0 2px 10px rgba(0,0,0,.3);color:#333;font-size:13px;display:none}
+.layer-panel.open{display:block}
+.layer-panel h4{margin:0 0 6px;font-size:13px;color:#555}
+.layer-panel label{display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer}
+.layer-panel input{width:16px;height:16px}
+/* Scale control */
+.custom-scale{background:rgba(255,255,255,.88);padding:3px 8px;border-radius:4px;font:11px/1.2 monospace;box-shadow:0 1px 4px rgba(0,0,0,.3);pointer-events:none}
+/* Cross icon */
+.cross-icon{background:none!important;border:none!important}
+/* Snap ring */
+.snap-ring{border:2px solid #e67e22;background:rgba(230,126,34,.15)}
+/* Measurement panel */
+#meas-panel{display:none;max-height:30vh;overflow-y:auto}
+#meas-panel table{width:100%;border-collapse:collapse;font-size:11px;font-family:monospace}
+#meas-panel th{background:#34495e;color:#fff;padding:4px 6px;text-align:left;position:sticky;top:0}
+#meas-panel td{padding:3px 6px;border-bottom:1px solid #ecf0f1}
+#meas-panel tr:hover{background:#f7f9fa}
+/* Info bar */
+.info-bar{display:flex;gap:10px;padding:2px 8px;font:11px/1.3 monospace;color:#7f8c8d;background:#f8f9fa;flex-shrink:0}
+.info-bar .snap-info{color:#e67e22;font-weight:700}
+/* Responsive */
+@media(max-width:600px){
+  .top-bar{padding:3px 6px;min-height:32px}
+  .top-bar h1{font-size:12px;max-width:35vw}
+  .bottom-bar{padding:3px 6px;min-height:32px}
+  .btn-sm{padding:3px 8px;font-size:11px}
+  .layer-panel{position:fixed;top:auto;bottom:0;left:0;right:0;max-height:50vh;border-radius:12px 12px 0 0;padding:16px}
+  #meas-panel{max-height:20vh}
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="map-container">
-  <div class="header">
-    <h1>🗺️ Mappa - {{ sid }}</h1>
-    <a class="btn" href="/survey/{{ sid }}">← Rilievo</a>
+<div class="map-wrap">
+  <!-- Top bar -->
+  <div class="top-bar">
+    <a class="btn-sm" href="/survey/{{ sid }}">←</a>
+    <h1>{{ sid }}</h1>
+    <span class="spacer"></span>
+    <span class="info" id="info-zoom">Z-</span>
+    <span class="info" id="info-pts"></span>
   </div>
+
+  <!-- Map -->
   <div id="map">
-    <!-- Layer Control -->
-    <div class="custom-layer-control">
-      <button class="layer-control-btn" id="btn-layers" title="Layer">🎨</button>
-      <div class="layer-panel hidden" id="layer-panel">
-        <h3>🗺️ Mappa Base</h3>
-        <div class="layer-group" id="basemap-group">
-          <!-- Populated dynamically -->
+    <div class="layer-ctl">
+      <button class="layer-btn" id="btn-layers" title="Layer">🎨</button>
+      <div class="layer-panel" id="layer-panel">
+        <h4>Overlay</h4>
+        <label><input type="checkbox" id="ov-points" checked> Punti</label>
+        <label><input type="checkbox" id="ov-labels" checked> Etichette</label>
+        <div style="margin-top:8px">
+          <button class="btn-sm" onclick="document.getElementById('layer-panel').classList.remove('open')">Chiudi</button>
         </div>
-        <h3>📍 Overlay</h3>
-        <div class="layer-group" id="overlay-group">
-          <label><input type="checkbox" id="overlay-points" checked> Punti</label>
-          <label><input type="checkbox" id="overlay-polyline" checked> Polyline</label>
-          <label><input type="checkbox" id="overlay-labels" checked> Etichette</label>
-        </div>
-        <button class="btn-close-panel" id="btn-close-panel">Chiudi</button>
       </div>
     </div>
   </div>
-  <div id="loading" class="loading">
-    <p>Caricamento mappa...</p>
+
+  <!-- Info bar (snap, cursor, measure) -->
+  <div class="info-bar">
+    <span id="info-cursor"></span>
+    <span class="snap-info" id="info-snap"></span>
   </div>
-  <div class="controls">
-    <button class="btn" id="btn-fit" title="Adatta vista">⊞ Fit View</button>
+
+  <!-- Measurement results table -->
+  <div id="meas-panel">
+    <table><thead><tr>
+      <th>#</th><th>Da</th><th>A</th><th>Dist 2D</th><th>Dist 3D</th><th>ΔH</th><th>Azimut</th><th>Pend.</th>
+    </tr></thead><tbody id="meas-tbody"></tbody></table>
+  </div>
+
+  <!-- Bottom toolbar -->
+  <div class="bottom-bar">
+    <button class="btn-sm" id="btn-fit" title="Adatta vista">⊞ Fit</button>
+    <button class="btn-sm" id="btn-measure" title="Misura distanza fra punti">📏 Misura</button>
+    <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#ecf0f1;cursor:pointer">
+      <input type="checkbox" id="chk-osnap" checked style="width:14px;height:14px"> OSnap
+    </label>
+    <button class="btn-sm danger" id="btn-clear-meas" style="display:none" title="Cancella misure">🗑 Misure</button>
   </div>
 </div>
 {% endblock %}
@@ -79,195 +114,367 @@
 const geojson = {{ geojson|safe }};
 const surveyId = '{{ sid }}';
 
-// ===== Map Initialization =====
-function initMap() {
-  try {
-    console.log('[Map] 🚀 Initializing map for survey:', surveyId);
+/* ====== Utility functions ====== */
 
-    const features = geojson.features || [];
-    if (features.length === 0) {
-      document.getElementById('loading').innerHTML = '<p>Nessun punto da visualizzare</p>';
-      return;
-    }
-
-    const latlngs = features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
-    const bounds = L.latLngBounds(latlngs);
-    const center = bounds.getCenter();
-
-    // Create map with white background (no tile layer)
-    const map = L.map('map', {
-      center: center,
-      zoom: 16,
-      zoomControl: true,
-      attributionControl: false,
-      scrollWheelZoom: true,
-      wheelDebounceTime: 100,
-      wheelPxPerZoomLevel: 120,
-      zoomSnap: 0.25,
-      zoomDelta: 0.5,
-      touchZoom: true,
-      bounceAtZoomLimits: false,
-      maxZoom: 28,
-      minZoom: 1
-    });
-
-    // White background — no tile layer added
-    document.getElementById('map').style.background = '#ffffff';
-
-    map.fitBounds(bounds, { padding: [50, 50] });
-
-    // Overlay layers
-    const markersLayer = L.layerGroup().addTo(map);
-    const polylineLayer = L.layerGroup().addTo(map);
-    const labelsLayer = L.layerGroup().addTo(map);
-
-    function getMarkerRadiusForZoom(zoom) {
-      const baseZoom = 16;
-      const baseRadius = 5;
-      const scaleFactor = 1.15;
-      const radius = baseRadius * Math.pow(scaleFactor, zoom - baseZoom);
-      return Math.max(4, Math.min(radius, 25));
-    }
-
-    const markers = [];
-
-    features.forEach(feature => {
-      const coords = feature.geometry.coordinates;
-      const lat = coords[1];
-      const lon = coords[0];
-      const props = feature.properties || {};
-      const name = props.name || 'P';
-      const tpv = props.TPV || {};
-      const hp = props.HPPOSLLH || {};
-      const rtkRaw = tpv.rtk || 'none';
-      const rtk = String(rtkRaw).toLowerCase();
-
-      let color = '#e74c3c';
-      if (rtk.includes('fixed')) {
-        color = '#27ae60';
-      } else if (rtk.includes('float')) {
-        color = '#f39c12';
-      } else if (rtk.includes('trilateration') || rtk.includes('cogo')) {
-        color = '#3498db';
-      }
-
-      const marker = L.circleMarker([lat, lon], {
-        radius: getMarkerRadiusForZoom(map.getZoom()),
-        fillColor: color,
-        color: '#333',
-        weight: 1.5,
-        opacity: 1,
-        fillOpacity: 0.85
-      });
-
-      const popupContent = `
-        <strong>${name}</strong><br>
-        Lat: ${lat.toFixed(7)}<br>
-        Lon: ${lon.toFixed(7)}<br>
-        Alt: ${(hp.altMSL || coords[2] || 0).toFixed(2)} m<br>
-        RTK: ${rtkRaw}
-      `;
-      marker.bindPopup(popupContent);
-      marker.addTo(markersLayer);
-      markers.push(marker);
-
-      L.marker([lat, lon], {
-        icon: L.divIcon({
-          className: 'point-label',
-          html: `<div style="background:rgba(0,0,0,0.65);color:white;padding:2px 6px;border-radius:4px;font-size:11px;white-space:nowrap;pointer-events:none;">${name}</div>`,
-          iconSize: null
-        }),
-        interactive: false
-      }).addTo(labelsLayer);
-    });
-
-    map.on('zoomend', () => {
-      const newRadius = getMarkerRadiusForZoom(map.getZoom());
-      markers.forEach(m => m.setRadius(newRadius));
-    });
-
-    if (latlngs.length > 1) {
-      L.polyline(latlngs, {
-        color: '#3b82f6',
-        weight: 2,
-        opacity: 0.7
-      }).addTo(polylineLayer);
-    }
-
-    window.overlayLayers = { points: markersLayer, polyline: polylineLayer, labels: labelsLayer };
-    window.leafletMap = map;
-
-    // Populate layer control (overlay only — no basemap selector)
-    const basemapGroup = document.getElementById('basemap-group');
-    basemapGroup.innerHTML = '<label style="color:#888;font-style:italic;">Sfondo bianco</label>';
-
-    document.getElementById('btn-layers').addEventListener('click', () => {
-      document.getElementById('layer-panel').classList.toggle('hidden');
-    });
-    document.getElementById('btn-close-panel').addEventListener('click', () => {
-      document.getElementById('layer-panel').classList.add('hidden');
-    });
-    document.getElementById('overlay-points').addEventListener('change', e => {
-      e.target.checked ? window.overlayLayers.points.addTo(map) : map.removeLayer(window.overlayLayers.points);
-    });
-    document.getElementById('overlay-polyline').addEventListener('change', e => {
-      e.target.checked ? window.overlayLayers.polyline.addTo(map) : map.removeLayer(window.overlayLayers.polyline);
-    });
-    document.getElementById('overlay-labels').addEventListener('change', e => {
-      e.target.checked ? window.overlayLayers.labels.addTo(map) : map.removeLayer(window.overlayLayers.labels);
-    });
-
-    // Custom Scale Control
-    const CustomScaleControl = L.Control.extend({
-      options: { position: 'bottomleft' },
-      onAdd: function(map) {
-        this._map = map;
-        this._container = L.DomUtil.create('div', 'custom-scale-control');
-        map.on('zoom move', this._update, this);
-        this._update();
-        return this._container;
-      },
-      onRemove: function(map) { map.off('zoom move', this._update, this); },
-      _update: function() {
-        const map = this._map;
-        const centerLat = map.getBounds().getCenter().lat;
-        const metersPerPixel = 40075016.686 * Math.abs(Math.cos(centerLat * Math.PI / 180)) / Math.pow(2, map.getZoom() + 8);
-        const rawMeters = metersPerPixel * 150;
-        let scaleValue, scaleUnit, scalePixels;
-        if (rawMeters >= 1000) {
-          const nice = [1,2,5,10,20,50,100,200,500,1000].find(v => v >= rawMeters/1000) || 1000;
-          scaleValue = nice; scaleUnit = 'km'; scalePixels = (nice*1000)/metersPerPixel;
-        } else if (rawMeters >= 1) {
-          const nice = [1,2,5,10,20,50,100,200,500].find(v => v >= rawMeters) || 500;
-          scaleValue = nice; scaleUnit = 'm'; scalePixels = nice/metersPerPixel;
-        } else {
-          const cm = rawMeters*100;
-          const nice = [1,2,5,10,20,50].find(v => v >= cm) || 50;
-          scaleValue = nice; scaleUnit = 'cm'; scalePixels = (nice/100)/metersPerPixel;
-        }
-        this._container.innerHTML = `<div class="scale-bar" style="width:${scalePixels}px;"></div><div class="scale-label">${scaleValue} ${scaleUnit}</div>`;
-      }
-    });
-    new CustomScaleControl().addTo(map);
-
-    document.getElementById('loading').classList.add('hidden');
-    console.log('[Map] ✅ Map initialized with', features.length, 'points');
-
-  } catch (err) {
-    console.error('[Map] ❌ Initialization failed:', err);
-    document.getElementById('loading').innerHTML = '<p>Errore nel caricamento: ' + err.message + '</p>';
-  }
+function rtkColor(s) {
+  var r = String(s).toLowerCase();
+  if (r.indexOf('fixed') >= 0) return '#27ae60';
+  if (r.indexOf('float') >= 0) return '#f39c12';
+  if (r.indexOf('trilateration') >= 0 || r.indexOf('cogo') >= 0) return '#3498db';
+  return '#e74c3c';
 }
 
-document.getElementById('btn-fit').addEventListener('click', () => {
-  if (window.leafletMap) {
-    const latlngs = (geojson.features || []).map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
-    if (latlngs.length > 0) {
-      window.leafletMap.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50] });
+function getCrossSize(z) {
+  if (z >= 20) return 18;
+  if (z >= 17) return 14;
+  return 12;
+}
+
+function makeCrossIcon(color, sizePx) {
+  var s = sizePx || 14;
+  var svg = '<svg width="'+s+'" height="'+s+'" viewBox="0 0 '+s+' '+s+'" xmlns="http://www.w3.org/2000/svg">'
+    +'<line x1="'+(s/2)+'" y1="0" x2="'+(s/2)+'" y2="'+s+'" stroke="'+color+'" stroke-width="2"/>'
+    +'<line x1="0" y1="'+(s/2)+'" x2="'+s+'" y2="'+(s/2)+'" stroke="'+color+'" stroke-width="2"/>'
+    +'</svg>';
+  return L.divIcon({className:'cross-icon', html:svg, iconSize:[s,s], iconAnchor:[s/2,s/2], popupAnchor:[0,-s/2]});
+}
+
+/* Geodetic calculations */
+function haversine(lat1, lon1, lat2, lon2) {
+  var R=6378137, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+  var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function azimuth(lat1, lon1, lat2, lon2) {
+  var dLon=(lon2-lon1)*Math.PI/180;
+  var y=Math.sin(dLon)*Math.cos(lat2*Math.PI/180);
+  var x=Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dLon);
+  return(Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function fmtDist(m) {
+  if (m>=1000) return (m/1000).toFixed(3)+' km';
+  if (m>=1) return m.toFixed(3)+' m';
+  return (m*100).toFixed(1)+' cm';
+}
+function fmtAz(deg) {
+  var d=Math.floor(deg); var mm=(deg-d)*60; var m=Math.floor(mm);
+  var s=((mm-m)*60).toFixed(1);
+  return d+'\u00b0'+('0'+m).slice(-2)+"'"+('0'+s).slice(-4)+'"';
+}
+
+/* ====== Map init ====== */
+(function() {
+  var features = geojson.features || [];
+  if (features.length === 0) {
+    document.getElementById('info-pts').textContent = '0 punti';
+    return;
+  }
+
+  var latlngs = features.map(function(f){return [f.geometry.coordinates[1], f.geometry.coordinates[0]];});
+  var bounds = L.latLngBounds(latlngs);
+
+  var map = L.map('map', {
+    zoomControl: true,
+    attributionControl: false,
+    scrollWheelZoom: true,
+    zoomSnap: 0.25,
+    zoomDelta: 0.5,
+    touchZoom: true,
+    maxZoom: 28,
+    minZoom: 1
+  });
+  document.getElementById('map').style.background = '#ffffff';
+  map.fitBounds(bounds, {padding:[30,30]});
+
+  /* Layers */
+  var markersLayer = L.layerGroup().addTo(map);
+  var labelsLayer = L.layerGroup().addTo(map);
+  var measLayer = null;
+  var snapLayer = null;
+
+  /* State */
+  var allMarkers = [];
+  var pointsIndex = []; /* [{name,lat,lon,alt,marker}] */
+  var measMode = false;
+  var snapEnabled = true;
+  var measPtA = null;
+  var rubberLine = null;
+  var snapRing = null;
+  var snappedPt = null;
+  var measCount = 0;
+  var SNAP_RADIUS_PX = 22;
+
+  /* ====== Add points ====== */
+  features.forEach(function(f) {
+    var c = f.geometry.coordinates;
+    var lat = c[1], lon = c[0];
+    var props = f.properties || {};
+    var name = props.name || f.id || 'P';
+    var codice = props.codice || '';
+    var tpv = props.TPV || {};
+    var hp = props.HPPOSLLH || {};
+    var rtkRaw = tpv.rtk || props.rtk || 'none';
+    var altHAE = hp.altHAE || c[2] || 0;
+    var altMSL = hp.altMSL || c[2] || 0;
+
+    var crossColor = rtkColor(rtkRaw);
+    var m = L.marker([lat, lon], {
+      icon: makeCrossIcon(crossColor, getCrossSize(map.getZoom())),
+      interactive: true
+    });
+
+    var popupHtml = '<b>'+name+'</b>'
+      +(codice?' <span style="color:#7f8c8d">('+codice+')</span>':'')
+      +'<br>Lat: '+lat.toFixed(8)
+      +'<br>Lon: '+lon.toFixed(8)
+      +'<br>Alt HAE: '+parseFloat(altHAE).toFixed(3)+' m'
+      +'<br>Alt MSL: '+parseFloat(altMSL).toFixed(3)+' m'
+      +'<br>RTK: <b>'+rtkRaw+'</b>';
+    m.bindPopup(popupHtml);
+
+    /* Marker click → measurement mode intercept */
+    (function(marker, mLat, mLon, mAlt, mName) {
+      marker.on('click', function(e) {
+        if (measMode) {
+          marker.closePopup();
+          if (e.originalEvent) { e.originalEvent.stopPropagation(); e.originalEvent._measHandled = true; }
+          var usePt = (snapEnabled && snappedPt) ? snappedPt : {name:mName, lat:mLat, lon:mLon, alt:mAlt};
+          onMapClickMeas({latlng:L.latLng(usePt.lat, usePt.lon), _pt:usePt});
+        }
+      });
+    })(m, lat, lon, parseFloat(altHAE)||0, name);
+
+    m.addTo(markersLayer);
+    allMarkers.push(m);
+    pointsIndex.push({name:name, lat:lat, lon:lon, alt:parseFloat(altHAE)||0, marker:m});
+
+    /* Label */
+    L.marker([lat, lon], {
+      icon: L.divIcon({
+        className:'',
+        html:'<div style="background:rgba(0,0,0,.6);color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;white-space:nowrap;pointer-events:none;transform:translate(6px,-6px)">'+name+'</div>',
+        iconSize:null
+      }),
+      interactive: false
+    }).addTo(labelsLayer);
+  });
+
+  document.getElementById('info-pts').textContent = features.length + ' pt';
+
+  /* ====== Zoom → resize crosses ====== */
+  map.on('zoomend', function() {
+    var sz = getCrossSize(map.getZoom());
+    allMarkers.forEach(function(mk) {
+      var h = mk.options.icon.options.html || '';
+      var cm = h.match(/stroke="([^"]+)"/);
+      var col = cm ? cm[1] : '#e74c3c';
+      mk.setIcon(makeCrossIcon(col, sz));
+    });
+    document.getElementById('info-zoom').textContent = 'Z' + map.getZoom().toFixed(1);
+  });
+  document.getElementById('info-zoom').textContent = 'Z' + map.getZoom().toFixed(1);
+
+  /* ====== Custom Scale Control ====== */
+  var CustomScale = L.Control.extend({
+    options:{position:'bottomleft'},
+    onAdd:function(m){
+      this._map=m;
+      this._el=L.DomUtil.create('div','custom-scale');
+      m.on('zoom move',this._upd,this);
+      this._upd();
+      return this._el;
+    },
+    onRemove:function(m){m.off('zoom move',this._upd,this);},
+    _upd:function(){
+      var lat=this._map.getBounds().getCenter().lat;
+      var mpp=40075016.686*Math.abs(Math.cos(lat*Math.PI/180))/Math.pow(2,this._map.getZoom()+8);
+      var raw=mpp*120, val, unit, px;
+      if(raw>=1000){val=[1,2,5,10,20,50,100,200,500,1000].find(function(v){return v>=raw/1000;})||1000;unit='km';px=(val*1000)/mpp;}
+      else if(raw>=1){val=[1,2,5,10,20,50,100,200,500].find(function(v){return v>=raw;})||500;unit='m';px=val/mpp;}
+      else{var cm=raw*100;val=[1,2,5,10,20,50].find(function(v){return v>=cm;})||50;unit='cm';px=(val/100)/mpp;}
+      var h='<svg width="'+(px+4)+'" height="12" style="display:block"><line x1="2" y1="8" x2="'+(px+2)+'" y2="8" stroke="#333" stroke-width="2"/>';
+      for(var t=0;t<=4;t++){var tx=2+px*t/4;h+='<line x1="'+tx+'" y1="4" x2="'+tx+'" y2="12" stroke="#333" stroke-width="1.5"/>';}
+      h+='</svg><div style="display:flex;justify-content:space-between;width:'+(px+4)+'px;color:#333;font-weight:bold;font-size:9px"><span>0</span><span>'+val+' '+unit+'</span></div>';
+      this._el.innerHTML=h;
+    }
+  });
+  new CustomScale().addTo(map);
+
+  /* ====== Snap engine (OSnap) ====== */
+  function findSnap(latlng) {
+    if (pointsIndex.length === 0) return null;
+    var best = null, bestDist = Infinity;
+    var pt = map.latLngToContainerPoint(latlng);
+    for (var i = 0; i < pointsIndex.length; i++) {
+      var pp = map.latLngToContainerPoint(L.latLng(pointsIndex[i].lat, pointsIndex[i].lon));
+      var dx = pt.x-pp.x, dy = pt.y-pp.y, d = Math.sqrt(dx*dx+dy*dy);
+      if (d < SNAP_RADIUS_PX && d < bestDist) { bestDist = d; best = pointsIndex[i]; }
+    }
+    return best;
+  }
+
+  function showSnapRing(pt) {
+    if (!snapLayer) return;
+    if (snapRing) { snapLayer.removeLayer(snapRing); }
+    if (pt) {
+      snapRing = L.circleMarker([pt.lat, pt.lon], {radius:12, className:'snap-ring', fillOpacity:0, weight:2, color:'#e67e22'});
+      snapRing.addTo(snapLayer);
+      document.getElementById('info-snap').textContent = '\u25CE SNAP: ' + pt.name;
+    } else {
+      snapRing = null;
+      document.getElementById('info-snap').textContent = '';
+    }
+    snappedPt = pt;
+  }
+
+  /* ====== Rubber band line ====== */
+  function updateRubber(latlng) {
+    if (!measPtA || !measLayer) return;
+    var target = snappedPt ? L.latLng(snappedPt.lat, snappedPt.lon) : latlng;
+    if (rubberLine) { rubberLine.setLatLngs([L.latLng(measPtA.lat, measPtA.lon), target]); }
+    else { rubberLine = L.polyline([L.latLng(measPtA.lat, measPtA.lon), target], {color:'#e67e22', weight:2, dashArray:'6,4'}).addTo(measLayer); }
+    var d2 = haversine(measPtA.lat, measPtA.lon, target.lat, target.lng);
+    document.getElementById('info-cursor').textContent = 'Dist: ' + fmtDist(d2);
+  }
+
+  /* ====== Toggle measurement mode ====== */
+  function toggleMeasure() {
+    measMode = !measMode;
+    document.getElementById('btn-measure').classList.toggle('active', measMode);
+    document.getElementById('map').classList.toggle('measure-mode', measMode);
+    if (measMode) {
+      if (!measLayer) { measLayer = L.layerGroup().addTo(map); }
+      if (!snapLayer) { snapLayer = L.layerGroup().addTo(map); }
+      measPtA = null; rubberLine = null;
+      document.getElementById('info-cursor').textContent = 'Clicca punto A';
+      document.getElementById('map').style.cursor = 'crosshair';
+    } else {
+      if (rubberLine && measLayer) { measLayer.removeLayer(rubberLine); rubberLine = null; }
+      showSnapRing(null); measPtA = null;
+      document.getElementById('info-cursor').textContent = '';
+      document.getElementById('map').style.cursor = '';
     }
   }
-});
 
-initMap();
+  /* ====== Map click → measurement ====== */
+  function onMapClickMeas(e) {
+    if (!measMode) return;
+    if (e.originalEvent && e.originalEvent._measHandled) return;
+
+    var pt = e._pt || null;
+    if (!pt) {
+      if (snapEnabled) {
+        pt = snappedPt;
+        if (!pt) { document.getElementById('info-cursor').textContent = '\u26A0 Avvicinati a un punto!'; return; }
+      } else {
+        pt = {name:'('+e.latlng.lat.toFixed(6)+','+e.latlng.lng.toFixed(6)+')', lat:e.latlng.lat, lon:e.latlng.lng, alt:0};
+      }
+    }
+
+    if (!measPtA) {
+      /* First point */
+      measPtA = pt;
+      document.getElementById('info-cursor').textContent = 'A: '+pt.name+' \u2014 clicca B';
+      L.circleMarker([pt.lat, pt.lon], {radius:7, color:'#e67e22', fillColor:'#e67e22', fillOpacity:0.6, weight:2}).addTo(measLayer);
+    } else {
+      /* Second point → compute */
+      var ptB = pt;
+      var d2 = haversine(measPtA.lat, measPtA.lon, ptB.lat, ptB.lon);
+      var dH = ptB.alt - measPtA.alt;
+      var d3 = Math.sqrt(d2*d2 + dH*dH);
+      var az = azimuth(measPtA.lat, measPtA.lon, ptB.lat, ptB.lon);
+      var slope = (d2>0.001) ? Math.atan2(Math.abs(dH), d2)*180/Math.PI : 0;
+
+      /* Draw final line */
+      if (rubberLine) { measLayer.removeLayer(rubberLine); rubberLine = null; }
+      var line = L.polyline([[measPtA.lat, measPtA.lon],[ptB.lat, ptB.lon]], {color:'#c0392b', weight:2.5, opacity:0.9});
+      line.addTo(measLayer);
+
+      /* Midpoint label */
+      var midLat=(measPtA.lat+ptB.lat)/2, midLon=(measPtA.lon+ptB.lon)/2;
+      var lbl = L.divIcon({className:'', html:'<div style="background:rgba(192,57,43,.9);color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;font-family:monospace;white-space:nowrap;transform:translate(-50%,-50%)">'+fmtDist(d2)+'</div>', iconAnchor:[0,0]});
+      L.marker([midLat, midLon], {icon:lbl, interactive:false}).addTo(measLayer);
+
+      /* B marker */
+      L.circleMarker([ptB.lat, ptB.lon], {radius:7, color:'#c0392b', fillColor:'#c0392b', fillOpacity:0.6, weight:2}).addTo(measLayer);
+
+      /* Popup on line */
+      line.bindPopup('<b>'+measPtA.name+' \u2192 '+ptB.name+'</b><br>2D: '+fmtDist(d2)+'<br>3D: '+fmtDist(d3)+'<br>\u0394H: '+(dH>=0?'+':'')+dH.toFixed(3)+' m<br>Az: '+fmtAz(az)+'<br>Pend: '+slope.toFixed(2)+'\u00b0').openPopup();
+
+      /* Table row */
+      measCount++;
+      var tbody = document.getElementById('meas-tbody');
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>'+measCount+'</td><td>'+measPtA.name+'</td><td>'+ptB.name+'</td><td>'+fmtDist(d2)+'</td><td>'+fmtDist(d3)+'</td><td>'+(dH>=0?'+':'')+dH.toFixed(3)+' m</td><td>'+fmtAz(az)+'</td><td>'+slope.toFixed(2)+'\u00b0</td>';
+      tbody.appendChild(tr);
+      document.getElementById('meas-panel').style.display = 'block';
+      document.getElementById('btn-clear-meas').style.display = '';
+
+      /* Reset for next */
+      measPtA = null;
+      document.getElementById('info-cursor').textContent = 'Clicca punto A';
+    }
+  }
+
+  /* ====== Mouse/touch move → snap ====== */
+  function onMapMoveMeas(e) {
+    if (!measMode) return;
+    var snap = snapEnabled ? findSnap(e.latlng) : null;
+    showSnapRing(snap);
+    if (measPtA) updateRubber(e.latlng);
+  }
+
+  /* ====== Clear measurements ====== */
+  function clearMeasurements() {
+    if (measLayer) { measLayer.clearLayers(); }
+    measPtA = null; rubberLine = null; measCount = 0;
+    document.getElementById('meas-tbody').innerHTML = '';
+    document.getElementById('meas-panel').style.display = 'none';
+    document.getElementById('btn-clear-meas').style.display = 'none';
+    document.getElementById('info-cursor').textContent = measMode ? 'Clicca punto A' : '';
+  }
+
+  /* ====== Event wiring ====== */
+  map.on('click', onMapClickMeas);
+  map.on('mousemove', onMapMoveMeas);
+
+  /* Touch support for snap */
+  map.on('touchmove', function(e) {
+    if (!measMode || !e.latlng) return;
+    var snap = snapEnabled ? findSnap(e.latlng) : null;
+    showSnapRing(snap);
+    if (measPtA) updateRubber(e.latlng);
+  });
+
+  document.getElementById('btn-measure').addEventListener('click', toggleMeasure);
+  document.getElementById('chk-osnap').addEventListener('change', function(e) {
+    snapEnabled = e.target.checked;
+    if (!snapEnabled) { showSnapRing(null); snappedPt = null; }
+  });
+  document.getElementById('btn-clear-meas').addEventListener('click', clearMeasurements);
+
+  /* Fit view */
+  document.getElementById('btn-fit').addEventListener('click', function() {
+    map.fitBounds(bounds, {padding:[30,30]});
+  });
+
+  /* Layer toggles */
+  document.getElementById('btn-layers').addEventListener('click', function() {
+    document.getElementById('layer-panel').classList.toggle('open');
+  });
+  document.getElementById('ov-points').addEventListener('change', function(e) {
+    e.target.checked ? markersLayer.addTo(map) : map.removeLayer(markersLayer);
+  });
+  document.getElementById('ov-labels').addEventListener('change', function(e) {
+    e.target.checked ? labelsLayer.addTo(map) : map.removeLayer(labelsLayer);
+  });
+
+  /* Close layer panel on map click */
+  map.on('click', function() {
+    document.getElementById('layer-panel').classList.remove('open');
+  });
+
+  window.leafletMap = map;
+})();
 </script>
 {% endblock %}

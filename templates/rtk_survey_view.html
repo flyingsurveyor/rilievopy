@@ -78,20 +78,7 @@
   <a class="btn" href="/cogo">📐 Strumenti COGO</a>
 </p>
 </div>
-<div class="card">
-<h3>Calcolo Area e Perimetro</h3>
-<p>Seleziona punti del poligono (in ordine):</p>
-<form id="area-form">
-  <div id="area-points"></div>
-  <p><button class="btn" type="button" id="calc-area-btn">Calcola area</button></p>
-</form>
-<div id="area-result" style="display:none;">
-  <div class="kv"><span class="k">Perimetro</span><span class="v" id="perim">-</span></div>
-  <div class="kv"><span class="k">Area (m²)</span><span class="v" id="area-m2">-</span></div>
-  <div class="kv"><span class="k">Area (are)</span><span class="v" id="area-are">-</span></div>
-  <div class="kv"><span class="k">Area (ha)</span><span class="v" id="area-ha">-</span></div>
-</div>
-</div>
+
 <div class="card">
 <h3>Punti</h3>
 <table><thead>
@@ -120,51 +107,6 @@
 <script>
 const points = {{ points_json|safe }};
 const sid = "{{ sid }}";
-
-// Popola checkbox per area
-const areaPointsDiv = document.getElementById('area-points');
-points.forEach(p => {
-  const label = document.createElement('label');
-  label.style.display = 'block';
-  label.style.marginBottom = '5px';
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.value = p.id;
-  cb.className = 'area-cb';
-  label.appendChild(cb);
-  label.appendChild(document.createTextNode(` ${p.id} - ${p.name}`));
-  areaPointsDiv.appendChild(label);
-});
-
-document.getElementById('calc-area-btn').addEventListener('click', async () => {
-  const selected = Array.from(document.querySelectorAll('.area-cb:checked')).map(cb => cb.value);
-  
-  if(selected.length < 3) {
-    alert('Seleziona almeno 3 punti');
-    return;
-  }
-  
-  const resp = await fetch(`/survey/${sid}/area`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({points: selected})
-  });
-  
-  if(resp.ok) {
-    const data = await resp.json();
-    if(data.error) {
-      alert(data.error);
-    } else {
-      document.getElementById('perim').textContent = data.perimeter_m.toFixed(3) + ' m';
-      document.getElementById('area-m2').textContent = data.area_m2.toFixed(2) + ' m²';
-      document.getElementById('area-are').textContent = data.area_are.toFixed(4) + ' are';
-      document.getElementById('area-ha').textContent = data.area_ha.toFixed(6) + ' ha';
-      document.getElementById('area-result').style.display = 'block';
-    }
-  } else {
-    alert('Errore nel calcolo');
-  }
-});
 
 // Funzione per confermare ed eliminare un punto
 function confirmDeletePoint(sid, pointIndex, pointName) {

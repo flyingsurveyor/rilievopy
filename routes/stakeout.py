@@ -6,7 +6,7 @@ import json
 import math
 import time
 
-from flask import Blueprint, Response, render_template, make_response, request
+from flask import Blueprint, Response, render_template, jsonify, request
 
 import modules.state as state_mod
 from modules.geodesy import geodetic_to_ecef, ecef_delta_to_enu
@@ -26,12 +26,12 @@ def stakeout_page():
 def stakeout_set_target():
     data = request.get_json()
     if not data:
-        return make_response({"error": "No data"}, 400)
+        return jsonify({"error": "No data"}), 400
 
     target_info = data.get("target")
     threshold = data.get("threshold", 0.05)
     if not target_info:
-        return make_response({"error": "No target"}, 400)
+        return jsonify({"error": "No target"}), 400
 
     if "lat" in target_info and "lon" in target_info:
         target = {
@@ -45,12 +45,12 @@ def stakeout_set_target():
         sid = target_info.get("sid")
         pid = target_info.get("pid")
         if not sid or not pid:
-            return make_response({"error": "Invalid target"}, 400)
+            return jsonify({"error": "Invalid target"}), 400
         try:
             svy = load_survey(sid)
             feat = next((f for f in svy.get("features", []) if f.get("id") == pid), None)
             if not feat:
-                return make_response({"error": "Point not found"}, 404)
+                return jsonify({"error": "Point not found"}), 404
             pt = point_from_feature(feat)
             target = {
                 "name": pt.get("name", pid),
@@ -60,12 +60,12 @@ def stakeout_set_target():
                 "threshold": threshold
             }
         except Exception as e:
-            return make_response({"error": str(e)}, 500)
+            return jsonify({"error": str(e)}), 500
 
     with state_mod.STAKEOUT_LOCK:
         state_mod.STAKEOUT_CURRENT = target
 
-    return make_response({"ok": True}, 200)
+    return jsonify({"ok": True})
 
 
 @bp.route("/stakeout/events")
