@@ -16,7 +16,7 @@
     /* ═══ Topbar ═══ */
     .topbar {
         position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-        height: 52px;
+        height: 44px;
         background: #1a1a2e;
         display: flex; align-items: center;
         padding: 0 12px;
@@ -53,8 +53,8 @@
         line-height: 1.2;
     }
     .mode-switch:hover { transform: scale(1.05); }
-    .mode-switch.to-ppk { background: #2ecc71; }
-    .mode-switch.to-rtk { background: #e74c3c; }
+    .mode-switch.to-ppk { background: #e74c3c; }
+    .mode-switch.to-rtk { background: #2ecc71; }
 
     /* Brand */
     .topbar-brand {
@@ -67,13 +67,13 @@
         font-size: 16px; font-weight: 700; color: #eee;
         letter-spacing: .5px;
     }
-    .brand-accent { color: #e94560; }
+    .brand-accent { color: #eee; }
     .brand-mode {
-        font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+        font-size: 16px; font-weight: 700; letter-spacing: .5px;
         margin-left: 4px;
     }
-    .brand-mode.rtk { color: #2ecc71; }
-    .brand-mode.ppk { color: #e74c3c; }
+    .brand-mode.rtk { color: #e74c3c; }
+    .brand-mode.ppk { color: #2ecc71; }
 
     /* ── GNSS status indicator in topbar ── */
     .topbar-gnss {
@@ -109,8 +109,8 @@
 
     /* ═══ Sidebar ═══ */
     .sidebar {
-        position: fixed; top: 52px; left: -195px;
-        width: 195px; height: calc(100% - 52px);
+        position: fixed; top: 44px; left: -195px;
+        width: 195px; height: calc(100% - 44px);
         background: #16213e; z-index: 999;
         transition: left .25s ease;
         overflow-y: auto;
@@ -170,8 +170,8 @@
 
     /* ═══ Main content ═══ */
     .content {
-        margin-top: 52px;
-        min-height: calc(100vh - 52px);
+        margin-top: 44px;
+        min-height: calc(100vh - 44px);
         padding: 0;
     }
 

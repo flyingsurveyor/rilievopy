@@ -10,8 +10,8 @@
 /* Fill available space below topbar, next to sidebar */
 .map-page{
   display:flex;flex-direction:column;
-  height:calc(100vh - 52px);  /* topbar is 52px */
-  height:calc(100dvh - 52px); /* modern browsers: accounts for mobile chrome */
+  height:calc(100vh - 44px);  /* topbar is 44px */
+  height:calc(100dvh - 44px); /* modern browsers: accounts for mobile chrome */
   overflow:hidden;
 }
 #map{flex:1;min-height:0;background:#fff;position:relative;z-index:0}
@@ -56,7 +56,7 @@
 
 /* Mobile adjustments */
 @media(max-width:768px){
-  .map-page{height:calc(100vh - 52px);height:calc(100dvh - 52px)}
+  .map-page{height:calc(100vh - 44px);height:calc(100dvh - 44px)}
   .map-hdr{padding:3px 6px;min-height:28px}
   .map-hdr h1{font-size:12px}
   .map-toolbar{padding:3px 6px;min-height:28px}
