@@ -7,62 +7,74 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
-*{box-sizing:border-box}
-html,body{margin:0;padding:0;height:100%;overflow:hidden}
-.map-wrap{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden}
+/* Fill available space below topbar, next to sidebar */
+.map-page{
+  display:flex;flex-direction:column;
+  height:calc(100vh - 52px);  /* topbar is 52px */
+  overflow:hidden;
+}
 #map{flex:1;min-height:0;background:#fff;position:relative;z-index:0}
-/* Top bar */
-.top-bar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:#2c3e50;color:#fff;flex-shrink:0;font-size:13px;min-height:36px;flex-wrap:wrap}
-.top-bar h1{font-size:14px;margin:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40vw}
-.top-bar .spacer{flex:1}
-.top-bar .info{font-family:monospace;font-size:11px;color:#bdc3c7;white-space:nowrap}
-/* Buttons */
-.btn-sm{background:#3498db;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;line-height:1.4;-webkit-tap-highlight-color:transparent}
+
+/* Compact header bar */
+.map-hdr{display:flex;align-items:center;gap:6px;padding:4px 8px;background:#2c3e50;color:#fff;flex-shrink:0;font-size:13px;flex-wrap:nowrap;min-height:32px}
+.map-hdr h1{font-size:13px;margin:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-hdr .spacer{flex:1}
+.map-hdr .info{font-family:monospace;font-size:11px;color:#bdc3c7;white-space:nowrap}
+
+/* Small buttons */
+.btn-sm{background:#3498db;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;line-height:1.4;text-decoration:none;display:inline-flex;align-items:center;gap:3px;-webkit-tap-highlight-color:transparent}
 .btn-sm:hover{background:#2980b9}
 .btn-sm.active{background:#e67e22}
 .btn-sm.danger{background:#e74c3c}
+
 /* Bottom toolbar */
-.bottom-bar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:#34495e;flex-shrink:0;flex-wrap:wrap;min-height:36px}
-/* Layer panel */
+.map-toolbar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:#34495e;flex-shrink:0;flex-wrap:wrap;min-height:32px}
+
+/* Info bar */
+.info-bar{display:flex;gap:10px;padding:2px 8px;font:11px/1.3 monospace;color:#7f8c8d;background:#f8f9fa;flex-shrink:0;min-height:16px}
+.info-bar .snap-info{color:#e67e22;font-weight:700}
+
+/* Layer control */
 .layer-ctl{position:absolute;top:8px;right:8px;z-index:1000}
-.layer-btn{width:36px;height:36px;border:none;background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
-.layer-panel{position:absolute;top:0;right:44px;background:#fff;border-radius:8px;padding:12px;min-width:200px;box-shadow:0 2px 10px rgba(0,0,0,.3);color:#333;font-size:13px;display:none}
+.layer-btn{width:34px;height:34px;border:none;background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.layer-panel{position:absolute;top:0;right:42px;background:#fff;border-radius:8px;padding:10px;min-width:180px;box-shadow:0 2px 10px rgba(0,0,0,.3);color:#333;font-size:13px;display:none}
 .layer-panel.open{display:block}
-.layer-panel h4{margin:0 0 6px;font-size:13px;color:#555}
-.layer-panel label{display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer}
+.layer-panel label{display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer}
 .layer-panel input{width:16px;height:16px}
-/* Scale control */
+
+/* Custom scale */
 .custom-scale{background:rgba(255,255,255,.88);padding:3px 8px;border-radius:4px;font:11px/1.2 monospace;box-shadow:0 1px 4px rgba(0,0,0,.3);pointer-events:none}
+
 /* Cross icon */
 .cross-icon{background:none!important;border:none!important}
 /* Snap ring */
 .snap-ring{border:2px solid #e67e22;background:rgba(230,126,34,.15)}
+
 /* Measurement panel */
-#meas-panel{display:none;max-height:30vh;overflow-y:auto}
+#meas-panel{display:none;max-height:25vh;overflow-y:auto;flex-shrink:0;background:#fff}
 #meas-panel table{width:100%;border-collapse:collapse;font-size:11px;font-family:monospace}
-#meas-panel th{background:#34495e;color:#fff;padding:4px 6px;text-align:left;position:sticky;top:0}
-#meas-panel td{padding:3px 6px;border-bottom:1px solid #ecf0f1}
+#meas-panel th{background:#34495e;color:#fff;padding:3px 6px;text-align:left;position:sticky;top:0}
+#meas-panel td{padding:2px 6px;border-bottom:1px solid #ecf0f1}
 #meas-panel tr:hover{background:#f7f9fa}
-/* Info bar */
-.info-bar{display:flex;gap:10px;padding:2px 8px;font:11px/1.3 monospace;color:#7f8c8d;background:#f8f9fa;flex-shrink:0}
-.info-bar .snap-info{color:#e67e22;font-weight:700}
-/* Responsive */
-@media(max-width:600px){
-  .top-bar{padding:3px 6px;min-height:32px}
-  .top-bar h1{font-size:12px;max-width:35vw}
-  .bottom-bar{padding:3px 6px;min-height:32px}
+
+/* Mobile adjustments */
+@media(max-width:768px){
+  .map-page{height:calc(100vh - 52px)}
+  .map-hdr{padding:3px 6px;min-height:28px}
+  .map-hdr h1{font-size:12px}
+  .map-toolbar{padding:3px 6px;min-height:28px}
   .btn-sm{padding:3px 8px;font-size:11px}
-  .layer-panel{position:fixed;top:auto;bottom:0;left:0;right:0;max-height:50vh;border-radius:12px 12px 0 0;padding:16px}
-  #meas-panel{max-height:20vh}
+  .layer-panel{position:fixed;top:auto;bottom:0;left:0;right:0;max-height:50vh;border-radius:12px 12px 0 0;padding:14px;z-index:2000}
+  #meas-panel{max-height:18vh}
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="map-wrap">
-  <!-- Top bar -->
-  <div class="top-bar">
-    <a class="btn-sm" href="/survey/{{ sid }}">←</a>
+<div class="map-page">
+  <!-- Header -->
+  <div class="map-hdr">
+    <a class="btn-sm" href="/survey/{{ sid }}">← Rilievo</a>
     <h1>{{ sid }}</h1>
     <span class="spacer"></span>
     <span class="info" id="info-zoom">Z-</span>
@@ -74,407 +86,307 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden}
     <div class="layer-ctl">
       <button class="layer-btn" id="btn-layers" title="Layer">🎨</button>
       <div class="layer-panel" id="layer-panel">
-        <h4>Overlay</h4>
         <label><input type="checkbox" id="ov-points" checked> Punti</label>
         <label><input type="checkbox" id="ov-labels" checked> Etichette</label>
-        <div style="margin-top:8px">
+        <div style="margin-top:6px">
           <button class="btn-sm" onclick="document.getElementById('layer-panel').classList.remove('open')">Chiudi</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Info bar (snap, cursor, measure) -->
+  <!-- Info bar -->
   <div class="info-bar">
     <span id="info-cursor"></span>
     <span class="snap-info" id="info-snap"></span>
   </div>
 
-  <!-- Measurement results table -->
+  <!-- Measurement results -->
   <div id="meas-panel">
     <table><thead><tr>
-      <th>#</th><th>Da</th><th>A</th><th>Dist 2D</th><th>Dist 3D</th><th>ΔH</th><th>Azimut</th><th>Pend.</th>
+      <th>#</th><th>Da</th><th>A</th><th>2D</th><th>3D</th><th>ΔH</th><th>Az</th><th>Pend</th>
     </tr></thead><tbody id="meas-tbody"></tbody></table>
   </div>
 
-  <!-- Bottom toolbar -->
-  <div class="bottom-bar">
+  <!-- Toolbar -->
+  <div class="map-toolbar">
     <button class="btn-sm" id="btn-fit" title="Adatta vista">⊞ Fit</button>
     <button class="btn-sm" id="btn-measure" title="Misura distanza fra punti">📏 Misura</button>
     <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#ecf0f1;cursor:pointer">
       <input type="checkbox" id="chk-osnap" checked style="width:14px;height:14px"> OSnap
     </label>
-    <button class="btn-sm danger" id="btn-clear-meas" style="display:none" title="Cancella misure">🗑 Misure</button>
+    <button class="btn-sm danger" id="btn-clear-meas" style="display:none" title="Cancella misure">🗑</button>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const geojson = {{ geojson|safe }};
-const surveyId = '{{ sid }}';
+var geojson = {{ geojson|safe }};
 
-/* ====== Utility functions ====== */
-
-function rtkColor(s) {
-  var r = String(s).toLowerCase();
-  if (r.indexOf('fixed') >= 0) return '#27ae60';
-  if (r.indexOf('float') >= 0) return '#f39c12';
-  if (r.indexOf('trilateration') >= 0 || r.indexOf('cogo') >= 0) return '#3498db';
+/* ====== Utility ====== */
+function rtkColor(s){
+  var r=String(s).toLowerCase();
+  if(r.indexOf('fixed')>=0) return '#27ae60';
+  if(r.indexOf('float')>=0) return '#f39c12';
+  if(r.indexOf('trilateration')>=0||r.indexOf('cogo')>=0) return '#3498db';
   return '#e74c3c';
 }
-
-function getCrossSize(z) {
-  if (z >= 20) return 18;
-  if (z >= 17) return 14;
-  return 12;
-}
-
-function makeCrossIcon(color, sizePx) {
-  var s = sizePx || 14;
-  var svg = '<svg width="'+s+'" height="'+s+'" viewBox="0 0 '+s+' '+s+'" xmlns="http://www.w3.org/2000/svg">'
+function getCrossSize(z){return z>=20?18:z>=17?14:12;}
+function makeCrossIcon(color,sz){
+  var s=sz||14;
+  var svg='<svg width="'+s+'" height="'+s+'" viewBox="0 0 '+s+' '+s+'" xmlns="http://www.w3.org/2000/svg">'
     +'<line x1="'+(s/2)+'" y1="0" x2="'+(s/2)+'" y2="'+s+'" stroke="'+color+'" stroke-width="2"/>'
-    +'<line x1="0" y1="'+(s/2)+'" x2="'+s+'" y2="'+(s/2)+'" stroke="'+color+'" stroke-width="2"/>'
-    +'</svg>';
-  return L.divIcon({className:'cross-icon', html:svg, iconSize:[s,s], iconAnchor:[s/2,s/2], popupAnchor:[0,-s/2]});
+    +'<line x1="0" y1="'+(s/2)+'" x2="'+s+'" y2="'+(s/2)+'" stroke="'+color+'" stroke-width="2"/></svg>';
+  return L.divIcon({className:'cross-icon',html:svg,iconSize:[s,s],iconAnchor:[s/2,s/2],popupAnchor:[0,-s/2]});
 }
-
-/* Geodetic calculations */
-function haversine(lat1, lon1, lat2, lon2) {
-  var R=6378137, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+function haversine(lat1,lon1,lat2,lon2){
+  var R=6378137,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
   var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
-function azimuth(lat1, lon1, lat2, lon2) {
+function azimuth(lat1,lon1,lat2,lon2){
   var dLon=(lon2-lon1)*Math.PI/180;
   var y=Math.sin(dLon)*Math.cos(lat2*Math.PI/180);
   var x=Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dLon);
   return(Math.atan2(y,x)*180/Math.PI+360)%360;
 }
-function fmtDist(m) {
-  if (m>=1000) return (m/1000).toFixed(3)+' km';
-  if (m>=1) return m.toFixed(3)+' m';
+function fmtDist(m){
+  if(m>=1000) return (m/1000).toFixed(3)+' km';
+  if(m>=1) return m.toFixed(3)+' m';
   return (m*100).toFixed(1)+' cm';
 }
-function fmtAz(deg) {
-  var d=Math.floor(deg); var mm=(deg-d)*60; var m=Math.floor(mm);
-  var s=((mm-m)*60).toFixed(1);
+function fmtAz(deg){
+  var d=Math.floor(deg),mm=(deg-d)*60,m=Math.floor(mm),s=((mm-m)*60).toFixed(1);
   return d+'\u00b0'+('0'+m).slice(-2)+"'"+('0'+s).slice(-4)+'"';
 }
 
-/* ====== Map init ====== */
-(function() {
-  var features = geojson.features || [];
-  if (features.length === 0) {
-    document.getElementById('info-pts').textContent = '0 punti';
-    return;
-  }
+/* ====== Map ====== */
+(function(){
+  var features=geojson.features||[];
+  if(!features.length){document.getElementById('info-pts').textContent='0 pt';return;}
 
-  var latlngs = features.map(function(f){return [f.geometry.coordinates[1], f.geometry.coordinates[0]];});
-  var bounds = L.latLngBounds(latlngs);
+  var latlngs=features.map(function(f){return[f.geometry.coordinates[1],f.geometry.coordinates[0]];});
+  var bounds=L.latLngBounds(latlngs);
 
-  var map = L.map('map', {
-    zoomControl: true,
-    attributionControl: false,
-    scrollWheelZoom: true,
-    zoomSnap: 0.25,
-    zoomDelta: 0.5,
-    touchZoom: true,
-    maxZoom: 28,
-    minZoom: 1
+  var map=L.map('map',{
+    zoomControl:true,attributionControl:false,
+    scrollWheelZoom:true,zoomSnap:0.25,zoomDelta:0.5,
+    touchZoom:true,maxZoom:28,minZoom:1
   });
-  document.getElementById('map').style.background = '#ffffff';
-  map.fitBounds(bounds, {padding:[30,30]});
+  document.getElementById('map').style.background='#fff';
+  map.fitBounds(bounds,{padding:[30,30]});
 
-  /* Layers */
-  var markersLayer = L.layerGroup().addTo(map);
-  var labelsLayer = L.layerGroup().addTo(map);
-  var measLayer = null;
-  var snapLayer = null;
+  /* Force Leaflet to recalculate size after layout settles */
+  setTimeout(function(){map.invalidateSize();},200);
+  setTimeout(function(){map.invalidateSize();},600);
 
-  /* State */
-  var allMarkers = [];
-  var pointsIndex = []; /* [{name,lat,lon,alt,marker}] */
-  var measMode = false;
-  var snapEnabled = true;
-  var measPtA = null;
-  var rubberLine = null;
-  var snapRing = null;
-  var snappedPt = null;
-  var measCount = 0;
-  var SNAP_RADIUS_PX = 22;
+  var markersLayer=L.layerGroup().addTo(map);
+  var labelsLayer=L.layerGroup().addTo(map);
+  var measLayer=null, snapLayer=null;
+
+  var allMarkers=[], pointsIndex=[];
+  var measMode=false, snapEnabled=true;
+  var measPtA=null, rubberLine=null, snapRing=null, snappedPt=null, measCount=0;
+  var SNAP_RADIUS_PX=22;
 
   /* ====== Add points ====== */
-  features.forEach(function(f) {
-    var c = f.geometry.coordinates;
-    var lat = c[1], lon = c[0];
-    var props = f.properties || {};
-    var name = props.name || f.id || 'P';
-    var codice = props.codice || '';
-    var tpv = props.TPV || {};
-    var hp = props.HPPOSLLH || {};
-    var rtkRaw = tpv.rtk || props.rtk || 'none';
-    var altHAE = hp.altHAE || c[2] || 0;
-    var altMSL = hp.altMSL || c[2] || 0;
+  features.forEach(function(f){
+    var c=f.geometry.coordinates, lat=c[1], lon=c[0];
+    var props=f.properties||{};
+    var name=props.name||f.id||'P';
+    var codice=props.codice||'';
+    var tpv=props.TPV||{}, hp=props.HPPOSLLH||{};
+    var rtkRaw=tpv.rtk||props.rtk||'none';
+    var altHAE=hp.altHAE||c[2]||0;
+    var altMSL=hp.altMSL||c[2]||0;
+    var col=rtkColor(rtkRaw);
 
-    var crossColor = rtkColor(rtkRaw);
-    var m = L.marker([lat, lon], {
-      icon: makeCrossIcon(crossColor, getCrossSize(map.getZoom())),
-      interactive: true
-    });
-
-    var popupHtml = '<b>'+name+'</b>'
-      +(codice?' <span style="color:#7f8c8d">('+codice+')</span>':'')
-      +'<br>Lat: '+lat.toFixed(8)
-      +'<br>Lon: '+lon.toFixed(8)
+    var m=L.marker([lat,lon],{icon:makeCrossIcon(col,getCrossSize(map.getZoom())),interactive:true});
+    m.bindPopup('<b>'+name+'</b>'+(codice?' <span style="color:#7f8c8d">('+codice+')</span>':'')
+      +'<br>Lat: '+lat.toFixed(8)+'<br>Lon: '+lon.toFixed(8)
       +'<br>Alt HAE: '+parseFloat(altHAE).toFixed(3)+' m'
       +'<br>Alt MSL: '+parseFloat(altMSL).toFixed(3)+' m'
-      +'<br>RTK: <b>'+rtkRaw+'</b>';
-    m.bindPopup(popupHtml);
+      +'<br>RTK: <b>'+rtkRaw+'</b>');
 
-    /* Marker click → measurement mode intercept */
-    (function(marker, mLat, mLon, mAlt, mName) {
-      marker.on('click', function(e) {
-        if (measMode) {
+    (function(marker,mLat,mLon,mAlt,mName){
+      marker.on('click',function(e){
+        if(measMode){
           marker.closePopup();
-          if (e.originalEvent) { e.originalEvent.stopPropagation(); e.originalEvent._measHandled = true; }
-          var usePt = (snapEnabled && snappedPt) ? snappedPt : {name:mName, lat:mLat, lon:mLon, alt:mAlt};
-          onMapClickMeas({latlng:L.latLng(usePt.lat, usePt.lon), _pt:usePt});
+          if(e.originalEvent){e.originalEvent.stopPropagation();e.originalEvent._measHandled=true;}
+          var usePt=(snapEnabled&&snappedPt)?snappedPt:{name:mName,lat:mLat,lon:mLon,alt:mAlt};
+          onMapClickMeas({latlng:L.latLng(usePt.lat,usePt.lon),_pt:usePt});
         }
       });
-    })(m, lat, lon, parseFloat(altHAE)||0, name);
+    })(m,lat,lon,parseFloat(altHAE)||0,name);
 
     m.addTo(markersLayer);
     allMarkers.push(m);
-    pointsIndex.push({name:name, lat:lat, lon:lon, alt:parseFloat(altHAE)||0, marker:m});
+    pointsIndex.push({name:name,lat:lat,lon:lon,alt:parseFloat(altHAE)||0,marker:m});
 
-    /* Label */
-    L.marker([lat, lon], {
-      icon: L.divIcon({
-        className:'',
-        html:'<div style="background:rgba(0,0,0,.6);color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;white-space:nowrap;pointer-events:none;transform:translate(6px,-6px)">'+name+'</div>',
-        iconSize:null
-      }),
-      interactive: false
+    L.marker([lat,lon],{
+      icon:L.divIcon({className:'',html:'<div style="background:rgba(0,0,0,.6);color:#fff;padding:1px 4px;border-radius:3px;font-size:10px;white-space:nowrap;pointer-events:none;transform:translate(6px,-6px)">'+name+'</div>',iconSize:null}),
+      interactive:false
     }).addTo(labelsLayer);
   });
 
-  document.getElementById('info-pts').textContent = features.length + ' pt';
+  document.getElementById('info-pts').textContent=features.length+' pt';
 
   /* ====== Zoom → resize crosses ====== */
-  map.on('zoomend', function() {
-    var sz = getCrossSize(map.getZoom());
-    allMarkers.forEach(function(mk) {
-      var h = mk.options.icon.options.html || '';
-      var cm = h.match(/stroke="([^"]+)"/);
-      var col = cm ? cm[1] : '#e74c3c';
-      mk.setIcon(makeCrossIcon(col, sz));
+  map.on('zoomend',function(){
+    var sz=getCrossSize(map.getZoom());
+    allMarkers.forEach(function(mk){
+      var h=mk.options.icon.options.html||'';
+      var cm=h.match(/stroke="([^"]+)"/);
+      var col=cm?cm[1]:'#e74c3c';
+      mk.setIcon(makeCrossIcon(col,sz));
     });
-    document.getElementById('info-zoom').textContent = 'Z' + map.getZoom().toFixed(1);
+    document.getElementById('info-zoom').textContent='Z'+map.getZoom().toFixed(1);
   });
-  document.getElementById('info-zoom').textContent = 'Z' + map.getZoom().toFixed(1);
+  document.getElementById('info-zoom').textContent='Z'+map.getZoom().toFixed(1);
 
-  /* ====== Custom Scale Control ====== */
-  var CustomScale = L.Control.extend({
+  /* ====== Scale ====== */
+  var CustomScale=L.Control.extend({
     options:{position:'bottomleft'},
-    onAdd:function(m){
-      this._map=m;
-      this._el=L.DomUtil.create('div','custom-scale');
-      m.on('zoom move',this._upd,this);
-      this._upd();
-      return this._el;
-    },
+    onAdd:function(m){this._map=m;this._el=L.DomUtil.create('div','custom-scale');m.on('zoom move',this._upd,this);this._upd();return this._el;},
     onRemove:function(m){m.off('zoom move',this._upd,this);},
     _upd:function(){
       var lat=this._map.getBounds().getCenter().lat;
       var mpp=40075016.686*Math.abs(Math.cos(lat*Math.PI/180))/Math.pow(2,this._map.getZoom()+8);
-      var raw=mpp*120, val, unit, px;
+      var raw=mpp*100,val,unit,px;
       if(raw>=1000){val=[1,2,5,10,20,50,100,200,500,1000].find(function(v){return v>=raw/1000;})||1000;unit='km';px=(val*1000)/mpp;}
       else if(raw>=1){val=[1,2,5,10,20,50,100,200,500].find(function(v){return v>=raw;})||500;unit='m';px=val/mpp;}
       else{var cm=raw*100;val=[1,2,5,10,20,50].find(function(v){return v>=cm;})||50;unit='cm';px=(val/100)/mpp;}
-      var h='<svg width="'+(px+4)+'" height="12" style="display:block"><line x1="2" y1="8" x2="'+(px+2)+'" y2="8" stroke="#333" stroke-width="2"/>';
-      for(var t=0;t<=4;t++){var tx=2+px*t/4;h+='<line x1="'+tx+'" y1="4" x2="'+tx+'" y2="12" stroke="#333" stroke-width="1.5"/>';}
+      var h='<svg width="'+(px+4)+'" height="10" style="display:block"><line x1="2" y1="7" x2="'+(px+2)+'" y2="7" stroke="#333" stroke-width="2"/>';
+      for(var t=0;t<=4;t++){var tx=2+px*t/4;h+='<line x1="'+tx+'" y1="3" x2="'+tx+'" y2="10" stroke="#333" stroke-width="1.5"/>';}
       h+='</svg><div style="display:flex;justify-content:space-between;width:'+(px+4)+'px;color:#333;font-weight:bold;font-size:9px"><span>0</span><span>'+val+' '+unit+'</span></div>';
       this._el.innerHTML=h;
     }
   });
   new CustomScale().addTo(map);
 
-  /* ====== Snap engine (OSnap) ====== */
-  function findSnap(latlng) {
-    if (pointsIndex.length === 0) return null;
-    var best = null, bestDist = Infinity;
-    var pt = map.latLngToContainerPoint(latlng);
-    for (var i = 0; i < pointsIndex.length; i++) {
-      var pp = map.latLngToContainerPoint(L.latLng(pointsIndex[i].lat, pointsIndex[i].lon));
-      var dx = pt.x-pp.x, dy = pt.y-pp.y, d = Math.sqrt(dx*dx+dy*dy);
-      if (d < SNAP_RADIUS_PX && d < bestDist) { bestDist = d; best = pointsIndex[i]; }
+  /* ====== Snap ====== */
+  function findSnap(latlng){
+    if(!pointsIndex.length) return null;
+    var best=null,bestD=Infinity,pt=map.latLngToContainerPoint(latlng);
+    for(var i=0;i<pointsIndex.length;i++){
+      var pp=map.latLngToContainerPoint(L.latLng(pointsIndex[i].lat,pointsIndex[i].lon));
+      var d=Math.sqrt(Math.pow(pt.x-pp.x,2)+Math.pow(pt.y-pp.y,2));
+      if(d<SNAP_RADIUS_PX&&d<bestD){bestD=d;best=pointsIndex[i];}
     }
     return best;
   }
-
-  function showSnapRing(pt) {
-    if (!snapLayer) return;
-    if (snapRing) { snapLayer.removeLayer(snapRing); }
-    if (pt) {
-      snapRing = L.circleMarker([pt.lat, pt.lon], {radius:12, className:'snap-ring', fillOpacity:0, weight:2, color:'#e67e22'});
-      snapRing.addTo(snapLayer);
-      document.getElementById('info-snap').textContent = '\u25CE SNAP: ' + pt.name;
-    } else {
-      snapRing = null;
-      document.getElementById('info-snap').textContent = '';
+  function showSnapRing(pt){
+    if(!snapLayer) return;
+    if(snapRing){snapLayer.removeLayer(snapRing);}
+    if(pt){
+      snapRing=L.circleMarker([pt.lat,pt.lon],{radius:12,className:'snap-ring',fillOpacity:0,weight:2,color:'#e67e22'}).addTo(snapLayer);
+      document.getElementById('info-snap').textContent='\u25CE '+pt.name;
+    }else{
+      snapRing=null;
+      document.getElementById('info-snap').textContent='';
     }
-    snappedPt = pt;
+    snappedPt=pt;
+  }
+  function updateRubber(latlng){
+    if(!measPtA||!measLayer) return;
+    var tgt=snappedPt?L.latLng(snappedPt.lat,snappedPt.lon):latlng;
+    if(rubberLine){rubberLine.setLatLngs([L.latLng(measPtA.lat,measPtA.lon),tgt]);}
+    else{rubberLine=L.polyline([L.latLng(measPtA.lat,measPtA.lon),tgt],{color:'#e67e22',weight:2,dashArray:'6,4'}).addTo(measLayer);}
+    document.getElementById('info-cursor').textContent='Dist: '+fmtDist(haversine(measPtA.lat,measPtA.lon,tgt.lat,tgt.lng));
   }
 
-  /* ====== Rubber band line ====== */
-  function updateRubber(latlng) {
-    if (!measPtA || !measLayer) return;
-    var target = snappedPt ? L.latLng(snappedPt.lat, snappedPt.lon) : latlng;
-    if (rubberLine) { rubberLine.setLatLngs([L.latLng(measPtA.lat, measPtA.lon), target]); }
-    else { rubberLine = L.polyline([L.latLng(measPtA.lat, measPtA.lon), target], {color:'#e67e22', weight:2, dashArray:'6,4'}).addTo(measLayer); }
-    var d2 = haversine(measPtA.lat, measPtA.lon, target.lat, target.lng);
-    document.getElementById('info-cursor').textContent = 'Dist: ' + fmtDist(d2);
-  }
-
-  /* ====== Toggle measurement mode ====== */
-  function toggleMeasure() {
-    measMode = !measMode;
-    document.getElementById('btn-measure').classList.toggle('active', measMode);
-    document.getElementById('map').classList.toggle('measure-mode', measMode);
-    if (measMode) {
-      if (!measLayer) { measLayer = L.layerGroup().addTo(map); }
-      if (!snapLayer) { snapLayer = L.layerGroup().addTo(map); }
-      measPtA = null; rubberLine = null;
-      document.getElementById('info-cursor').textContent = 'Clicca punto A';
-      document.getElementById('map').style.cursor = 'crosshair';
-    } else {
-      if (rubberLine && measLayer) { measLayer.removeLayer(rubberLine); rubberLine = null; }
-      showSnapRing(null); measPtA = null;
-      document.getElementById('info-cursor').textContent = '';
-      document.getElementById('map').style.cursor = '';
+  /* ====== Measure mode ====== */
+  function toggleMeasure(){
+    measMode=!measMode;
+    document.getElementById('btn-measure').classList.toggle('active',measMode);
+    if(measMode){
+      if(!measLayer){measLayer=L.layerGroup().addTo(map);}
+      if(!snapLayer){snapLayer=L.layerGroup().addTo(map);}
+      measPtA=null;rubberLine=null;
+      document.getElementById('info-cursor').textContent='Clicca punto A';
+      document.getElementById('map').style.cursor='crosshair';
+    }else{
+      if(rubberLine&&measLayer){measLayer.removeLayer(rubberLine);rubberLine=null;}
+      showSnapRing(null);measPtA=null;
+      document.getElementById('info-cursor').textContent='';
+      document.getElementById('map').style.cursor='';
     }
   }
 
-  /* ====== Map click → measurement ====== */
-  function onMapClickMeas(e) {
-    if (!measMode) return;
-    if (e.originalEvent && e.originalEvent._measHandled) return;
-
-    var pt = e._pt || null;
-    if (!pt) {
-      if (snapEnabled) {
-        pt = snappedPt;
-        if (!pt) { document.getElementById('info-cursor').textContent = '\u26A0 Avvicinati a un punto!'; return; }
-      } else {
-        pt = {name:'('+e.latlng.lat.toFixed(6)+','+e.latlng.lng.toFixed(6)+')', lat:e.latlng.lat, lon:e.latlng.lng, alt:0};
-      }
+  function onMapClickMeas(e){
+    if(!measMode) return;
+    if(e.originalEvent&&e.originalEvent._measHandled) return;
+    var pt=e._pt||null;
+    if(!pt){
+      if(snapEnabled){pt=snappedPt;if(!pt){document.getElementById('info-cursor').textContent='\u26A0 Avvicinati a un punto!';return;}}
+      else{pt={name:'('+e.latlng.lat.toFixed(6)+','+e.latlng.lng.toFixed(6)+')',lat:e.latlng.lat,lon:e.latlng.lng,alt:0};}
     }
+    if(!measPtA){
+      measPtA=pt;
+      document.getElementById('info-cursor').textContent='A: '+pt.name+' \u2014 clicca B';
+      L.circleMarker([pt.lat,pt.lon],{radius:6,color:'#e67e22',fillColor:'#e67e22',fillOpacity:0.6,weight:2}).addTo(measLayer);
+    }else{
+      var ptB=pt;
+      var d2=haversine(measPtA.lat,measPtA.lon,ptB.lat,ptB.lon);
+      var dH=ptB.alt-measPtA.alt;
+      var d3=Math.sqrt(d2*d2+dH*dH);
+      var az=azimuth(measPtA.lat,measPtA.lon,ptB.lat,ptB.lon);
+      var slope=(d2>0.001)?Math.atan2(Math.abs(dH),d2)*180/Math.PI:0;
 
-    if (!measPtA) {
-      /* First point */
-      measPtA = pt;
-      document.getElementById('info-cursor').textContent = 'A: '+pt.name+' \u2014 clicca B';
-      L.circleMarker([pt.lat, pt.lon], {radius:7, color:'#e67e22', fillColor:'#e67e22', fillOpacity:0.6, weight:2}).addTo(measLayer);
-    } else {
-      /* Second point → compute */
-      var ptB = pt;
-      var d2 = haversine(measPtA.lat, measPtA.lon, ptB.lat, ptB.lon);
-      var dH = ptB.alt - measPtA.alt;
-      var d3 = Math.sqrt(d2*d2 + dH*dH);
-      var az = azimuth(measPtA.lat, measPtA.lon, ptB.lat, ptB.lon);
-      var slope = (d2>0.001) ? Math.atan2(Math.abs(dH), d2)*180/Math.PI : 0;
+      if(rubberLine){measLayer.removeLayer(rubberLine);rubberLine=null;}
+      var line=L.polyline([[measPtA.lat,measPtA.lon],[ptB.lat,ptB.lon]],{color:'#c0392b',weight:2.5,opacity:0.9}).addTo(measLayer);
 
-      /* Draw final line */
-      if (rubberLine) { measLayer.removeLayer(rubberLine); rubberLine = null; }
-      var line = L.polyline([[measPtA.lat, measPtA.lon],[ptB.lat, ptB.lon]], {color:'#c0392b', weight:2.5, opacity:0.9});
-      line.addTo(measLayer);
+      var midLat=(measPtA.lat+ptB.lat)/2,midLon=(measPtA.lon+ptB.lon)/2;
+      L.marker([midLat,midLon],{icon:L.divIcon({className:'',html:'<div style="background:rgba(192,57,43,.9);color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;font-family:monospace;white-space:nowrap;transform:translate(-50%,-50%)">'+fmtDist(d2)+'</div>',iconAnchor:[0,0]}),interactive:false}).addTo(measLayer);
 
-      /* Midpoint label */
-      var midLat=(measPtA.lat+ptB.lat)/2, midLon=(measPtA.lon+ptB.lon)/2;
-      var lbl = L.divIcon({className:'', html:'<div style="background:rgba(192,57,43,.9);color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;font-family:monospace;white-space:nowrap;transform:translate(-50%,-50%)">'+fmtDist(d2)+'</div>', iconAnchor:[0,0]});
-      L.marker([midLat, midLon], {icon:lbl, interactive:false}).addTo(measLayer);
+      L.circleMarker([ptB.lat,ptB.lon],{radius:6,color:'#c0392b',fillColor:'#c0392b',fillOpacity:0.6,weight:2}).addTo(measLayer);
 
-      /* B marker */
-      L.circleMarker([ptB.lat, ptB.lon], {radius:7, color:'#c0392b', fillColor:'#c0392b', fillOpacity:0.6, weight:2}).addTo(measLayer);
-
-      /* Popup on line */
       line.bindPopup('<b>'+measPtA.name+' \u2192 '+ptB.name+'</b><br>2D: '+fmtDist(d2)+'<br>3D: '+fmtDist(d3)+'<br>\u0394H: '+(dH>=0?'+':'')+dH.toFixed(3)+' m<br>Az: '+fmtAz(az)+'<br>Pend: '+slope.toFixed(2)+'\u00b0').openPopup();
 
-      /* Table row */
       measCount++;
-      var tbody = document.getElementById('meas-tbody');
-      var tr = document.createElement('tr');
-      tr.innerHTML = '<td>'+measCount+'</td><td>'+measPtA.name+'</td><td>'+ptB.name+'</td><td>'+fmtDist(d2)+'</td><td>'+fmtDist(d3)+'</td><td>'+(dH>=0?'+':'')+dH.toFixed(3)+' m</td><td>'+fmtAz(az)+'</td><td>'+slope.toFixed(2)+'\u00b0</td>';
-      tbody.appendChild(tr);
-      document.getElementById('meas-panel').style.display = 'block';
-      document.getElementById('btn-clear-meas').style.display = '';
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+measCount+'</td><td>'+measPtA.name+'</td><td>'+ptB.name+'</td><td>'+fmtDist(d2)+'</td><td>'+fmtDist(d3)+'</td><td>'+(dH>=0?'+':'')+dH.toFixed(3)+'</td><td>'+fmtAz(az)+'</td><td>'+slope.toFixed(2)+'\u00b0</td>';
+      document.getElementById('meas-tbody').appendChild(tr);
+      document.getElementById('meas-panel').style.display='block';
+      document.getElementById('btn-clear-meas').style.display='';
 
-      /* Reset for next */
-      measPtA = null;
-      document.getElementById('info-cursor').textContent = 'Clicca punto A';
+      measPtA=null;
+      document.getElementById('info-cursor').textContent='Clicca punto A';
     }
   }
 
-  /* ====== Mouse/touch move → snap ====== */
-  function onMapMoveMeas(e) {
-    if (!measMode) return;
-    var snap = snapEnabled ? findSnap(e.latlng) : null;
+  function onMapMoveMeas(e){
+    if(!measMode) return;
+    var snap=snapEnabled?findSnap(e.latlng):null;
     showSnapRing(snap);
-    if (measPtA) updateRubber(e.latlng);
+    if(measPtA) updateRubber(e.latlng);
   }
 
-  /* ====== Clear measurements ====== */
-  function clearMeasurements() {
-    if (measLayer) { measLayer.clearLayers(); }
-    measPtA = null; rubberLine = null; measCount = 0;
-    document.getElementById('meas-tbody').innerHTML = '';
-    document.getElementById('meas-panel').style.display = 'none';
-    document.getElementById('btn-clear-meas').style.display = 'none';
-    document.getElementById('info-cursor').textContent = measMode ? 'Clicca punto A' : '';
+  function clearMeas(){
+    if(measLayer){measLayer.clearLayers();}
+    measPtA=null;rubberLine=null;measCount=0;
+    document.getElementById('meas-tbody').innerHTML='';
+    document.getElementById('meas-panel').style.display='none';
+    document.getElementById('btn-clear-meas').style.display='none';
+    document.getElementById('info-cursor').textContent=measMode?'Clicca punto A':'';
   }
 
-  /* ====== Event wiring ====== */
-  map.on('click', onMapClickMeas);
-  map.on('mousemove', onMapMoveMeas);
+  /* ====== Events ====== */
+  map.on('click',onMapClickMeas);
+  map.on('mousemove',onMapMoveMeas);
+  map.on('touchmove',function(e){if(!measMode||!e.latlng)return;var snap=snapEnabled?findSnap(e.latlng):null;showSnapRing(snap);if(measPtA)updateRubber(e.latlng);});
 
-  /* Touch support for snap */
-  map.on('touchmove', function(e) {
-    if (!measMode || !e.latlng) return;
-    var snap = snapEnabled ? findSnap(e.latlng) : null;
-    showSnapRing(snap);
-    if (measPtA) updateRubber(e.latlng);
-  });
+  document.getElementById('btn-measure').addEventListener('click',toggleMeasure);
+  document.getElementById('chk-osnap').addEventListener('change',function(e){snapEnabled=e.target.checked;if(!snapEnabled){showSnapRing(null);snappedPt=null;}});
+  document.getElementById('btn-clear-meas').addEventListener('click',clearMeas);
+  document.getElementById('btn-fit').addEventListener('click',function(){map.fitBounds(bounds,{padding:[30,30]});});
+  document.getElementById('btn-layers').addEventListener('click',function(){document.getElementById('layer-panel').classList.toggle('open');});
+  document.getElementById('ov-points').addEventListener('change',function(e){e.target.checked?markersLayer.addTo(map):map.removeLayer(markersLayer);});
+  document.getElementById('ov-labels').addEventListener('change',function(e){e.target.checked?labelsLayer.addTo(map):map.removeLayer(labelsLayer);});
+  map.on('click',function(){document.getElementById('layer-panel').classList.remove('open');});
 
-  document.getElementById('btn-measure').addEventListener('click', toggleMeasure);
-  document.getElementById('chk-osnap').addEventListener('change', function(e) {
-    snapEnabled = e.target.checked;
-    if (!snapEnabled) { showSnapRing(null); snappedPt = null; }
-  });
-  document.getElementById('btn-clear-meas').addEventListener('click', clearMeasurements);
-
-  /* Fit view */
-  document.getElementById('btn-fit').addEventListener('click', function() {
-    map.fitBounds(bounds, {padding:[30,30]});
-  });
-
-  /* Layer toggles */
-  document.getElementById('btn-layers').addEventListener('click', function() {
-    document.getElementById('layer-panel').classList.toggle('open');
-  });
-  document.getElementById('ov-points').addEventListener('change', function(e) {
-    e.target.checked ? markersLayer.addTo(map) : map.removeLayer(markersLayer);
-  });
-  document.getElementById('ov-labels').addEventListener('change', function(e) {
-    e.target.checked ? labelsLayer.addTo(map) : map.removeLayer(labelsLayer);
-  });
-
-  /* Close layer panel on map click */
-  map.on('click', function() {
-    document.getElementById('layer-panel').classList.remove('open');
-  });
-
-  window.leafletMap = map;
+  window.leafletMap=map;
 })();
 </script>
 {% endblock %}
