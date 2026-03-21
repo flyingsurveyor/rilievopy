@@ -32,6 +32,13 @@ The app starts immediately with no prompts. Open the browser:
 | `/import` | Import CSV/TXT/GeoJSON |
 | `/settings` | Configure GNSS connection, relay, survey params |
 
+### Topografia (ufficio)
+| Route | Description |
+|-------|-------------|
+| `/cad` | CAD web — disegno topografico 2D con snap, layer, misure |
+| `/dtm` | DTM analysis — TIN Delaunay, curve di livello, volumi, profili |
+| `/traverses` | Poligonali — aperte/chiuse, livellazione, frazionamento aree |
+
 ### PPK (post-processing)
 | Route | Description |
 |-------|-------------|
@@ -54,6 +61,8 @@ rilievo/
 │   ├── utils.py                    # Conversions, robust averaging
 │   ├── geodesy.py                  # WGS84, ECEF ↔ ENU ↔ Geodetic
 │   ├── cogo.py                     # COGO: trilateration, intersections, Helmert
+│   ├── dtm.py                      # DTM: TIN Delaunay, contours, volumes, profiles
+│   ├── traverses.py                # Traverses: open/closed, leveling, area division
 │   ├── state.py                    # Shared state, BytePipe, TCPRelay
 │   ├── ubx_parser.py              # UBX parser + upstream TCP
 │   ├── connection.py               # GNSS connection manager

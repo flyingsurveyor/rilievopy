@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% set active = "dtm" %}
+{% block title %}DTM — Modello Terreno{% endblock %}
+{% block head %}
+<style>
+.container{max-width:1000px;margin:20px auto;padding:0 20px}
+.card{background:white;border-radius:8px;padding:20px;margin-bottom:20px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+.card h2{color:#2c3e50;margin:0 0 14px;font-size:18px;border-bottom:2px solid #3498db;padding-bottom:8px;display:flex;align-items:center;gap:8px}
+.kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #edf2f7}.kv:last-child{border-bottom:none}
+.k{color:#718096;font-size:13px}.v{font-variant-numeric:tabular-nums;color:#2d3748;font-size:13px;font-weight:600}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-group label{display:block;margin:0 0 4px;color:#2c3e50;font-weight:500;font-size:13px}
+button,.btn{background:#3498db;color:white;border:none;padding:10px 16px;border-radius:4px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin:4px 2px;transition:background .3s;font-size:14px;font-weight:500}
+button:hover,.btn:hover{background:#2980b9}.btn-success{background:#2ecc71}.btn-success:hover{background:#27ae60}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:12px 0}
+.stat-box{background:#ecf0f1;border-radius:8px;padding:10px;text-align:center}
+.stat-value{font-size:18px;font-weight:700;color:#2c3e50}.stat-label{font-size:11px;color:#7f8c8d;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+#tin-canvas{width:100%;border:1px solid #ecf0f1;border-radius:8px;background:#1a1a2e;display:block}
+#prof-canvas{width:100%;height:200px;border:1px solid #ecf0f1;border-radius:8px;background:#fafafa;display:none}
+@media(max-width:768px){.container{padding:5px;margin:0}.card{padding:12px}.form-row{grid-template-columns:1fr}.stat-grid{grid-template-columns:1fr 1fr}button,.btn{min-height:44px;width:100%;margin-bottom:8px}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+<div class="card">
+  <h2><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20L8.5 8 13 14 17.5 6 22 20z"/></svg> DTM</h2>
+  <p style="color:#666;margin-bottom:12px">TIN Delaunay, curve di livello, volumi, profili.</p>
+  <div class="form-row">
+    <div class="form-group"><label>Rilievo</label>
+      <select id="sid">
+        <option value="">— seleziona —</option>
+        {% for s in surveys %}<option value="{{ s.sid }}">{{ s.title }} ({{ s.n_points }} pt)</option>{% endfor %}
+      </select></div>
+    <div class="form-group"><label>Equidistanza curve (m)</label><input type="number" id="ci" value="1.0" step="0.5" min="0.1"></div>
+  </div>
+  <button class="btn-success" onclick="buildAll()">🔺 Genera TIN + Curve</button>
+  <button class="btn" onclick="openInCAD()">📐 Apri in CAD</button>
+</div>
+
+<div class="card" id="stats-card" style="display:none"><h2>Statistiche</h2><div class="stat-grid" id="sg"></div></div>
+
+<div class="card" id="viz-card" style="display:none">
+  <h2>TIN + Curve di livello</h2>
+  <canvas id="tin-canvas" width="900" height="550"></canvas>
+  <div style="margin-top:8px;font-size:12px;color:#666" id="contour-info"></div>
+</div>
+
+<div class="card">
+  <h2>Volumi</h2>
+  <div class="form-row">
+    <div class="form-group"><label>Quota piano rif. (m)</label><input type="number" id="ref-z" value="0" step="0.1"></div>
+    <div class="form-group" style="align-self:end"><button onclick="calcVol()">Calcola</button></div>
+  </div>
+  <div id="vol-res"></div>
+</div>
+
+<div class="card">
+  <h2>Profilo longitudinale</h2>
+  <p style="color:#666;font-size:13px;margin-bottom:8px">Seleziona punto inizio e fine dal rilievo, oppure inserisci coordinate locali.</p>
+  <div class="form-row">
+    <div class="form-group"><label>Inizio (punto rilievo o X,Y)</label>
+      <select id="prof-start-sel" onchange="fillProfPt('start')"><option value="">— manuale —</option></select>
+      <input type="text" id="prof-start" placeholder="0, 0" style="margin-top:4px"></div>
+    <div class="form-group"><label>Fine (punto rilievo o X,Y)</label>
+      <select id="prof-end-sel" onchange="fillProfPt('end')"><option value="">— manuale —</option></select>
+      <input type="text" id="prof-end" placeholder="100, 50" style="margin-top:4px"></div>
+  </div>
+  <button onclick="doProfile()">📊 Profilo</button>
+  <div id="prof-res"></div>
+  <canvas id="prof-canvas"></canvas>
+</div>
+
+<div style="margin-top:10px"><a class="btn" href="/">← Dashboard</a> <a class="btn" href="/cad">📐 CAD</a></div>
+</div>
+
+<script>
+let tinD=null,contD=null,ptsLocal=[];
+
+async function buildAll(){
+  const sid=document.getElementById('sid').value; if(!sid){alert('Seleziona rilievo');return;}
+  const ci=parseFloat(document.getElementById('ci').value);
+  const res=await fetch('/api/dtm/build',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({survey_id:sid,contour_interval:ci})});
+  const d=await res.json(); if(d.error){alert(d.error);return;}
+  tinD=d; contD=d.contours; ptsLocal=d.points;
+  const s=d.statistics;
+  document.getElementById('stats-card').style.display='';
+  document.getElementById('sg').innerHTML=[
+    ['Punti',s.n_points],['Triangoli',s.n_triangles],['Z min',s.z_min.toFixed(2)+'m'],['Z max',s.z_max.toFixed(2)+'m'],
+    ['Z medio',s.z_mean.toFixed(2)+'m'],['Dislivello',s.z_range.toFixed(2)+'m'],['Pend. media',s.slope_mean.toFixed(1)+'°'],
+    ['Area 2D',s.area_2d.toFixed(0)+'m²'],['Area 3D',s.area_3d.toFixed(0)+'m²']
+  ].map(([l,v])=>`<div class="stat-box"><div class="stat-value">${v}</div><div class="stat-label">${l}</div></div>`).join('');
+  document.getElementById('ref-z').value=s.z_mean.toFixed(1);
+
+  // Populate profile point selectors
+  const opts=ptsLocal.map((p,i)=>`<option value="${i}">${p.name||'P'+(i+1)} (${p.x.toFixed(1)}, ${p.y.toFixed(1)})</option>`).join('');
+  document.getElementById('prof-start-sel').innerHTML='<option value="">— manuale —</option>'+opts;
+  document.getElementById('prof-end-sel').innerHTML='<option value="">— manuale —</option>'+opts;
+
+  // Contour info
+  const nLevels=contD?Object.keys(contD).length:0;
+  document.getElementById('contour-info').textContent=nLevels?`${nLevels} livelli, equidistanza ${ci}m — direttrici ogni 5 livelli`:'Nessuna curva generata';
+
+  document.getElementById('viz-card').style.display='';
+  drawTIN();
+}
+
+function fillProfPt(which){
+  const sel=document.getElementById('prof-'+which+'-sel');
+  const idx=sel.value;if(idx==='')return;
+  const p=ptsLocal[parseInt(idx)];
+  document.getElementById('prof-'+which).value=`${p.x.toFixed(3)}, ${p.y.toFixed(3)}`;
+}
+
+function drawTIN(){
+  const canvas=document.getElementById('tin-canvas'),ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,W,H);
+  if(!tinD||!tinD.points.length)return;
+  const pts=tinD.points,xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),zs=pts.map(p=>p.z);
+  const xMin=Math.min(...xs),xMax=Math.max(...xs),yMin=Math.min(...ys),yMax=Math.max(...ys);
+  const zMin=Math.min(...zs),zMax=Math.max(...zs),zR=zMax-zMin||1;
+  const pad=40,scale=Math.min((W-2*pad)/(xMax-xMin||1),(H-2*pad)/(yMax-yMin||1));
+  const tx=x=>pad+(x-xMin)*scale, ty=y=>H-pad-(y-yMin)*scale;
+
+  // Triangles
+  tinD.triangles.forEach(tri=>{
+    const zA=(tri.v0.z+tri.v1.z+tri.v2.z)/3,t=(zA-zMin)/zR;
+    ctx.fillStyle=`hsl(${210-t*180},60%,${30+t*35}%)`;ctx.globalAlpha=.55;
+    ctx.beginPath();ctx.moveTo(tx(tri.v0.x),ty(tri.v0.y));ctx.lineTo(tx(tri.v1.x),ty(tri.v1.y));ctx.lineTo(tx(tri.v2.x),ty(tri.v2.y));ctx.closePath();ctx.fill();
+    ctx.globalAlpha=1;ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=.5;ctx.stroke();
+  });
+
+  // Contour lines ON THE CANVAS
+  if(contD){
+    const levels=Object.keys(contD).map(Number).sort((a,b)=>a-b);
+    levels.forEach((z,idx)=>{
+      const key=z.toFixed(2),pls=contD[key];if(!pls)return;
+      const major=(idx%5===0);
+      ctx.strokeStyle=major?'#e74c3c':'#5dade2';ctx.lineWidth=major?2:0.8;ctx.globalAlpha=major?.95:.6;
+      for(const pl of pls){if(pl.length<2)continue;ctx.beginPath();
+        for(let i=0;i<pl.length;i++){i===0?ctx.moveTo(tx(pl[i].x),ty(pl[i].y)):ctx.lineTo(tx(pl[i].x),ty(pl[i].y));}ctx.stroke();
+        if(major&&pl.length>2){const m=pl[Math.floor(pl.length/2)];ctx.font='10px monospace';ctx.fillStyle='#e74c3c';ctx.globalAlpha=1;ctx.fillText(z.toFixed(1),tx(m.x)+3,ty(m.y)-3);}
+      }ctx.globalAlpha=1;
+    });
+  }
+
+  // Points
+  pts.forEach(p=>{ctx.beginPath();ctx.arc(tx(p.x),ty(p.y),3,0,2*Math.PI);ctx.fillStyle='#fff';ctx.fill();
+    if(p.name&&scale>2){ctx.font='10px monospace';ctx.fillStyle='#aaa';ctx.fillText(p.name,tx(p.x)+5,ty(p.y)-5);}});
+
+  // Legend
+  for(let i=0;i<100;i++){const t=i/99;ctx.fillStyle=`hsl(${210-t*180},60%,${30+t*35}%)`;ctx.fillRect(W-28,H-pad-i*((H-2*pad)/100),10,(H-2*pad)/100);}
+  ctx.font='10px sans-serif';ctx.fillStyle='#aaa';ctx.fillText(zMax.toFixed(1)+'m',W-50,pad+10);ctx.fillText(zMin.toFixed(1)+'m',W-50,H-pad);
+}
+
+async function calcVol(){
+  const sid=document.getElementById('sid').value;if(!sid)return;
+  const res=await fetch('/api/dtm/volume',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({survey_id:sid,reference_z:parseFloat(document.getElementById('ref-z').value)})});
+  const d=await res.json();if(d.error){alert(d.error);return;}
+  document.getElementById('vol-res').innerHTML=`<div style="margin-top:8px">
+    <div class="kv"><span class="k">Scavo (sopra piano)</span><span class="v">${d.cut.toFixed(2)} m³</span></div>
+    <div class="kv"><span class="k">Riporto (sotto piano)</span><span class="v">${d.fill.toFixed(2)} m³</span></div>
+    <div class="kv"><span class="k">Volume netto</span><span class="v" style="color:${d.net>0?'#e74c3c':'#2ecc71'}">${d.net.toFixed(2)} m³</span></div>
+    <div class="kv"><span class="k">Area 2D / 3D</span><span class="v">${d.area_2d.toFixed(0)} / ${d.area_3d.toFixed(0)} m²</span></div></div>`;
+}
+
+async function doProfile(){
+  const sid=document.getElementById('sid').value;if(!sid){alert('Genera TIN prima');return;}
+  const s=document.getElementById('prof-start').value.split(',').map(Number);
+  const e=document.getElementById('prof-end').value.split(',').map(Number);
+  if(s.length<2||e.length<2||isNaN(s[0])||isNaN(e[0])){alert('Formato: X, Y');return;}
+  const res=await fetch('/api/dtm/profile',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({survey_id:sid,start_x:s[0],start_y:s[1],end_x:e[0],end_y:e[1],step:1.0})});
+  const d=await res.json();if(d.error){alert(d.error);return;}
+  if(!d.profile.length){alert('Nessun punto interpolato');return;}
+  const zMin=Math.min(...d.profile.map(p=>p.z)),zMax=Math.max(...d.profile.map(p=>p.z));
+  document.getElementById('prof-res').innerHTML=`<div style="margin-top:8px">
+    <div class="kv"><span class="k">Lunghezza</span><span class="v">${d.length.toFixed(2)} m</span></div>
+    <div class="kv"><span class="k">Punti profilo</span><span class="v">${d.profile.length}</span></div>
+    <div class="kv"><span class="k">Z min / max</span><span class="v">${zMin.toFixed(2)} / ${zMax.toFixed(2)} m</span></div></div>`;
+  // Draw
+  const cv=document.getElementById('prof-canvas');cv.style.display='';cv.width=cv.offsetWidth;cv.height=200;
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,pad=40;
+  ctx.fillStyle='#fafafa';ctx.fillRect(0,0,W,H);
+  const maxSt=d.profile[d.profile.length-1].station,zR=zMax-zMin||1;
+  const sx=st=>pad+(st/maxSt)*(W-2*pad),sy=z=>H-pad-((z-zMin)/zR)*(H-2*pad);
+  ctx.strokeStyle='#ecf0f1';ctx.lineWidth=.5;
+  for(let i=0;i<=5;i++){const y=pad+i*(H-2*pad)/5;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-10,y);ctx.stroke();ctx.font='10px sans-serif';ctx.fillStyle='#999';ctx.fillText((zMax-i*zR/5).toFixed(1),2,y+4);}
+  ctx.strokeStyle='#3498db';ctx.lineWidth=2;ctx.beginPath();
+  d.profile.forEach((p,i)=>{i===0?ctx.moveTo(sx(p.station),sy(p.z)):ctx.lineTo(sx(p.station),sy(p.z));});ctx.stroke();
+  ctx.lineTo(sx(d.profile[d.profile.length-1].station),H-pad);ctx.lineTo(sx(0),H-pad);ctx.closePath();ctx.fillStyle='rgba(52,152,219,.15)';ctx.fill();
+}
+
+function openInCAD(){
+  const sid=document.getElementById('sid').value;if(!sid)return;
+  window.location.href='/cad?survey='+sid;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+{% set active = "cad" %}
+{% block title %}CAD Topografico{% endblock %}
+{% block head %}
+<style>
+.cad-header{display:flex;align-items:center;gap:10px;padding:12px 20px 0;flex-wrap:wrap}
+.cad-header h2{margin:0;font-size:18px;color:#2c3e50}
+.cad-header select,.cad-header input{padding:7px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;color:#2c3e50;background:white}
+.cad-header .label{font-size:12px;color:#95a5a6}
+.cad-toolbar{display:flex;gap:3px;padding:6px 20px;flex-wrap:wrap;align-items:center}
+.cad-toolbar .sep{width:1px;height:24px;background:#ddd;margin:0 4px}
+.tbtn{padding:5px 10px;border:1px solid #ddd;border-radius:4px;background:white;color:#2c3e50;cursor:pointer;font-size:12px;font-weight:500;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.tbtn:hover{background:#ecf0f1;border-color:#bdc3c7}
+.tbtn.active{background:#3498db;border-color:#3498db;color:white}
+.cad-wrap{position:relative;margin:0 20px;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+#cad-canvas{width:100%;display:block;cursor:crosshair;background:#1a1a2e}
+.cad-status{display:flex;gap:12px;padding:5px 12px;background:#2c3e50;border-radius:0 0 8px 8px;font-size:11px;color:#94a3b8;font-family:'Courier New',monospace;flex-wrap:wrap;margin:0 20px 8px}
+.cad-status b{color:#e2e8f0}
+.snap-ring{position:absolute;pointer-events:none;width:14px;height:14px;border:2px solid #2ecc71;border-radius:50%;transform:translate(-50%,-50%);display:none;z-index:5}
+.cad-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 20px 20px}
+.cad-panel{background:white;border-radius:8px;padding:12px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+.cad-panel h3{font-size:13px;color:#2c3e50;margin:0 0 8px;border-bottom:2px solid #3498db;padding-bottom:5px}
+.layer-row{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px}
+.layer-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.meas-box{background:#eafaf1;border:1px solid #2ecc71;border-radius:4px;padding:8px 12px;font-size:13px;display:none;margin:6px 20px}
+.meas-box b{color:#27ae60}
+.kv{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dashed #edf2f7;font-size:12px}
+.osnap-bar{display:flex;gap:3px;padding:0 20px 4px;flex-wrap:wrap}
+.osnap-btn{padding:3px 8px;border:1px solid #ddd;border-radius:3px;background:white;font-size:11px;cursor:pointer;color:#666}
+.osnap-btn.on{background:#2ecc71;border-color:#2ecc71;color:white}
+@media(max-width:768px){
+  .cad-header,.cad-toolbar,.osnap-bar{padding-left:12px;padding-right:12px}
+  .cad-wrap,.cad-status{margin-left:12px;margin-right:12px}
+  .cad-panels{grid-template-columns:1fr;padding:0 12px 12px}
+  .tbtn{padding:7px 8px;font-size:13px}
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="cad-header">
+  <h2>📐 CAD</h2>
+  <select id="survey-sel" onchange="loadSurvey()">
+    <option value="">— carica rilievo —</option>
+    {% for s in surveys %}<option value="{{ s.sid }}">{{ s.title }} ({{ s.n_points }} pt)</option>{% endfor %}
+  </select>
+  <select id="proj-sel" onchange="loadProject()">
+    <option value="">— carica progetto —</option>
+  </select>
+  <span class="label" id="title-lbl"></span>
+</div>
+<div class="cad-toolbar">
+  <button class="tbtn active" id="btn-select" onclick="setTool('select')" title="V · Seleziona">⬚ Sel</button>
+  <button class="tbtn" id="btn-pan" onclick="setTool('pan')" title="Spazio">✋</button>
+  <div class="sep"></div>
+  <button class="tbtn" id="btn-line" onclick="setTool('line')" title="L">╱ Linea</button>
+  <button class="tbtn" id="btn-polyline" onclick="setTool('polyline')" title="P">⌇ Poli</button>
+  <button class="tbtn" id="btn-polygon" onclick="setTool('polygon')" title="G">⬡ Polig</button>
+  <div class="sep"></div>
+  <button class="tbtn" id="btn-move" onclick="setTool('move')" title="M">↔ Muovi</button>
+  <button class="tbtn" id="btn-copy" onclick="setTool('copy')" title="C">⊞ Copia</button>
+  <button class="tbtn" id="btn-mirror" onclick="setTool('mirror')">⟷ Spec</button>
+  <button class="tbtn" id="btn-offset" onclick="setTool('offset')">⫽ Offset</button>
+  <div class="sep"></div>
+  <button class="tbtn" id="btn-measure_dist" onclick="setTool('measure_dist')" title="D">📏 Dist</button>
+  <button class="tbtn" id="btn-measure_area" onclick="setTool('measure_area')" title="A">📐 Area</button>
+  <button class="tbtn" id="btn-profile" onclick="setTool('profile')" title="R">📊 Profilo</button>
+  <div class="sep"></div>
+  <button class="tbtn" onclick="zoomExtents()" title="F">⊞</button>
+  <button class="tbtn" onclick="toggleLabels()">Aa</button>
+  <button class="tbtn" onclick="toggleGrid()">⊞</button>
+  <button class="tbtn" onclick="undo()" title="Ctrl+Z">↩</button>
+  <div class="sep"></div>
+  <button class="tbtn" onclick="saveProject()">💾 Salva</button>
+  <button class="tbtn" onclick="exportDXF()">📄 DXF</button>
+</div>
+<div class="osnap-bar">
+  <span style="font-size:11px;color:#999;margin-right:4px">OSNAP:</span>
+  <button class="osnap-btn on" id="os-endpoint" onclick="toggleOsnap('endpoint')">End</button>
+  <button class="osnap-btn on" id="os-midpoint" onclick="toggleOsnap('midpoint')">Mid</button>
+  <button class="osnap-btn" id="os-nearest" onclick="toggleOsnap('nearest')">Near</button>
+  <button class="osnap-btn" id="os-perpendicular" onclick="toggleOsnap('perpendicular')">Perp</button>
+</div>
+<div class="cad-wrap" id="cad-wrap">
+  <canvas id="cad-canvas"></canvas>
+  <div class="snap-ring" id="snap-ind"></div>
+</div>
+<div class="cad-status">
+  <span>X:<b id="ix">—</b></span> <span>Y:<b id="iy">—</b></span> <span>Z:<b id="iz">—</b></span>
+  <span>Snap:<b id="is">—</b></span> <span>Tool:<b id="it">select</b></span>
+  <span>Pt:<b id="ip">0</b> Ent:<b id="ie">0</b></span>
+</div>
+<div class="meas-box" id="meas-box"><span id="meas-txt"></span></div>
+<div class="cad-panels">
+  <div class="cad-panel"><h3>Layer</h3><div id="layer-list"></div></div>
+  <div class="cad-panel"><h3>Selezione</h3><div id="sel-info"><span style="color:#95a5a6;font-size:12px">Clicca un punto o entità</span></div></div>
+</div>
+
+<script>
+const CC=document.getElementById('cad-canvas'), CX=CC.getContext('2d'), SI=document.getElementById('snap-ind');
+let pts=[],ents=[],undoS=[],tool='select',showLbl=true,showGrid=true;
+let cam={cx:0,cy:0,sc:1},snapR=1.5,surveyId='',projOrigin=null;
+let drawQ=[],measuring=[],selPt=null,selEnt=null,drawSnap=null;
+let isPan=false,panS=null,panC=null;
+let osnap={endpoint:true,midpoint:true,nearest:false,perpendicular:false};
+let editBase=null; // base point for move/copy/mirror
+let contourData=null; // from DTM
+
+const LY={PUNTI:{c:'#ffffff',v:true},FABBRICATI:{c:'#e94560',v:true},RECINZIONI:{c:'#f39c12',v:true},
+  VIABILITA:{c:'#bdc3c7',v:true},QUOTE:{c:'#3498db',v:true},DISEGNO:{c:'#2ecc71',v:true},
+  CURVE_DIR:{c:'#e74c3c',v:true},CURVE_INT:{c:'#5dade2',v:true},TIN:{c:'#444',v:true}};
+
+function resize(){const r=CC.parentElement.getBoundingClientRect();CC.width=Math.floor(r.width);CC.height=Math.max(350,Math.floor(window.innerHeight-300));draw();}
+window.addEventListener('resize',resize);
+function w2s(x,y){return{x:CC.width/2+(x-cam.cx)*cam.sc,y:CC.height/2-(y-cam.cy)*cam.sc};}
+function s2w(x,y){return{x:cam.cx+(x-CC.width/2)/cam.sc,y:cam.cy-(y-CC.height/2)/cam.sc};}
+
+// --- OSNAP ---
+function toggleOsnap(mode){osnap[mode]=!osnap[mode];document.getElementById('os-'+mode).classList.toggle('on');}
+
+function findSnap(wx,wy){
+  let best=null,bd=snapR,btype='';
+  // Endpoint snap (survey points)
+  if(osnap.endpoint){for(const p of pts){const d=Math.hypot(p.x-wx,p.y-wy);if(d<bd){bd=d;best={x:p.x,y:p.y,z:p.z,name:p.name||p.id};btype='END';}}}
+  // Endpoint snap (entity vertices)
+  if(osnap.endpoint){for(const e of ents){for(const p of e.pts){const d=Math.hypot(p.x-wx,p.y-wy);if(d<bd){bd=d;best={x:p.x,y:p.y,z:0};btype='END';}}}}
+  // Midpoint snap
+  if(osnap.midpoint){for(const e of ents){for(let i=0;i<e.pts.length-1;i++){const mx=(e.pts[i].x+e.pts[i+1].x)/2,my=(e.pts[i].y+e.pts[i+1].y)/2;
+    const d=Math.hypot(mx-wx,my-wy);if(d<bd){bd=d;best={x:mx,y:my,z:0};btype='MID';}}}}
+  // Nearest on entity
+  if(osnap.nearest){for(const e of ents){for(let i=0;i<e.pts.length-1;i++){
+    const np=nearestOnSeg(e.pts[i],e.pts[i+1],wx,wy);const d=Math.hypot(np.x-wx,np.y-wy);
+    if(d<bd){bd=d;best={x:np.x,y:np.y,z:0};btype='NEAR';}}}}
+  if(best)best.snapType=btype;
+  return best;
+}
+
+function nearestOnSeg(a,b,px,py){
+  const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy;
+  if(len2<1e-12)return{x:a.x,y:a.y};
+  let t=((px-a.x)*dx+(py-a.y)*dy)/len2;
+  t=Math.max(0,Math.min(1,t));
+  return{x:a.x+t*dx,y:a.y+t*dy};
+}
+
+// --- Entity selection ---
+function findEntity(wx,wy){
+  const tol=snapR*1.5;
+  for(let i=ents.length-1;i>=0;i--){
+    const e=ents[i];
+    for(let j=0;j<e.pts.length-1;j++){
+      const np=nearestOnSeg(e.pts[j],e.pts[j+1],wx,wy);
+      if(Math.hypot(np.x-wx,np.y-wy)<tol)return i;
+    }
+    if(e.type==='polygon'&&e.pts.length>2){
+      const np=nearestOnSeg(e.pts[e.pts.length-1],e.pts[0],wx,wy);
+      if(Math.hypot(np.x-wx,np.y-wy)<tol)return i;
+    }
+  }
+  return -1;
+}
+
+// --- Draw ---
+function draw(){
+  const W=CC.width,H=CC.height;
+  CX.fillStyle='#1a1a2e';CX.fillRect(0,0,W,H);
+  if(showGrid)drawGrid(W,H);
+
+  // TIN edges (if loaded)
+  if(contourData&&LY.TIN.v){/* drawn by drawContours */}
+
+  // Contour lines
+  if(contourData&&LY.CURVE_INT.v) drawContours();
+
+  // Entities
+  for(let i=0;i<ents.length;i++){
+    const e=ents[i];if(!LY[e.layer]?.v)continue;
+    CX.strokeStyle=(i===selEnt)?'#f39c12':(e.color||LY[e.layer]?.c||'#2ecc71');
+    CX.lineWidth=(i===selEnt)?2.5:1.5;CX.beginPath();
+    for(let j=0;j<e.pts.length;j++){const s=w2s(e.pts[j].x,e.pts[j].y);j===0?CX.moveTo(s.x,s.y):CX.lineTo(s.x,s.y);}
+    if(e.type==='polygon'&&e.pts.length>2)CX.closePath();CX.stroke();
+  }
+
+  // Drawing in progress
+  if(drawQ.length>0){CX.strokeStyle='#2ecc71';CX.lineWidth=1.5;CX.setLineDash([6,4]);CX.beginPath();
+    for(let i=0;i<drawQ.length;i++){const s=w2s(drawQ[i].x,drawQ[i].y);i===0?CX.moveTo(s.x,s.y):CX.lineTo(s.x,s.y);}CX.stroke();CX.setLineDash([]);}
+
+  // Measuring
+  if(measuring.length>0){CX.strokeStyle='#f39c12';CX.lineWidth=1;CX.setLineDash([4,4]);CX.beginPath();
+    for(let i=0;i<measuring.length;i++){const s=w2s(measuring[i].x,measuring[i].y);i===0?CX.moveTo(s.x,s.y):CX.lineTo(s.x,s.y);}CX.stroke();CX.setLineDash([]);}
+
+  // Points
+  for(const p of pts){
+    const ly=LY[p.layer||'PUNTI'];if(!ly?.v)continue;
+    const s=w2s(p.x,p.y);if(s.x<-20||s.x>W+20||s.y<-20||s.y>H+20)continue;
+    const sz=p===selPt?6:4;
+    CX.strokeStyle=p===selPt?'#f39c12':ly.c;CX.lineWidth=p===selPt?2.5:1.5;
+    CX.beginPath();CX.moveTo(s.x-sz,s.y);CX.lineTo(s.x+sz,s.y);CX.moveTo(s.x,s.y-sz);CX.lineTo(s.x,s.y+sz);CX.stroke();
+    if(showLbl&&cam.sc>2){CX.font='11px -apple-system,sans-serif';CX.fillStyle='rgba(255,255,255,.7)';
+      if(p.name)CX.fillText(p.name,s.x+7,s.y-5);CX.fillStyle='#3498db';CX.font='10px monospace';CX.fillText(p.z.toFixed(2),s.x+7,s.y+11);}
+  }
+  document.getElementById('ip').textContent=pts.length;
+  document.getElementById('ie').textContent=ents.length;
+}
+
+function drawContours(){
+  if(!contourData)return;
+  const levels=Object.keys(contourData).map(Number).sort((a,b)=>a-b);
+  if(!levels.length)return;
+  const interval=levels.length>1?levels[1]-levels[0]:1;
+  const majorEvery=5;
+  levels.forEach((z,idx)=>{
+    const key=z.toFixed(2);
+    const polylines=contourData[key];if(!polylines)return;
+    const isMajor=(idx%majorEvery===0);
+    CX.strokeStyle=isMajor?LY.CURVE_DIR.c:LY.CURVE_INT.c;
+    CX.lineWidth=isMajor?1.5:0.7;
+    CX.globalAlpha=isMajor?0.9:0.5;
+    for(const pl of polylines){if(pl.length<2)continue;CX.beginPath();
+      for(let i=0;i<pl.length;i++){const s=w2s(pl[i].x,pl[i].y);i===0?CX.moveTo(s.x,s.y):CX.lineTo(s.x,s.y);}CX.stroke();
+      // Label on major
+      if(isMajor&&pl.length>2&&cam.sc>1){const mid=pl[Math.floor(pl.length/2)];const ms=w2s(mid.x,mid.y);
+        CX.font='10px monospace';CX.fillStyle=LY.CURVE_DIR.c;CX.globalAlpha=1;CX.fillText(z.toFixed(1),ms.x+3,ms.y-3);}
+    }
+    CX.globalAlpha=1;
+  });
+}
+
+function drawGrid(W,H){
+  const steps=[.1,.25,.5,1,2,5,10,25,50,100,250,500,1000];
+  let gs=steps[0];for(const s of steps){if(s*cam.sc>=45){gs=s;break;}}
+  const tl=s2w(0,0),br=s2w(W,H);
+  const xm=Math.floor(Math.min(tl.x,br.x)/gs)*gs,xM=Math.ceil(Math.max(tl.x,br.x)/gs)*gs;
+  const ym=Math.floor(Math.min(tl.y,br.y)/gs)*gs,yM=Math.ceil(Math.max(tl.y,br.y)/gs)*gs;
+  CX.strokeStyle='rgba(255,255,255,.06)';CX.lineWidth=.5;
+  for(let x=xm;x<=xM;x+=gs){const a=w2s(x,ym),b=w2s(x,yM);CX.beginPath();CX.moveTo(a.x,a.y);CX.lineTo(b.x,b.y);CX.stroke();}
+  for(let y=ym;y<=yM;y+=gs){const a=w2s(xm,y),b=w2s(xM,y);CX.beginPath();CX.moveTo(a.x,a.y);CX.lineTo(b.x,b.y);CX.stroke();}
+  CX.strokeStyle='rgba(255,255,255,.15)';CX.lineWidth=1;
+  let a=w2s(0,ym),b=w2s(0,yM);CX.beginPath();CX.moveTo(a.x,a.y);CX.lineTo(b.x,b.y);CX.stroke();
+  a=w2s(xm,0);b=w2s(xM,0);CX.beginPath();CX.moveTo(a.x,a.y);CX.lineTo(b.x,b.y);CX.stroke();
+  CX.fillStyle='#4a5568';CX.font='10px sans-serif';CX.fillText(gs+'m',8,H-6);
+}
+
+// --- Tools ---
+function setTool(t){
+  if(tool!==t&&drawQ.length>0)finalize();
+  if(tool!==t){measuring=[];editBase=null;document.getElementById('meas-box').style.display='none';}
+  tool=t;document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('btn-'+t);if(btn)btn.classList.add('active');
+  document.getElementById('it').textContent=t;CC.style.cursor=t==='pan'?'grab':'crosshair';
+}
+function finalize(){
+  if(drawQ.length<2){drawQ=[];draw();return;}
+  undoS.push({a:'add',i:ents.length});
+  ents.push({type:tool,pts:[...drawQ],layer:'DISEGNO',color:LY.DISEGNO.c});drawQ=[];draw();
+}
+function undo(){if(!undoS.length)return;const op=undoS.pop();if(op.a==='add')ents.splice(op.i,1);if(op.a==='del')ents.splice(op.i,0,op.ent);draw();}
+
+// --- Mouse ---
+let mw={x:0,y:0};
+CC.addEventListener('mousemove',e=>{
+  const r=CC.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+  mw=s2w(sx,sy);
+  document.getElementById('ix').textContent=mw.x.toFixed(3);
+  document.getElementById('iy').textContent=mw.y.toFixed(3);
+  const sn=findSnap(mw.x,mw.y);
+  if(sn){drawSnap=sn;const ss=w2s(sn.x,sn.y);SI.style.display='';SI.style.left=(r.left+ss.x)+'px';SI.style.top=(r.top+ss.y)+'px';
+    document.getElementById('is').textContent=(sn.name||sn.snapType||'');
+    if(sn.z!==undefined)document.getElementById('iz').textContent=sn.z.toFixed(3);
+  }else{drawSnap=null;SI.style.display='none';document.getElementById('is').textContent='—';document.getElementById('iz').textContent='—';}
+  if(isPan&&panS){cam.cx=panC.cx-(sx-panS.x)/cam.sc;cam.cy=panC.cy+(sy-panS.y)/cam.sc;draw();}
+});
+
+CC.addEventListener('mousedown',e=>{
+  if(e.button===1||(e.button===0&&tool==='pan')){isPan=true;const r=CC.getBoundingClientRect();panS={x:e.clientX-r.left,y:e.clientY-r.top};panC={cx:cam.cx,cy:cam.cy};CC.style.cursor='grabbing';e.preventDefault();return;}
+  if(e.button!==0)return;
+  const wp=drawSnap?{x:drawSnap.x,y:drawSnap.y}:{...mw};
+
+  if(tool==='select'){
+    selPt=null;selEnt=null;
+    // Try point first
+    const sn=findSnap(mw.x,mw.y);if(sn&&sn.name){selPt=pts.find(p=>p.x===sn.x&&p.y===sn.y)||null;}
+    if(!selPt){const ei=findEntity(mw.x,mw.y);if(ei>=0)selEnt=ei;}
+    showSelection();draw();
+  }
+  else if(tool==='line'){drawQ.push(wp);if(drawQ.length>=2)finalize();draw();}
+  else if(tool==='polyline'||tool==='polygon'){drawQ.push(wp);draw();}
+  else if(tool==='move'||tool==='copy'){
+    if(!editBase){
+      if(selEnt===null){const ei=findEntity(mw.x,mw.y);if(ei>=0)selEnt=ei;}
+      if(selEnt!==null){editBase=wp;draw();}
+    }else{
+      const dx=wp.x-editBase.x,dy=wp.y-editBase.y;
+      if(tool==='copy'){
+        const clone=JSON.parse(JSON.stringify(ents[selEnt]));
+        clone.pts=clone.pts.map(p=>({x:p.x+dx,y:p.y+dy}));
+        undoS.push({a:'add',i:ents.length});ents.push(clone);
+      }else{
+        ents[selEnt].pts=ents[selEnt].pts.map(p=>({x:p.x+dx,y:p.y+dy}));
+      }
+      editBase=null;selEnt=null;draw();
+    }
+  }
+  else if(tool==='mirror'){
+    if(!editBase){editBase=wp;}
+    else{
+      if(selEnt===null){alert('Seleziona un\'entità prima');editBase=null;return;}
+      const ax=editBase.x,ay=editBase.y,bx=wp.x,by=wp.y;
+      const dx=bx-ax,dy=by-ay,len2=dx*dx+dy*dy;
+      if(len2<1e-9){editBase=null;return;}
+      const clone=JSON.parse(JSON.stringify(ents[selEnt]));
+      clone.pts=clone.pts.map(p=>{
+        const t=2*((p.x-ax)*dx+(p.y-ay)*dy)/len2;
+        return{x:ax+t*dx-p.x+2*ax-ax,y:ay+t*dy-p.y+2*ay-ay};
+      });
+      // Correct mirror formula
+      clone.pts=ents[selEnt].pts.map(p=>{
+        const t=((p.x-ax)*dx+(p.y-ay)*dy)/len2;
+        const fx=ax+t*dx,fy=ay+t*dy;
+        return{x:2*fx-p.x,y:2*fy-p.y};
+      });
+      undoS.push({a:'add',i:ents.length});ents.push(clone);
+      editBase=null;draw();
+    }
+  }
+  else if(tool==='offset'){
+    if(selEnt===null){const ei=findEntity(mw.x,mw.y);if(ei>=0){selEnt=ei;draw();}return;}
+    const dist=parseFloat(prompt('Distanza offset (m):','1.0'));
+    if(isNaN(dist)||dist===0)return;
+    const e=ents[selEnt];if(e.pts.length<2)return;
+    // Determine side from click position
+    const side=pointSide(e.pts,mw.x,mw.y);
+    const off=offsetPolyline(e.pts,dist*side,e.type==='polygon');
+    if(off.length>=2){undoS.push({a:'add',i:ents.length});ents.push({type:e.type,pts:off,layer:e.layer,color:e.color});}
+    selEnt=null;draw();
+  }
+  else if(tool==='measure_dist'){
+    measuring.push(wp);
+    if(measuring.length>=2){
+      const dx=measuring[1].x-measuring[0].x,dy=measuring[1].y-measuring[0].y;
+      const d=Math.hypot(dx,dy),az=Math.atan2(dx,dy)*200/Math.PI;
+      document.getElementById('meas-txt').innerHTML=`<b>Dist:</b> ${d.toFixed(3)}m | <b>Az:</b> ${(az<0?az+400:az).toFixed(4)} gon | <b>ΔE:</b> ${dx.toFixed(3)} <b>ΔN:</b> ${dy.toFixed(3)}`;
+      document.getElementById('meas-box').style.display='';measuring=[];}draw();
+  }
+  else if(tool==='measure_area'){measuring.push(wp);draw();}
+  else if(tool==='profile'){measuring.push(wp);
+    if(measuring.length>=2){doProfile(measuring[0],measuring[1]);measuring=[];}draw();}
+});
+
+CC.addEventListener('mouseup',()=>{if(isPan){isPan=false;CC.style.cursor=tool==='pan'?'grab':'crosshair';}});
+CC.addEventListener('dblclick',()=>{
+  if(tool==='polyline'||tool==='polygon')finalize();
+  if(tool==='measure_area'&&measuring.length>=3){
+    let area=0;const n=measuring.length;
+    for(let i=0;i<n;i++){const j=(i+1)%n;area+=measuring[i].x*measuring[j].y;area-=measuring[j].x*measuring[i].y;}area=Math.abs(area)/2;
+    let per=0;for(let i=0;i<n;i++){const j=(i+1)%n;per+=Math.hypot(measuring[j].x-measuring[i].x,measuring[j].y-measuring[i].y);}
+    document.getElementById('meas-txt').innerHTML=`<b>Area:</b> ${area.toFixed(2)} m² | <b>Perim:</b> ${per.toFixed(3)}m | <b>V:</b> ${n}`;
+    document.getElementById('meas-box').style.display='';measuring=[];draw();}
+});
+CC.addEventListener('contextmenu',e=>{e.preventDefault();if(drawQ.length)finalize();if(measuring.length){measuring=[];draw();}editBase=null;});
+CC.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY>0?.85:1.18;const r=CC.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+  const wb=s2w(sx,sy);cam.sc*=f;cam.sc=Math.max(.01,Math.min(cam.sc,10000));const wa=s2w(sx,sy);cam.cx-=(wa.x-wb.x);cam.cy-=(wa.y-wb.y);snapR=8/cam.sc;draw();},{passive:false});
+
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  if(e.key==='Escape'){drawQ=[];measuring=[];editBase=null;document.getElementById('meas-box').style.display='none';setTool('select');draw();}
+  if(e.key==='z'&&e.ctrlKey){undo();e.preventDefault();}
+  if(e.key==='Delete'&&selEnt!==null){undoS.push({a:'del',i:selEnt,ent:ents[selEnt]});ents.splice(selEnt,1);selEnt=null;draw();}
+  const km={l:'line',p:'polyline',g:'polygon',d:'measure_dist',a:'measure_area',v:'select',m:'move',c:'copy',r:'profile'};
+  if(km[e.key])setTool(km[e.key]);
+  if(e.key===' '){setTool('pan');e.preventDefault();}
+  if(e.key==='f')zoomExtents();
+});
+
+// --- Offset helpers ---
+function pointSide(pts,px,py){
+  // Which side of polyline is point on? Returns +1 or -1
+  if(pts.length<2)return 1;
+  const a=pts[0],b=pts[1];
+  return((b.x-a.x)*(py-a.y)-(b.y-a.y)*(px-a.x))>0?1:-1;
+}
+function offsetPolyline(pts,dist,closed){
+  if(pts.length<2)return[];
+  const res=[];
+  for(let i=0;i<pts.length-1;i++){
+    const dx=pts[i+1].x-pts[i].x,dy=pts[i+1].y-pts[i].y;
+    const len=Math.hypot(dx,dy);if(len<1e-9)continue;
+    const nx=-dy/len*dist,ny=dx/len*dist;
+    res.push({x:pts[i].x+nx,y:pts[i].y+ny});
+    if(i===pts.length-2)res.push({x:pts[i+1].x+nx,y:pts[i+1].y+ny});
+  }
+  return res;
+}
+
+// --- Misc ---
+function zoomExtents(){if(!pts.length&&!ents.length)return;
+  let xs=[],ys=[];pts.forEach(p=>{xs.push(p.x);ys.push(p.y);});
+  ents.forEach(e=>e.pts.forEach(p=>{xs.push(p.x);ys.push(p.y);}));
+  if(!xs.length)return;
+  cam.cx=(Math.min(...xs)+Math.max(...xs))/2;cam.cy=(Math.min(...ys)+Math.max(...ys))/2;
+  const dx=Math.max(...xs)-Math.min(...xs)||10,dy=Math.max(...ys)-Math.min(...ys)||10;
+  cam.sc=Math.min(CC.width/(dx*1.2),CC.height/(dy*1.2));snapR=8/cam.sc;draw();}
+function toggleLabels(){showLbl=!showLbl;draw();}
+function toggleGrid(){showGrid=!showGrid;draw();}
+
+function showSelection(){
+  const d=document.getElementById('sel-info');
+  if(selPt){d.innerHTML=`<div class="kv"><span>Nome</span><b>${selPt.name||selPt.id}</b></div><div class="kv"><span>Codice</span><b>${selPt.code||'—'}</b></div><div class="kv"><span>E</span><b>${selPt.x.toFixed(3)}</b></div><div class="kv"><span>N</span><b>${selPt.y.toFixed(3)}</b></div><div class="kv"><span>Q</span><b>${selPt.z.toFixed(3)}</b></div><div class="kv"><span>Layer</span><b>${selPt.layer||'PUNTI'}</b></div>`;}
+  else if(selEnt!==null&&ents[selEnt]){const e=ents[selEnt];d.innerHTML=`<div class="kv"><span>Tipo</span><b>${e.type}</b></div><div class="kv"><span>Vertici</span><b>${e.pts.length}</b></div><div class="kv"><span>Layer</span><b>${e.layer}</b></div><div style="margin-top:6px"><button class="tbtn" onclick="deleteSelEnt()" style="color:#e74c3c;border-color:#e74c3c">🗑 Elimina</button></div>`;}
+  else{d.innerHTML='<span style="color:#95a5a6;font-size:12px">Nessuna selezione</span>';}
+}
+function deleteSelEnt(){if(selEnt!==null){undoS.push({a:'del',i:selEnt,ent:ents[selEnt]});ents.splice(selEnt,1);selEnt=null;showSelection();draw();}}
+
+function codeToLayer(c){if(!c)return'PUNTI';c=c.toUpperCase();
+  if(/FAB|MUR|PORTA|FINES|COLON/.test(c))return'FABBRICATI';if(/REC|CANCEL|CONF|CIPPO/.test(c))return'RECINZIONI';
+  if(/STR|CURVA|CENTRO|AIUOLA/.test(c))return'VIABILITA';if(/QT|PIAN|PEND|FOSSO|SCARP/.test(c))return'QUOTE';return'PUNTI';}
+function hashCol(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))&0xffffff;return'#'+((h&0x7f7f7f)+0x404040).toString(16).padStart(6,'0');}
+function buildLayers(){const d=document.getElementById('layer-list');d.innerHTML='';
+  for(const[n,l] of Object.entries(LY)){d.innerHTML+=`<div class="layer-row"><input type="checkbox" ${l.v?'checked':''} onchange="LY['${n}'].v=this.checked;draw()"><div class="layer-dot" style="background:${l.c}"></div><span>${n}</span></div>`;}}
+
+// --- Profile via canvas click ---
+async function doProfile(start,end){
+  if(!surveyId){document.getElementById('meas-txt').innerHTML='<b>Profilo:</b> carica prima un rilievo';document.getElementById('meas-box').style.display='';return;}
+  try{
+    const res=await fetch('/api/dtm/profile',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({survey_id:surveyId,start_x:start.x,start_y:start.y,end_x:end.x,end_y:end.y,step:1.0})});
+    const d=await res.json();
+    if(d.error){document.getElementById('meas-txt').innerHTML=`<b>Errore profilo:</b> ${d.error}`;document.getElementById('meas-box').style.display='';return;}
+    if(!d.profile.length){document.getElementById('meas-txt').innerHTML='<b>Profilo:</b> nessun punto interpolato';document.getElementById('meas-box').style.display='';return;}
+    const zMin=Math.min(...d.profile.map(p=>p.z)),zMax=Math.max(...d.profile.map(p=>p.z));
+    document.getElementById('meas-txt').innerHTML=`<b>Profilo:</b> L=${d.length.toFixed(1)}m | Z: ${zMin.toFixed(2)}—${zMax.toFixed(2)}m | ${d.profile.length} punti`;
+    document.getElementById('meas-box').style.display='';
+  }catch(e){console.error(e);}
+}
+
+// --- Load survey ---
+async function loadSurvey(){
+  const sid=document.getElementById('survey-sel').value;if(!sid)return;surveyId=sid;
+  const res=await fetch('/api/cad/load_survey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({survey_id:sid})});
+  const data=await res.json();if(data.error){alert(data.error);return;}
+  pts=data.points.map(p=>({...p,layer:codeToLayer(p.code)}));
+  ents=[];undoS=[];drawQ=[];measuring=[];selPt=null;selEnt=null;editBase=null;contourData=null;projOrigin=data.origin;
+  buildLayers();document.getElementById('title-lbl').textContent=data.title;zoomExtents();
+}
+
+// --- Load/save projects ---
+async function loadProjectList(){
+  const res=await fetch('/api/cad/list_projects');const d=await res.json();
+  const sel=document.getElementById('proj-sel');sel.innerHTML='<option value="">— carica progetto —</option>';
+  (d.projects||[]).forEach(p=>{sel.innerHTML+=`<option value="${p.name}">${p.title} (${p.n_entities} ent)</option>`;});
+}
+async function loadProject(){
+  const n=document.getElementById('proj-sel').value;if(!n)return;
+  const res=await fetch('/api/cad/load/'+n);const d=await res.json();if(d.error){alert(d.error);return;}
+  pts=d.points||[];ents=d.entities||[];projOrigin=d.origin;surveyId=d.survey_id||'';
+  if(d.camera){cam=d.camera;snapR=8/cam.sc;}
+  undoS=[];drawQ=[];measuring=[];selPt=null;selEnt=null;editBase=null;contourData=null;
+  buildLayers();document.getElementById('title-lbl').textContent=d.name;draw();
+}
+async function saveProject(){
+  const name=prompt('Nome progetto:','cad_'+new Date().toISOString().slice(0,10));if(!name)return;
+  const res=await fetch('/api/cad/save',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name,survey_id:surveyId,origin:projOrigin,points:pts,entities:ents,camera:cam,layers:LY})});
+  const d=await res.json();if(d.error){alert(d.error);return;}
+  alert('Progetto salvato: '+d.name);loadProjectList();
+}
+
+// --- Export DXF ---
+async function exportDXF(){
+  const res=await fetch('/api/cad/export_dxf',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({points:pts,entities:ents})});
+  if(!res.ok){alert('Errore export');return;}
+  const blob=await res.blob();const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='cad_export.dxf';a.click();
+}
+
+// --- Load contours into CAD ---
+async function loadContours(interval){
+  if(!surveyId){alert('Carica prima un rilievo');return;}
+  const res=await fetch('/api/dtm/contours',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({survey_id:surveyId,interval:interval||1.0})});
+  const d=await res.json();if(d.error){alert(d.error);return;}
+  contourData=d.contours;draw();
+}
+
+// --- Init ---
+resize();buildLayers();loadProjectList();
+</script>
+{% endblock %}

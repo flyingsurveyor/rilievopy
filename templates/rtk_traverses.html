@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% set active = "traverses" %}
+{% block title %}Poligonali e Livellazione{% endblock %}
+{% block head %}
+<style>
+.container{max-width:1000px;margin:20px auto;padding:0 20px}
+.card{background:white;border-radius:8px;padding:20px;margin-bottom:20px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+.card h2{color:#2c3e50;margin:0 0 14px;font-size:18px;border-bottom:2px solid #3498db;padding-bottom:8px;display:flex;align-items:center;gap:8px}
+.kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #edf2f7}.kv:last-child{border-bottom:none}
+.k{color:#718096;font-size:13px}.v{font-variant-numeric:tabular-nums;color:#2d3748;font-size:13px;font-weight:600}
+label{display:block;margin:0 0 4px;color:#2c3e50;font-weight:500;font-size:13px}
+.form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+button,.btn{background:#3498db;color:white;border:none;padding:10px 16px;border-radius:4px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin:4px 2px;transition:background .3s;font-size:14px;font-weight:500}
+button:hover,.btn:hover{background:#2980b9}.btn-success{background:#2ecc71}.btn-success:hover{background:#27ae60}.btn-danger{background:#e74c3c}.btn-danger:hover{background:#c0392b}
+.data-table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+.data-table th{background:#ecf0f1;color:#2c3e50;font-weight:600;text-align:center;padding:8px;font-size:12px}
+.data-table th,.data-table td{border:1px solid #ddd;padding:6px 8px;text-align:center}
+.data-table td input,.data-table td select{width:80px;padding:5px;border:1px solid #ddd;border-radius:3px;text-align:right;font-size:13px;font-family:inherit}
+.data-table td select{width:140px;text-align:left}
+.data-table tr:nth-child(even){background:#f9f9f9}
+.result-section{background:#ecf0f1;border-radius:8px;padding:16px;margin:12px 0}
+.result-section h3{margin:0 0 10px;font-size:15px;color:#2c3e50}
+.text-green{color:#2ecc71;font-weight:700}.text-red{color:#e74c3c;font-weight:700}
+.tabs{display:flex;gap:0;border-bottom:2px solid #ecf0f1;margin-bottom:16px}
+.tab{padding:10px 16px;font-size:14px;font-weight:500;color:#7f8c8d;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;transition:all .2s}
+.tab:hover{color:#2c3e50}.tab.active{color:#3498db;border-bottom-color:#3498db}
+.tab-content{display:none}.tab-content.active{display:block}
+@media(max-width:768px){.container{padding:5px;margin:0}.card{padding:12px}.form-row{grid-template-columns:1fr}button,.btn{min-height:44px;width:100%;margin-bottom:8px}.data-table td input,.data-table td select{width:65px;font-size:12px}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+<div class="card">
+  <h2><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 20 8 10 14 16 20 4"/><circle cx="4" cy="20" r="1.5"/><circle cx="8" cy="10" r="1.5"/><circle cx="14" cy="16" r="1.5"/><circle cx="20" cy="4" r="1.5"/></svg>Poligonali e Livellazione</h2>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('polig')">📐 Poligonale</button>
+    <button class="tab" onclick="showTab('level')">📏 Livellazione</button>
+  </div>
+
+  <!-- POLIGONALE -->
+  <div class="tab-content active" id="tab-polig">
+    <div class="form-row">
+      <div><label>Tipo</label><select id="tipo"><option value="aperta">Aperta</option><option value="chiusa">Chiusa</option></select></div>
+      <div><label>Azimut partenza (gon)</label><input type="number" id="az-start" value="0" step="0.0001"></div>
+      <div><label>Azimut arrivo (opz.)</label><input type="number" id="az-end" step="0.0001" placeholder="solo aperta"></div>
+    </div>
+    <div class="form-row" style="grid-template-columns:1fr 1fr">
+      <div><label>Metodo</label><select id="metodo"><option value="bowditch">Bowditch</option><option value="transit">Transit</option></select></div>
+      <div><label>Importa punto noto da rilievo</label>
+        <select id="import-pt" onchange="importSurveyPoint()">
+          <option value="">— seleziona —</option>
+        </select></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table"><thead><tr>
+        <th>Nome</th><th>Ang.Hz (gon)</th><th>Dist. (m)</th><th>Disliv. (m)</th>
+        <th>E noto</th><th>N noto</th><th>H noto</th><th></th>
+      </tr></thead><tbody id="st-body"></tbody></table>
+    </div>
+    <button class="btn" onclick="addSt(false)">+ Stazione</button>
+    <button class="btn-success" onclick="addSt(true)">+ Staz. con coordinate note</button>
+    <div style="margin-top:14px">
+      <button class="btn-success" onclick="calcPolig()" style="font-size:15px;padding:12px 24px">Calcola</button>
+    </div>
+  </div>
+
+  <!-- LIVELLAZIONE -->
+  <div class="tab-content" id="tab-level">
+    <div class="form-row" style="grid-template-columns:1fr 1fr">
+      <div><label>Quota partenza (m)</label><input type="number" id="q-start" value="100.000" step="0.001"></div>
+      <div><label>Quota arrivo (opz.)</label><input type="number" id="q-end" step="0.001" placeholder="per chiusura"></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table"><thead><tr><th>Nome</th><th>Lettura indietro</th><th>Lettura avanti</th><th>Distanza (m)</th><th></th></tr></thead>
+        <tbody id="lv-body"></tbody></table>
+    </div>
+    <button class="btn" onclick="addLv()">+ Misura</button>
+    <div style="margin-top:14px"><button class="btn-success" onclick="calcLevel()" style="font-size:15px;padding:12px 24px">Calcola</button></div>
+  </div>
+</div>
+
+<div class="card" id="result-card" style="display:none">
+  <h2>Risultati</h2>
+  <div id="result-content"></div>
+  <div style="margin-top:12px" id="export-btns" style="display:none">
+    <button class="btn" onclick="exportCSV()">💾 Export CSV</button>
+  </div>
+</div>
+<div style="margin-top:10px"><a class="btn" href="/">← Dashboard</a> <a class="btn" href="/cogo">📐 COGO</a> <a class="btn" href="/cad">📐 CAD</a></div>
+</div>
+
+<script>
+let stN=0,lvN=0,lastResult=null;
+const allPoints = {{ all_points_json|safe }};
+
+// Populate import point selector
+const impSel=document.getElementById('import-pt');
+allPoints.forEach(p=>{impSel.innerHTML+=`<option value="${JSON.stringify(p).replace(/"/g,'&quot;')}">${p.label} (${p.lat.toFixed(6)}, ${p.lon.toFixed(6)})</option>`;});
+
+function importSurveyPoint(){
+  const sel=document.getElementById('import-pt');if(!sel.value)return;
+  try{
+    const p=JSON.parse(sel.value.replace(/&quot;/g,'"'));
+    addSt(true);
+    const rows=document.querySelectorAll('#st-body tr');
+    const last=rows[rows.length-1];
+    last.querySelector('.sn').value=p.name||p.pid;
+    // NOTE: coordinates from survey are lat/lon, not local E/N
+    // This requires the user to input their own projected coords or use COGO
+    // We show lat/lon as reference
+    last.querySelector('.se').value='';last.querySelector('.sn2').value='';
+    last.querySelector('.se').placeholder=`lat:${p.lat.toFixed(6)}`;
+    last.querySelector('.sn2').placeholder=`lon:${p.lon.toFixed(6)}`;
+    sel.value='';
+  }catch(e){console.error(e);}
+}
+
+function showTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');event.target.classList.add('active');
+}
+
+function addSt(known){
+  stN++;const tr=document.createElement('tr');const dis=known?'':'disabled placeholder="—"';
+  tr.innerHTML=`<td><input value="S${stN}" class="sn"></td>
+    <td><input type="number" step="0.0001" class="sa"></td><td><input type="number" step="0.001" class="sd"></td><td><input type="number" step="0.001" class="sh"></td>
+    <td><input type="number" step="0.001" class="se" ${dis}></td><td><input type="number" step="0.001" class="sn2" ${dis}></td><td><input type="number" step="0.001" class="sq" ${dis}></td>
+    <td><button class="btn-danger" style="padding:4px 10px;min-height:0" onclick="this.closest('tr').remove()">✕</button></td>`;
+  document.getElementById('st-body').appendChild(tr);
+}
+function addLv(){
+  lvN++;const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input value="C${lvN}" class="ln"></td><td><input type="number" step="0.001" class="lb"></td>
+    <td><input type="number" step="0.001" class="lf"></td><td><input type="number" step="0.1" class="ld" value="50"></td>
+    <td><button class="btn-danger" style="padding:4px 10px;min-height:0" onclick="this.closest('tr').remove()">✕</button></td>`;
+  document.getElementById('lv-body').appendChild(tr);
+}
+
+async function calcPolig(){
+  const rows=document.querySelectorAll('#st-body tr');if(rows.length<2){alert('Servono almeno 2 stazioni');return;}
+  const stazioni=[];
+  rows.forEach(r=>{
+    const s={name:r.querySelector('.sn').value};
+    const v=(sel,key)=>{const x=r.querySelector(sel).value;if(x!=='')s[key]=parseFloat(x);};
+    v('.sa','angolo_hz');v('.sd','distanza');v('.sh','dislivello');
+    if(!r.querySelector('.se').disabled){v('.se','e_noto');v('.sn2','n_noto');v('.sq','h_noto');}
+    stazioni.push(s);
+  });
+  const azEnd=document.getElementById('az-end').value;
+  const body={tipo:document.getElementById('tipo').value,stazioni,azimut_partenza:parseFloat(document.getElementById('az-start').value),
+    azimut_arrivo:azEnd?parseFloat(azEnd):null,metodo:document.getElementById('metodo').value};
+  const res=await fetch('/api/traverses/compute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await res.json();if(d.error){alert(d.error);return;}
+  lastResult=d; showPoligResult(d);
+}
+
+function showPoligResult(d){
+  const c=d.chiusura,t=d.tolleranze;
+  let h=`<div class="result-section"><h3>Chiusura</h3>
+    <div class="kv"><span class="k">Sviluppo</span><span class="v">${d.sviluppo.toFixed(3)} m</span></div>
+    <div class="kv"><span class="k">Errore lineare</span><span class="v ${t.lineare_ok===false?'text-red':'text-green'}">${c.errore_lineare.toFixed(4)} m</span></div>
+    <div class="kv"><span class="k">Rapporto</span><span class="v">1 : ${Math.round(c.rapporto)}</span></div>
+    <div class="kv"><span class="k">ΔE / ΔN</span><span class="v">${c.errore_est.toFixed(4)} / ${c.errore_nord.toFixed(4)} m</span></div>`;
+  if(c.errore_angolare_gon!=null)h+=`<div class="kv"><span class="k">Errore angolare</span><span class="v ${t.angolare_ok===false?'text-red':'text-green'}">${c.errore_angolare_gon.toFixed(4)} gon</span></div>`;
+  if(c.errore_quota)h+=`<div class="kv"><span class="k">ΔH</span><span class="v">${c.errore_quota.toFixed(4)} m</span></div>`;
+  h+=`<div class="kv"><span class="k">Tolleranza</span><span class="v">${t.lineare.toFixed(4)} m</span></div>
+    <div class="kv"><span class="k">Metodo</span><span class="v">${d.metodo}</span></div></div>`;
+  h+=`<h3 style="margin-top:16px">Coordinate compensate</h3><div style="overflow-x:auto"><table class="data-table">
+    <thead><tr><th>Nome</th><th>E</th><th>N</th><th>H</th><th>Azimut</th><th>Corr.E</th><th>Corr.N</th></tr></thead><tbody>`;
+  d.stazioni.forEach(s=>{h+=`<tr><td><b>${s.name}</b></td><td>${s.e_calc!=null?s.e_calc.toFixed(3):'—'}</td><td>${s.n_calc!=null?s.n_calc.toFixed(3):'—'}</td><td>${s.h_calc!=null?s.h_calc.toFixed(3):'—'}</td><td>${s.azimut!=null?s.azimut.toFixed(4):'—'}</td><td>${s.corr_e.toFixed(4)}</td><td>${s.corr_n.toFixed(4)}</td></tr>`;});
+  h+='</tbody></table></div>';
+  document.getElementById('result-card').style.display='';document.getElementById('result-content').innerHTML=h;
+  document.getElementById('export-btns').style.display='';
+}
+
+async function calcLevel(){
+  const rows=document.querySelectorAll('#lv-body tr');if(!rows.length){alert('Aggiungi misure');return;}
+  const misure=[];rows.forEach(r=>{misure.push({nome:r.querySelector('.ln').value,lettura_indietro:parseFloat(r.querySelector('.lb').value)||0,lettura_avanti:parseFloat(r.querySelector('.lf').value)||0,distanza:parseFloat(r.querySelector('.ld').value)||50});});
+  const qe=document.getElementById('q-end').value;
+  const body={misure,quota_partenza:parseFloat(document.getElementById('q-start').value),quota_arrivo:qe?parseFloat(qe):null};
+  const res=await fetch('/api/traverses/leveling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await res.json();if(d.error){alert(d.error);return;}lastResult=d;
+  let h=`<div class="result-section"><h3>Livellazione</h3>
+    <div class="kv"><span class="k">Sviluppo</span><span class="v">${d.sviluppo.toFixed(1)} m</span></div>
+    <div class="kv"><span class="k">Dislivello totale</span><span class="v">${d.dislivello_totale.toFixed(4)} m</span></div>
+    <div class="kv"><span class="k">Errore chiusura</span><span class="v ${d.entro_tolleranza===false?'text-red':'text-green'}">${d.errore_chiusura.toFixed(4)} m</span></div>
+    <div class="kv"><span class="k">Tolleranza</span><span class="v">${d.tolleranza.toFixed(4)} m</span></div>`;
+  if(d.entro_tolleranza!=null)h+=`<div class="kv"><span class="k">Esito</span><span class="v ${d.entro_tolleranza?'text-green':'text-red'}">${d.entro_tolleranza?'✓ ENTRO':'✗ FUORI'} TOLLERANZA</span></div>`;
+  h+=`</div><div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Caposaldo</th><th>Disliv.</th><th>Q provv.</th><th>Q comp.</th><th>Corr.</th></tr></thead><tbody>`;
+  h+=`<tr><td><b>Partenza</b></td><td>—</td><td>${d.quota_partenza.toFixed(4)}</td><td><b>${d.quota_partenza.toFixed(4)}</b></td><td>—</td></tr>`;
+  d.risultati.forEach(r=>{h+=`<tr><td><b>${r.nome}</b></td><td>${r.dislivello.toFixed(4)}</td><td>${r.quota_provvisoria.toFixed(4)}</td><td><b>${r.quota_compensata.toFixed(4)}</b></td><td>${r.correzione.toFixed(5)}</td></tr>`;});
+  h+='</tbody></table></div>';
+  document.getElementById('result-card').style.display='';document.getElementById('result-content').innerHTML=h;
+  document.getElementById('export-btns').style.display='';
+}
+
+async function exportCSV(){
+  if(!lastResult||!lastResult.stazioni)return;
+  const res=await fetch('/api/traverses/export_csv',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({stazioni:lastResult.stazioni})});
+  if(!res.ok){alert('Errore');return;}
+  const blob=await res.blob();const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='poligonale.csv';a.click();
+}
+
+addSt(true);addSt(false);addSt(true);addLv();addLv();
+</script>
+{% endblock %}

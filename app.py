@@ -53,6 +53,10 @@ def create_app():
     from routes.ppk import bp as ppk_bp
     app.register_blueprint(ppk_bp)
 
+    # Register Topo Tools blueprint (DTM, traverses, CAD)
+    from routes.topo_tools import bp as topo_bp
+    app.register_blueprint(topo_bp)
+
     return app
 
 

@@ -463,6 +463,17 @@ def survey_map(sid):
     return render_template('rtk_map.html', sid=sid, geojson=json.dumps(svy))
 
 
+@bp.route("/survey/<sid>/cad")
+def survey_cad(sid):
+    """Open the CAD editor pre-loaded with this survey."""
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+    title = svy.get("properties", {}).get("title", sid)
+    return render_template('rtk_survey_cad.html', sid=sid, title=title)
+
+
 @bp.route("/survey/<sid>.dxf")
 def survey_download_dxf(sid):
     try:
