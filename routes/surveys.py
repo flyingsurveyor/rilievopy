@@ -574,17 +574,29 @@ def delete_point(sid, point_index):
     }, 200)
 
 
+from flask import jsonify
+
 @bp.route("/survey/<sid>/delete", methods=["POST"])
 def delete_survey(sid):
     try:
         load_survey(sid)
     except FileNotFoundError:
-        return make_response({"error": "Survey not found"}, 404)
-    confirm = request.form.get("confirm", "")
+        return jsonify({"success": False, "error": "Survey not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    confirm = (data.get("confirmation") or "").strip()
+
     if confirm != "ELIMINA":
-        return make_response({"error": "Conferma non valida. Scrivi 'ELIMINA' per confermare."}, 400)
+        return jsonify({
+            "success": False,
+            "error": "Conferma non valida. Scrivi 'ELIMINA' per confermare."
+        }), 400
+
     delete_survey_file(sid)
-    return make_response({"success": True, "message": f"Rilievo {sid} eliminato"}, 200)
+    return jsonify({
+        "success": True,
+        "message": f"Rilievo {sid} eliminato"
+    }), 200
 
 
 # ---------- Area ----------
