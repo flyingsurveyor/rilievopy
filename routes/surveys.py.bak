@@ -7,7 +7,6 @@ import json
 import math
 import os
 import time
-import threading
 from datetime import datetime
 
 from flask import Blueprint, abort, make_response, render_template, request, send_from_directory
@@ -53,228 +52,6 @@ def _tpv_age_seconds(snap: dict):
         return (datetime.now() - ts).total_seconds()
     except Exception:
         return None
-
-
-_MEASURE_LOCK = threading.Lock()
-_MEASURE_STATE = {}
-
-
-def _measure_get(sid: str):
-    with _MEASURE_LOCK:
-        st = dict(_MEASURE_STATE.get(sid, {}))
-    if not st:
-        return {"active": False, "phase": "idle", "progress": 0, "sid": sid}
-    st.setdefault("sid", sid)
-    st.setdefault("active", st.get("phase") in ("sampling", "saving"))
-    st.setdefault("progress", 0)
-    return st
-
-
-def _measure_set(sid: str, **kwargs):
-    with _MEASURE_LOCK:
-        cur = dict(_MEASURE_STATE.get(sid, {}))
-        cur.update(kwargs)
-        _MEASURE_STATE[sid] = cur
-        return dict(cur)
-
-
-def _default_interval(duration: float) -> float:
-    try:
-        d = float(duration)
-    except Exception:
-        d = 10.0
-    return 0.25 if d <= 2.0 else 0.5
-
-
-def _collect_key(samples, group, key):
-    vals = []
-    for s in samples:
-        g = s.get(group, {})
-        v = g.get(key, None)
-        if isinstance(v, (int, float)):
-            vals.append(v)
-    return robust_avg(vals)
-
-
-def _collect_vals(samples, group, key):
-    vals = []
-    for s in samples:
-        g = s.get(group, {})
-        v = g.get(key, None)
-        if isinstance(v, (int, float)):
-            vals.append(v)
-    return vals
-
-
-def _precheck_measurement(force: bool = False):
-    if force:
-        return {"ok": True}
-    pre_snap = STATE.snapshot()
-    age = _tpv_age_seconds(pre_snap)
-    if age is None or age > _GNSS_STALE_ERROR_S:
-        return {
-            "ok": False,
-            "error": "no_gnss_data",
-            "message": "Nessun dato GNSS ricevuto. Verificare la connessione."
-        }
-    if age < _GNSS_STALE_WARN_S:
-        cfg = _settings.load_settings()
-        if cfg.get("rtk_quality_gate", True):
-            tpv_pre = pre_snap.get("TPV", {})
-            hp_pre = pre_snap.get("HPPOSLLH", {})
-            dop_pre = pre_snap.get("DOP", {})
-            warnings = []
-
-            rtk_val = tpv_pre.get("rtk", "none")
-            if rtk_val == "none":
-                warnings.append(f"Nessun fix RTK (stato: {rtk_val})")
-
-            hacc = hp_pre.get("hAcc")
-            max_hacc = cfg.get("max_hacc", 0.05)
-            if hacc is not None and hacc > max_hacc:
-                warnings.append(f"Precisione orizzontale elevata: {hacc:.3f} m (soglia: {max_hacc} m)")
-
-            pdop = dop_pre.get("pdop")
-            max_pdop = cfg.get("max_pdop", 3.0)
-            if pdop is not None and pdop > max_pdop:
-                warnings.append(f"PDOP elevato: {pdop:.2f} (soglia: {max_pdop})")
-
-            numsv = tpv_pre.get("numSV")
-            min_sv = cfg.get("min_sv", 8)
-            if numsv is not None and numsv < min_sv:
-                warnings.append(f"Pochi satelliti: {numsv} (minimo: {min_sv})")
-
-            if warnings:
-                return {"ok": False, "quality_warning": True, "warnings": warnings}
-    return {"ok": True}
-
-
-def _finalize_measurement(sid: str, name: str, desc: str, codice: str, duration: float, interval: float, force: bool = False):
-    start_ts = datetime.now()
-    samples = []
-    n_iters = max(1, int(round(duration / interval)))
-    _measure_set(sid, phase="sampling", active=True, progress=0, message="Misura in corso…",
-                 duration_s=duration, interval_s=interval, started_at=start_ts.isoformat(timespec='seconds'))
-
-    for idx in range(n_iters):
-        samples.append(STATE.snapshot())
-        progress = int(round(((idx + 1) / max(1, n_iters)) * 100))
-        elapsed = min(duration, (idx + 1) * interval)
-        _measure_set(sid, phase="sampling", active=True, progress=progress, elapsed_s=round(elapsed, 2),
-                     samples=len(samples), message="Misura in corso…")
-        if idx < n_iters - 1:
-            time.sleep(interval)
-
-    end_ts = datetime.now()
-    _measure_set(sid, phase="saving", active=True, progress=100, elapsed_s=round(duration, 2),
-                 message="Elaborazione e salvataggio…")
-
-    mode = int(round(_collect_key(samples, "TPV", "mode") or 0))
-    rtk = samples[-1].get("TPV", {}).get("rtk", "-") if samples else "-"
-    numSV = int(round(_collect_key(samples, "TPV", "numSV") or 0))
-
-    lat = _collect_key(samples, "HPPOSLLH", "lat") or _collect_key(samples, "TPV", "lat")
-    lon = _collect_key(samples, "HPPOSLLH", "lon") or _collect_key(samples, "TPV", "lon")
-    altHAE = _collect_key(samples, "HPPOSLLH", "altHAE")
-    altMSL = _collect_key(samples, "HPPOSLLH", "altMSL") or _collect_key(samples, "TPV", "altMSL")
-    hAcc = _collect_key(samples, "HPPOSLLH", "hAcc") or _collect_key(samples, "TPV", "hAcc")
-    vAcc = _collect_key(samples, "HPPOSLLH", "vAcc") or _collect_key(samples, "TPV", "vAcc")
-
-    X = _collect_key(samples, "HPPOSECEF", "X")
-    Y = _collect_key(samples, "HPPOSECEF", "Y")
-    Z = _collect_key(samples, "HPPOSECEF", "Z")
-    pAcc = _collect_key(samples, "HPPOSECEF", "pAcc")
-
-    gdop = _collect_key(samples, "DOP", "gdop"); pdop = _collect_key(samples, "DOP", "pdop")
-    hdop = _collect_key(samples, "DOP", "hdop"); vdop = _collect_key(samples, "DOP", "vdop")
-    ndop = _collect_key(samples, "DOP", "ndop"); edop = _collect_key(samples, "DOP", "edop")
-    tdop = _collect_key(samples, "DOP", "tdop")
-
-    covNN = _collect_key(samples, "COV", "covNN"); covEE = _collect_key(samples, "COV", "covEE")
-    covDD = _collect_key(samples, "COV", "covDD"); covNE = _collect_key(samples, "COV", "covNE")
-    covND = _collect_key(samples, "COV", "covND"); covED = _collect_key(samples, "COV", "covED")
-
-    relN = _collect_key(samples, "RELPOS", "N"); relE = _collect_key(samples, "RELPOS", "E")
-    relD = _collect_key(samples, "RELPOS", "D")
-    relsN = _collect_key(samples, "RELPOS", "sN"); relsE = _collect_key(samples, "RELPOS", "sE")
-    relsD = _collect_key(samples, "RELPOS", "sD")
-    horiz = baseline = bearing = slope = None
-    if relN is not None and relE is not None and relD is not None:
-        horiz = math.hypot(relN, relE)
-        baseline = math.sqrt(horiz * horiz + relD * relD)
-        bearing = math.degrees(math.atan2(relE, relN))
-        bearing = bearing + 360 if bearing < 0 else bearing
-        slope = math.degrees(math.atan2(-relD, horiz)) if horiz else 0.0
-
-    _lat_stats = robust_avg_stats(_collect_vals(samples, "HPPOSLLH", "lat"))
-    _lon_stats = robust_avg_stats(_collect_vals(samples, "HPPOSLLH", "lon"))
-    _alt_stats = robust_avg_stats(_collect_vals(samples, "HPPOSLLH", "altHAE"))
-
-    _mean_lat_rad = math.radians(lat or 0.0)
-    sigma_N = sigma_E = sigma_U = None
-    n_kept = _alt_stats.get("n_kept", 0)
-    if _lat_stats.get("sigma") is not None:
-        sigma_N = _lat_stats["sigma"] * math.radians(1.0) * WGS84_A
-    if _lon_stats.get("sigma") is not None:
-        sigma_E = _lon_stats["sigma"] * math.radians(1.0) * WGS84_A * math.cos(_mean_lat_rad)
-    if _alt_stats.get("sigma") is not None:
-        sigma_U = _alt_stats["sigma"]
-
-    stats = {
-        "mode": mode, "rtk": rtk, "numSV": numSV,
-        "hAcc": hAcc, "vAcc": vAcc, "pAcc": pAcc,
-        "gdop": gdop, "pdop": pdop, "hdop": hdop, "vdop": vdop,
-        "ndop": ndop, "edop": edop, "tdop": tdop,
-        "covNN": covNN, "covEE": covEE, "covDD": covDD,
-        "covNE": covNE, "covND": covND, "covED": covED,
-        "relN": relN, "relE": relE, "relD": relD,
-        "relsN": relsN, "relsE": relsE, "relsD": relsD,
-        "baseline": baseline, "horiz": horiz, "bearing": bearing, "slope": slope,
-        "sigma_N": sigma_N, "sigma_E": sigma_E, "sigma_U": sigma_U, "n_kept": n_kept,
-    }
-
-    svy = load_survey(sid)
-    pid = next_point_id(svy)
-    start_iso = start_ts.isoformat(timespec='seconds')
-    end_iso = end_ts.isoformat(timespec='seconds')
-
-    feat = point_feature(pid, lat, lon, altHAE, altMSL, X, Y, Z, stats, {
-        "name": name, "codice": codice, "desc": desc, "duration": duration,
-        "interval": interval, "n_samples": len(samples), "start": start_iso, "end": end_iso
-    })
-    svy.setdefault("features", []).append(feat)
-    backup_survey(sid)
-    save_survey(sid, svy)
-
-    try:
-        log_event("point_saved", sid, {"pid": pid, "codice": codice, "rtk": rtk, "force": force})
-    except Exception:
-        pass
-
-    return {
-        "ok": True,
-        "pid": pid,
-        "rtk": rtk,
-        "redirect_url": f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}",
-        "savedname": name,
-        "savedcodice": codice,
-    }
-
-
-def _measurement_worker(sid: str, name: str, desc: str, codice: str, duration: float, interval: float, force: bool = False):
-    try:
-        result = _finalize_measurement(sid, name, desc, codice, duration, interval, force=force)
-        _measure_set(sid, phase="done", active=False, progress=100, message="Punto salvato.",
-                     finished_at=datetime.now().isoformat(timespec='seconds'), **result)
-    except Exception as e:
-        try:
-            log_event("point_failed", sid, {"reason": str(e)})
-        except Exception:
-            pass
-        _measure_set(sid, phase="error", active=False, progress=0,
-                     message=f"Errore durante la misura: {e}",
-                     finished_at=datetime.now().isoformat(timespec='seconds'))
-
 
 
 # ---------- List ----------
@@ -430,51 +207,6 @@ def survey_update_notes(sid):
 
 
 # ---------- Add point ----------
-@bp.route("/api/survey/<sid>/start_point", methods=["POST"])
-def survey_start_point(sid):
-    try:
-        load_survey(sid)
-    except FileNotFoundError:
-        return make_response(json.dumps({"ok": False, "error": "not_found"}), 404, {"Content-Type": "application/json"})
-
-    current = _measure_get(sid)
-    if current.get("phase") in ("sampling", "saving"):
-        return make_response(json.dumps({"ok": False, "error": "busy", "message": "Misura già in corso."}), 200, {"Content-Type": "application/json"})
-
-    name = sanitize_point_name(request.form.get("name", ""))
-    desc = (request.form.get("desc", "") or "").strip()[:300]
-    codice = (request.form.get("codice", "") or "").strip()[:20]
-    force = request.form.get("force", "0") == "1"
-    dur_form = request.form.get("dur", "").strip()
-    try:
-        duration = float(dur_form) if dur_form else 10.0
-    except Exception:
-        duration = 10.0
-    try:
-        interval = float(request.form.get("step", "").strip() or _default_interval(duration))
-    except Exception:
-        interval = _default_interval(duration)
-
-    pre = _precheck_measurement(force=force)
-    if not pre.get("ok"):
-        if pre.get("error") == "no_gnss_data":
-            try:
-                log_event("point_failed", sid, {"reason": "no_gnss_data"})
-            except Exception:
-                pass
-        return make_response(json.dumps(pre), 200, {"Content-Type": "application/json"})
-
-    _measure_set(sid, phase="queued", active=True, progress=0, message="Avvio misura…", name=name, codice=codice, duration_s=duration)
-    th = threading.Thread(target=_measurement_worker, args=(sid, name, desc, codice, duration, interval, force), daemon=True)
-    th.start()
-    return make_response(json.dumps({"ok": True, "started": True, "duration_s": duration, "interval_s": interval}), 200, {"Content-Type": "application/json"})
-
-
-@bp.route("/api/survey/<sid>/point_status")
-def survey_point_status(sid):
-    return make_response(json.dumps(_measure_get(sid)), 200, {"Content-Type": "application/json"})
-
-
 @bp.route("/survey/<sid>/point", methods=["GET", "POST"])
 def survey_point(sid):
     if request.method == "GET":
@@ -516,24 +248,181 @@ def survey_point(sid):
         except Exception:
             duration = 10.0
     try:
-        interval = float(request.args.get("step", _default_interval(duration)))
+        interval = float(request.args.get("step", 0.5))
     except Exception:
-        interval = _default_interval(duration)
+        interval = 0.5
 
-    pre = _precheck_measurement(force=force)
-    if not pre.get("ok"):
-        if pre.get("error") == "no_gnss_data":
+    # ---------- Pre-sampling GNSS checks ----------
+    if not force:
+        pre_snap = STATE.snapshot()
+        age = _tpv_age_seconds(pre_snap)
+
+        # Check for stale or missing GNSS data (>_GNSS_STALE_ERROR_S seconds)
+        if age is None or age > _GNSS_STALE_ERROR_S:
             try:
                 log_event("point_failed", sid, {"reason": "no_gnss_data"})
             except Exception:
                 pass
-        return make_response(json.dumps(pre), 200, {"Content-Type": "application/json"})
+            return make_response(json.dumps({
+                "ok": False,
+                "error": "no_gnss_data",
+                "message": "Nessun dato GNSS ricevuto. Verificare la connessione."
+            }), 200, {"Content-Type": "application/json"})
+
+        # Quality gate checks (only when GNSS data is fresh, i.e., age < _GNSS_STALE_WARN_S)
+        if age < _GNSS_STALE_WARN_S:
+            cfg = _settings.load_settings()
+            if cfg.get("rtk_quality_gate", True):
+                tpv_pre = pre_snap.get("TPV", {})
+                hp_pre = pre_snap.get("HPPOSLLH", {})
+                dop_pre = pre_snap.get("DOP", {})
+                warnings = []
+
+                rtk_val = tpv_pre.get("rtk", "none")
+                if rtk_val == "none":
+                    warnings.append(f"Nessun fix RTK (stato: {rtk_val})")
+
+                hacc = hp_pre.get("hAcc")
+                max_hacc = cfg.get("max_hacc", 0.05)
+                if hacc is not None and hacc > max_hacc:
+                    warnings.append(
+                        f"Precisione orizzontale elevata: {hacc:.3f} m (soglia: {max_hacc} m)"
+                    )
+
+                pdop = dop_pre.get("pdop")
+                max_pdop = cfg.get("max_pdop", 3.0)
+                if pdop is not None and pdop > max_pdop:
+                    warnings.append(f"PDOP elevato: {pdop:.2f} (soglia: {max_pdop})")
+
+                numsv = tpv_pre.get("numSV")
+                min_sv = cfg.get("min_sv", 8)
+                if numsv is not None and numsv < min_sv:
+                    warnings.append(f"Pochi satelliti: {numsv} (minimo: {min_sv})")
+
+                if warnings:
+                    return make_response(json.dumps({
+                        "ok": False,
+                        "quality_warning": True,
+                        "warnings": warnings
+                    }), 200, {"Content-Type": "application/json"})
+
+    start_ts = datetime.now()
+    samples = []
+    n_iters = max(1, int(duration / interval))
+    for _ in range(n_iters):
+        samples.append(STATE.snapshot())
+        time.sleep(interval)
+    end_ts = datetime.now()
+
+    def collect_key(group, key):
+        vals = []
+        for s in samples:
+            g = s.get(group, {})
+            v = g.get(key, None)
+            if isinstance(v, (int, float)):
+                vals.append(v)
+        return robust_avg(vals)
+
+    mode = int(round(collect_key("TPV", "mode") or 0))
+    rtk = samples[-1].get("TPV", {}).get("rtk", "-")
+    numSV = int(round(collect_key("TPV", "numSV") or 0))
+
+    lat = collect_key("HPPOSLLH", "lat") or collect_key("TPV", "lat")
+    lon = collect_key("HPPOSLLH", "lon") or collect_key("TPV", "lon")
+    altHAE = collect_key("HPPOSLLH", "altHAE")
+    altMSL = collect_key("HPPOSLLH", "altMSL") or collect_key("TPV", "altMSL")
+    hAcc = collect_key("HPPOSLLH", "hAcc") or collect_key("TPV", "hAcc")
+    vAcc = collect_key("HPPOSLLH", "vAcc") or collect_key("TPV", "vAcc")
+
+    X = collect_key("HPPOSECEF", "X")
+    Y = collect_key("HPPOSECEF", "Y")
+    Z = collect_key("HPPOSECEF", "Z")
+    pAcc = collect_key("HPPOSECEF", "pAcc")
+
+    gdop = collect_key("DOP", "gdop"); pdop = collect_key("DOP", "pdop")
+    hdop = collect_key("DOP", "hdop"); vdop = collect_key("DOP", "vdop")
+    ndop = collect_key("DOP", "ndop"); edop = collect_key("DOP", "edop")
+    tdop = collect_key("DOP", "tdop")
+
+    covNN = collect_key("COV", "covNN"); covEE = collect_key("COV", "covEE")
+    covDD = collect_key("COV", "covDD"); covNE = collect_key("COV", "covNE")
+    covND = collect_key("COV", "covND"); covED = collect_key("COV", "covED")
+
+    relN = collect_key("RELPOS", "N"); relE = collect_key("RELPOS", "E")
+    relD = collect_key("RELPOS", "D")
+    relsN = collect_key("RELPOS", "sN"); relsE = collect_key("RELPOS", "sE")
+    relsD = collect_key("RELPOS", "sD")
+    horiz = baseline = bearing = slope = None
+    if relN is not None and relE is not None and relD is not None:
+        horiz = math.hypot(relN, relE)
+        baseline = math.sqrt(horiz * horiz + relD * relD)
+        bearing = math.degrees(math.atan2(relE, relN))
+        bearing = bearing + 360 if bearing < 0 else bearing
+        slope = math.degrees(math.atan2(-relD, horiz)) if horiz else 0.0
+
+    # ---------- Sigma (std dev) of position samples ----------
+    def collect_vals(group, key):
+        vals = []
+        for s in samples:
+            g = s.get(group, {})
+            v = g.get(key, None)
+            if isinstance(v, (int, float)):
+                vals.append(v)
+        return vals
+
+    _lat_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lat"))
+    _lon_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lon"))
+    _alt_stats = robust_avg_stats(collect_vals("HPPOSLLH", "altHAE"))
+
+    _mean_lat_rad = math.radians(lat or 0.0)
+    sigma_N = None
+    sigma_E = None
+    sigma_U = None
+    n_kept = _alt_stats.get("n_kept", 0)
+    if _lat_stats.get("sigma") is not None:
+        sigma_N = _lat_stats["sigma"] * math.radians(1.0) * WGS84_A
+    if _lon_stats.get("sigma") is not None:
+        sigma_E = _lon_stats["sigma"] * math.radians(1.0) * WGS84_A * math.cos(_mean_lat_rad)
+    if _alt_stats.get("sigma") is not None:
+        sigma_U = _alt_stats["sigma"]
+
+    stats = {
+        "mode": mode, "rtk": rtk, "numSV": numSV,
+        "hAcc": hAcc, "vAcc": vAcc, "pAcc": pAcc,
+        "gdop": gdop, "pdop": pdop, "hdop": hdop, "vdop": vdop,
+        "ndop": ndop, "edop": edop, "tdop": tdop,
+        "covNN": covNN, "covEE": covEE, "covDD": covDD,
+        "covNE": covNE, "covND": covND, "covED": covED,
+        "relN": relN, "relE": relE, "relD": relD,
+        "relsN": relsN, "relsE": relsE, "relsD": relsD,
+        "baseline": baseline, "horiz": horiz, "bearing": bearing, "slope": slope,
+        "sigma_N": sigma_N, "sigma_E": sigma_E, "sigma_U": sigma_U, "n_kept": n_kept,
+    }
 
     try:
-        result = _finalize_measurement(sid, name, desc, codice, duration, interval, force=force)
+        svy = load_survey(sid)
     except FileNotFoundError:
         abort(404)
-    return _redirect(result["redirect_url"])
+    pid = next_point_id(svy)
+    start_iso = start_ts.isoformat(timespec='seconds')
+    end_iso = end_ts.isoformat(timespec='seconds')
+
+    feat = point_feature(
+        pid, lat, lon, altHAE, altMSL, X, Y, Z, stats,
+        {"name": name, "codice": codice, "desc": desc, "duration": duration,
+         "interval": interval, "n_samples": len(samples),
+         "start": start_iso, "end": end_iso}
+    )
+    svy.setdefault("features", []).append(feat)
+    backup_survey(sid)
+    save_survey(sid, svy)
+
+    try:
+        log_event("point_saved", sid, {"pid": pid, "codice": codice, "rtk": rtk})
+    except Exception:
+        pass
+
+    return _redirect(f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}")
 
 
 # ---------- Downloads ----------
