@@ -17,6 +17,7 @@ os.makedirs(SURVEY_DIR, exist_ok=True)
 
 SURVEY_LOCK = threading.Lock()
 SURVEY_EXT = ".geojson"
+MEDIA_DIRNAME = "media"
 
 
 # ---------- Helpers ----------
@@ -30,6 +31,22 @@ def sanitize_survey_id(s: str) -> str:
 
 def survey_path(sid: str) -> str:
     return os.path.join(SURVEY_DIR, f"{sid}{SURVEY_EXT}")
+
+
+def survey_media_dir(sid: str) -> str:
+    path = os.path.join(SURVEY_DIR, MEDIA_DIRNAME, sanitize_survey_id(sid))
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def survey_audio_dir(sid: str) -> str:
+    path = os.path.join(survey_media_dir(sid), "audio")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def survey_note_relpath(sid: str, filename: str) -> str:
+    return os.path.join(MEDIA_DIRNAME, sanitize_survey_id(sid), "audio", filename).replace('\\', '/')
 
 
 # ---------- CRUD ----------
@@ -86,10 +103,15 @@ def create_survey(title: str, desc: str) -> str:
 
 def delete_survey_file(sid: str) -> bool:
     path = survey_path(sid)
+    media_path = os.path.join(SURVEY_DIR, MEDIA_DIRNAME, sanitize_survey_id(sid))
+    removed = False
     if os.path.exists(path):
         os.remove(path)
-        return True
-    return False
+        removed = True
+    if os.path.isdir(media_path):
+        shutil.rmtree(media_path, ignore_errors=True)
+        removed = True
+    return removed
 
 
 def backup_survey(sid: str):

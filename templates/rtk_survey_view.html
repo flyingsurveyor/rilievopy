@@ -6,105 +6,158 @@
 {% block head %}
 <style>
 .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
-  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-  .card h1, .card h2, .card h3 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
-  .card h3 { font-size: 18px; }
-  button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
-  button:hover, .btn:hover { background: #2980b9; }
-  .btn-danger { background: #e74c3c; }
-  .btn-danger:hover { background: #c0392b; }
-  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
-  th { background: #ecf0f1; color: #2c3e50; font-weight: 600; text-align: left; }
-  th, td { border: 1px solid #ddd; padding: 10px; }
-  tr:nth-child(even) { background: #f9f9f9; }
-  tr:hover { background: #f1f1f1; }
-  textarea { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #333; font-size: 16px; }
-  .kv { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eee; }
-  .kv:last-child { border-bottom: none; }
-  .k { color: #666; }
-  .v { color: #333; }
-  input[type=checkbox] { margin-right: 5px; }
-  .btn-delete-point { background: none; border: none; cursor: pointer; font-size: 1.2em; opacity: 0.6; color: #e74c3c; }
-  .btn-delete-point:hover { opacity: 1; }
-  .danger-zone { margin-top: 40px; padding: 20px; border: 2px solid #e74c3c; border-radius: 8px; background-color: #ffe6e6; }
-  .danger-zone h3 { color: #e74c3c; margin-top: 0; border: none; }
-  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; }
-  .modal-content { background: white; padding: 24px; border-radius: 12px; max-width: 500px; max-height: 90vh; overflow-y: auto; color: #333; }
-  .modal-content h2 { margin-top: 0; color: #2c3e50; }
-  .modal-content h3 { font-size: 14px; margin: 12px 0 6px; color: #333; }
-  .radio-group, .checkbox-group { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-  .radio-group label, .checkbox-group label { padding: 10px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-  .radio-group label:hover, .checkbox-group label:hover { border-color: #3498db; background: #f0f9ff; }
-  .modal-buttons { display: flex; gap: 12px; margin-top: 16px; }
-  .progress-bar { width: 100%; height: 24px; background: #e0e0e0; border-radius: 12px; overflow: hidden; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg,#3498db,#2980b9); width: 0%; transition: width 0.3s ease; }
-  @media screen and (max-width: 768px) {
+.card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.card h1, .card h2, .card h3 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
+.card h3 { font-size: 18px; }
+button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
+button:hover, .btn:hover { background: #2980b9; }
+.btn-secondary { background: #95a5a6; }
+.btn-secondary:hover { background: #7f8c8d; }
+.btn-danger { background: #e74c3c; }
+.btn-danger:hover { background: #c0392b; }
+.btn-delete-point { background: none; border: none; cursor: pointer; font-size: 1.2em; opacity: 0.75; color: #e74c3c; margin: 0; padding: 2px 6px; }
+.btn-delete-point:hover { opacity: 1; background: transparent; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #ecf0f1; color: #2c3e50; font-weight: 600; text-align: left; }
+th, td { border: 1px solid #ddd; padding: 10px; }
+tr:nth-child(even) { background: #f9f9f9; }
+tr:hover { background: #f1f1f1; }
+textarea, input[type=text], select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #d4dde5; background: white; color: #333; font-size: 15px; box-sizing: border-box; }
+textarea { min-height: 92px; resize: vertical; }
+input[type=checkbox] { margin-right: 5px; }
+.actions-inline { display: flex; gap: 8px; flex-wrap: wrap; }
+.muted { color: #637381; font-size: 13px; }
+.badge-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.badge { background: #eef5fb; color: #2c3e50; border: 1px solid #d9e8f5; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
+.notes-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.notes-toolbar .filter-box { min-width: 220px; flex: 1 1 220px; }
+.note-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.note-col { border: 1px solid #e2eaf1; border-radius: 12px; padding: 14px; background: #fbfdff; }
+.note-col h4 { margin: 0 0 12px 0; color: #2c3e50; font-size: 16px; }
+.note-list { display: flex; flex-direction: column; gap: 12px; }
+.note-empty { color: #6d7b88; font-size: 14px; padding: 10px 2px; }
+.note-card { border: 1px solid #dfe8f0; border-radius: 12px; padding: 12px; background: #fff; }
+.note-card .top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.note-card .title { font-size: 15px; font-weight: 800; color: #2c3e50; }
+.note-card .meta { font-size: 12px; color: #5f6f7c; }
+.note-card .sub { font-size: 12px; color: #415365; margin-top: 6px; }
+.note-card .pill { display: inline-block; margin-right: 6px; margin-top: 6px; background: #f0f7ff; color: #244864; border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 700; }
+.note-card audio { width: 100%; margin-top: 10px; }
+.note-card .edit-box { margin-top: 10px; }
+.note-card .edit-box textarea { min-height: 82px; font-size: 14px; }
+.note-card .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.note-card .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.note-card .actions button { margin: 0; }
+.status-text { font-size: 13px; margin-top: 4px; }
+.status-ok { color: #0c7a43; }
+.status-err { color: #c0392b; }
+.danger-zone { margin-top: 40px; padding: 20px; border: 2px solid #e74c3c; border-radius: 12px; background-color: #fff1f1; }
+.danger-zone h3 { color: #e74c3c; margin-top: 0; border: none; }
+@media screen and (max-width: 980px) {
+  .note-columns { grid-template-columns: 1fr; }
+}
+@media screen and (max-width: 768px) {
   body { font-size: 14px; padding: 0; margin: 0; }
-  .container { padding: 5px; margin: 0; }
-  .card { padding: 12px; margin-bottom: 10px; }
-  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+  .container { padding: 6px; margin: 0; }
+  .card { padding: 14px; margin-bottom: 12px; }
+  button, .btn { min-height: 46px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
+  .actions-inline { flex-direction: column; }
   table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
   th, td { padding: 6px 8px; font-size: 12px; }
-  @media screen and (max-width: 480px) {
-  body { font-size: 13px; }
-  th, td { padding: 4px 6px; font-size: 11px; }
+  .note-card .row-2 { grid-template-columns: 1fr; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
-<div class="card">
-<h1>Rilievo: {{ title }}</h1>
-<form method="POST" action="/survey/{{ sid }}/notes">
-<label>Note generali</label>
-<textarea name="notes" rows="4" maxlength="1000" placeholder="tipo base, altezza base, altezza rover, ecc.">{{ notes|safe }}</textarea>
-<p style="margin-top:8px;">
-  <button class="btn" type="submit">💾 Salva note</button>
-  <a class="btn" href="/surveys">← Rilievi</a>
-  <a class="btn" href="/survey/{{ sid }}/point">➕ Nuovo punto</a>
-</p>
-</form>
-<p><b>Visualizza:</b>
-  <a class="btn" href="/survey/{{ sid }}/cad">📐 CAD</a>
-  <a class="btn" href="/survey/{{ sid }}/map">🗺 Mappa</a>
-</p>
-<p><b>Export:</b>
-  <a class="btn" href="/survey/{{ sid }}.geojson">GeoJSON</a>
-  <a class="btn" href="/survey/{{ sid }}.csv">CSV</a>
-  <a class="btn" href="/survey/{{ sid }}.dxf">DXF 3D</a>
-  <a class="btn" href="/survey/{{ sid }}_2d.dxf">DXF 2D</a>
-  <a class="btn" href="/survey/{{ sid }}.gpkg">GPKG</a>
-</p>
-<p><b>Topografia:</b>
-  <a class="btn" href="/cad">📐 CAD</a>
-  <a class="btn" href="/dtm">🔺 DTM</a>
-</p>
-<p><b>COGO:</b>
-  <a class="btn" href="/cogo">📐 Strumenti COGO</a>
-</p>
-</div>
+  <div class="card">
+    <h1>Rilievo: {{ title }}</h1>
+    <form method="POST" action="/survey/{{ sid }}/notes">
+      <label>Note generali</label>
+      <textarea name="notes" rows="4" maxlength="1000" placeholder="tipo base, altezza base, altezza rover, ecc.">{{ notes|safe }}</textarea>
+      <div class="actions-inline" style="margin-top:8px;">
+        <button class="btn" type="submit">💾 Salva note</button>
+        <a class="btn" href="/surveys">← Rilievi</a>
+        <a class="btn" href="/survey/{{ sid }}/point">➕ Nuovo punto</a>
+      </div>
+    </form>
+    <p><b>Visualizza:</b>
+      <a class="btn" href="/survey/{{ sid }}/cad">📐 CAD</a>
+      <a class="btn" href="/survey/{{ sid }}/map">🗺 Mappa</a>
+    </p>
+    <p><b>Export:</b>
+      <a class="btn" href="/survey/{{ sid }}.geojson">GeoJSON</a>
+      <a class="btn" href="/survey/{{ sid }}.csv">CSV</a>
+      <a class="btn" href="/survey/{{ sid }}.dxf">DXF 3D</a>
+      <a class="btn" href="/survey/{{ sid }}_2d.dxf">DXF 2D</a>
+      <a class="btn" href="/survey/{{ sid }}.gpkg">GPKG</a>
+    </p>
+    <p><b>Topografia:</b>
+      <a class="btn" href="/cad">📐 CAD</a>
+      <a class="btn" href="/dtm">🔺 DTM</a>
+    </p>
+    <p><b>COGO:</b>
+      <a class="btn" href="/cogo">📐 Strumenti COGO</a>
+    </p>
+    <div class="badge-row">
+      <div class="badge">Totale note vocali: {{ voice_note_counts.total }}</div>
+      <div class="badge">Punto salvate: {{ voice_note_counts.point }}</div>
+      <div class="badge">In attesa: {{ voice_note_counts.pending }}</div>
+      <div class="badge">Sessione: {{ voice_note_counts.session }}</div>
+    </div>
+  </div>
 
-<div class="card">
-<h3>Punti</h3>
-<table><thead>
-<tr>
-  <th>Sel</th><th>ID</th><th>Nome</th><th>Codice</th>
-  <th>Lat</th><th>Lon</th><th>HAE</th>
-  <th>PDOP</th><th>HDOP</th><th>VDOP</th>
-  <th>N</th><th>E</th><th>D</th><th>|baseline|</th>
-  <th>σN</th><th>σE</th><th>σU</th>
-  <th>TXT</th><th>🗑️</th>
-</tr></thead><tbody>
-{{ rows|safe }}
-</tbody></table>
-</div>
-<div class="card danger-zone">
-<h3>⚠️ Zona pericolosa</h3>
-<p>L'eliminazione del rilievo è irreversibile.</p>
-<button class="btn-danger" onclick="confirmDeleteSurvey('{{ sid }}', {{ num_points }})">
-  🗑️ Elimina rilievo
-</button>
-</div>
+  <div class="card">
+    <h3>Punti</h3>
+    <table><thead>
+      <tr>
+        <th>Sel</th><th>ID</th><th>Nome</th><th>Codice</th>
+        <th>Lat</th><th>Lon</th><th>HAE</th>
+        <th>PDOP</th><th>HDOP</th><th>VDOP</th>
+        <th>N</th><th>E</th><th>D</th><th>|baseline|</th>
+        <th>σN</th><th>σE</th><th>σU</th>
+        <th>TXT</th><th>🗑️</th>
+      </tr></thead><tbody>
+      {{ rows|safe }}
+    </tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>Note vocali del rilievo</h3>
+    <div class="notes-toolbar">
+      <div class="filter-box">
+        <label for="notes-point-filter" class="muted">Filtra note punto per ID/nome punto</label>
+        <select id="notes-point-filter">
+          <option value="">Tutti i punti</option>
+        </select>
+      </div>
+      <div class="actions-inline">
+        <button type="button" class="btn btn-secondary" onclick="refreshVoiceNotes()">↻ Aggiorna note</button>
+      </div>
+    </div>
+
+    <div class="note-columns">
+      <div class="note-col">
+        <h4>Note punto salvate</h4>
+        <div id="point-note-list" class="note-list"></div>
+      </div>
+      <div class="note-col">
+        <h4>Note punto in attesa</h4>
+        <div id="pending-note-list" class="note-list"></div>
+      </div>
+      <div class="note-col">
+        <h4>Note sessione</h4>
+        <div id="session-note-list" class="note-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card danger-zone">
+    <h3>⚠️ Zona pericolosa</h3>
+    <p>L'eliminazione del rilievo è irreversibile.</p>
+    <button class="btn-danger" onclick="confirmDeleteSurvey('{{ sid }}', {{ num_points }})">🗑️ Elimina rilievo</button>
+  </div>
 </div>
 {% endblock %}
 
@@ -112,10 +165,231 @@
 <script>
 const points = {{ points_json|safe }};
 const sid = "{{ sid }}";
+let sessionNotes = {{ voice_session_notes_json|safe }};
+let pendingNotes = {{ voice_pending_notes_json|safe }};
+let pointNotes = {{ voice_point_notes_json|safe }};
 
-// Funzione per confermare ed eliminare un punto
+const pointNoteList = document.getElementById('point-note-list');
+const pendingNoteList = document.getElementById('pending-note-list');
+const sessionNoteList = document.getElementById('session-note-list');
+const notesPointFilter = document.getElementById('notes-point-filter');
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function fmtDuration(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return n.toFixed(1).replace(/\.0$/, '') + ' s';
+}
+
+function noteTitle(note, type) {
+  if (type === 'session') return 'Nota sessione';
+  const ref = note.point_id || note.point_ref || '—';
+  const pointName = note.point_name ? (' • ' + note.point_name) : '';
+  return 'Nota punto ' + ref + pointName;
+}
+
+function buildPills(note) {
+  const snap = note.gnss_snapshot || {};
+  const pills = [];
+  const fix = snap.fix_type || '—';
+  pills.push(`<span class="pill">Fix ${escapeHtml(String(fix))}</span>`);
+  if (note.codice) pills.push(`<span class="pill">Cod ${escapeHtml(note.codice)}</span>`);
+  if (fmtDuration(note.duration_s)) pills.push(`<span class="pill">Durata ${escapeHtml(fmtDuration(note.duration_s))}</span>`);
+  if (typeof snap.hAcc === 'number') pills.push(`<span class="pill">hAcc ${snap.hAcc.toFixed(3)} m</span>`);
+  if (typeof snap.pdop === 'number') pills.push(`<span class="pill">PDOP ${snap.pdop.toFixed(2)}</span>`);
+  return pills.join('');
+}
+
+function buildMetaLine(note) {
+  const snap = note.gnss_snapshot || {};
+  const parts = [note.created || ''];
+  if (typeof snap.lat === 'number' && typeof snap.lon === 'number') {
+    parts.push(`${snap.lat.toFixed(8)}, ${snap.lon.toFixed(8)}`);
+  }
+  return parts.filter(Boolean).map(escapeHtml).join(' • ');
+}
+
+function createNoteCard(note, type) {
+  const card = document.createElement('div');
+  card.className = 'note-card';
+  card.dataset.noteId = note.id || '';
+  card.dataset.pointId = note.point_id || note.point_ref || '';
+  const isSession = type === 'session';
+  const pointNameValue = escapeHtml(note.point_name || '');
+  const codiceValue = escapeHtml(note.codice || '');
+  const noteTextValue = escapeHtml(note.note_text || '');
+  card.innerHTML = `
+    <div class="top">
+      <div class="title">${escapeHtml(noteTitle(note, type))}</div>
+      <div class="meta">${buildMetaLine(note)}</div>
+    </div>
+    <div class="sub">${buildPills(note)}</div>
+    <audio controls preload="none" src="${escapeHtml(note.audio_url || '')}"></audio>
+    <div class="edit-box">
+      ${isSession ? `
+        <div class="row-2">
+          <div>
+            <label class="muted">Riferimento libero</label>
+            <input type="text" class="js-point-name" maxlength="80" value="${pointNameValue}" placeholder="es. antenna, offset, base...">
+          </div>
+          <div>
+            <label class="muted">Codice</label>
+            <input type="text" class="js-codice" maxlength="20" value="${codiceValue}" placeholder="codice opzionale">
+          </div>
+        </div>` : ''}
+      <label class="muted">Testo nota</label>
+      <textarea class="js-note-text" maxlength="300" placeholder="Descrizione rapida della nota">${noteTextValue}</textarea>
+      <div class="status-text" id="status-${escapeHtml(note.id || '')}"></div>
+      <div class="actions">
+        <button type="button" class="btn" data-action="save">💾 Salva modifica</button>
+        <button type="button" class="btn-danger" data-action="delete">🗑️ Elimina</button>
+      </div>
+    </div>
+  `;
+  card.querySelector('[data-action="save"]').addEventListener('click', () => saveVoiceNote(card, type));
+  card.querySelector('[data-action="delete"]').addEventListener('click', () => deleteVoiceNote(card, type));
+  return card;
+}
+
+function renderNoteList(container, notes, type, emptyText) {
+  container.innerHTML = '';
+  if (!notes.length) {
+    const empty = document.createElement('div');
+    empty.className = 'note-empty';
+    empty.textContent = emptyText;
+    container.appendChild(empty);
+    return;
+  }
+  const filterVal = (notesPointFilter.value || '').trim();
+  const filtered = (type === 'session') ? notes : notes.filter(n => {
+    if (!filterVal) return true;
+    const pid = (n.point_id || n.point_ref || '').trim();
+    return pid === filterVal;
+  });
+  if (!filtered.length) {
+    const empty = document.createElement('div');
+    empty.className = 'note-empty';
+    empty.textContent = 'Nessuna nota per il filtro selezionato.';
+    container.appendChild(empty);
+    return;
+  }
+  filtered.slice().reverse().forEach(note => container.appendChild(createNoteCard(note, type)));
+}
+
+function renderAllVoiceNotes() {
+  renderNoteList(pointNoteList, pointNotes, 'point', 'Nessuna nota già agganciata ai punti.');
+  renderNoteList(pendingNoteList, pendingNotes, 'pending', 'Nessuna nota punto in attesa di salvataggio punto.');
+  renderNoteList(sessionNoteList, sessionNotes, 'session', 'Nessuna nota sessione.');
+}
+
+function populatePointFilter() {
+  const current = notesPointFilter.value || '';
+  const used = new Map();
+  points.forEach(p => used.set(p.id, p.name || ''));
+  pendingNotes.forEach(n => {
+    const key = n.point_ref || n.point_id || '';
+    if (key && !used.has(key)) used.set(key, n.point_name || '');
+  });
+  pointNotes.forEach(n => {
+    const key = n.point_id || n.point_ref || '';
+    if (key && !used.has(key)) used.set(key, n.point_name || '');
+  });
+
+  notesPointFilter.innerHTML = '<option value="">Tutti i punti</option>';
+  Array.from(used.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, {numeric: true})).forEach(([id, name]) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = name ? `${id} — ${name}` : id;
+    notesPointFilter.appendChild(opt);
+  });
+  notesPointFilter.value = current && used.has(current) ? current : '';
+}
+
+function setStatus(card, text, cls='') {
+  const el = card.querySelector('.status-text');
+  if (!el) return;
+  el.className = 'status-text ' + cls;
+  el.textContent = text || '';
+}
+
+async function saveVoiceNote(card, type) {
+  const noteId = card.dataset.noteId;
+  if (!noteId) return;
+  const fd = new FormData();
+  fd.append('note_text', card.querySelector('.js-note-text')?.value || '');
+  if (type === 'session') {
+    fd.append('point_name', card.querySelector('.js-point-name')?.value || '');
+    fd.append('codice', card.querySelector('.js-codice')?.value || '');
+  }
+  setStatus(card, 'Salvataggio...', '');
+  try {
+    const resp = await fetch(`/api/survey/${encodeURIComponent(sid)}/voice-note/${encodeURIComponent(noteId)}`, { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error(data.message || data.error || 'Errore salvataggio');
+    replaceNoteInState(data.note, type);
+    setStatus(card, 'Modifica salvata.', 'status-ok');
+    renderAllVoiceNotes();
+  } catch (err) {
+    setStatus(card, String(err), 'status-err');
+  }
+}
+
+async function deleteVoiceNote(card, type) {
+  const noteId = card.dataset.noteId;
+  if (!noteId) return;
+  if (!confirm('Eliminare questa nota vocale? Verrà rimosso anche il file audio.')) return;
+  setStatus(card, 'Eliminazione...', '');
+  try {
+    const resp = await fetch(`/api/survey/${encodeURIComponent(sid)}/voice-note/${encodeURIComponent(noteId)}/delete`, { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error(data.message || data.error || 'Errore eliminazione');
+    removeNoteFromState(noteId, type);
+    populatePointFilter();
+    renderAllVoiceNotes();
+  } catch (err) {
+    setStatus(card, String(err), 'status-err');
+  }
+}
+
+function replaceNoteInState(note, type) {
+  const target = type === 'session' ? sessionNotes : (type === 'pending' ? pendingNotes : pointNotes);
+  const idx = target.findIndex(n => n.id === note.id);
+  if (idx >= 0) target[idx] = note;
+}
+
+function removeNoteFromState(noteId, type) {
+  if (type === 'session') sessionNotes = sessionNotes.filter(n => n.id !== noteId);
+  else if (type === 'pending') pendingNotes = pendingNotes.filter(n => n.id !== noteId);
+  else pointNotes = pointNotes.filter(n => n.id !== noteId);
+}
+
+async function refreshVoiceNotes() {
+  try {
+    const resp = await fetch(`/api/survey/${encodeURIComponent(sid)}/voice-notes`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error(data.message || 'Errore aggiornamento note');
+    sessionNotes = data.session_notes || [];
+    pendingNotes = data.pending_notes || [];
+    pointNotes = data.point_notes || [];
+    populatePointFilter();
+    renderAllVoiceNotes();
+  } catch (err) {
+    alert('Errore aggiornamento note: ' + err);
+  }
+}
+
+notesPointFilter.addEventListener('change', renderAllVoiceNotes);
+
 function confirmDeletePoint(sid, pointIndex, pointName) {
-  if (confirm(`Vuoi eliminare il punto "${pointName}"?`)) {
+  if (confirm(`Vuoi eliminare il punto "${pointName}"? Le sue note vocali verranno eliminate insieme al punto.`)) {
     fetch(`/survey/${sid}/point/${pointIndex}/delete`, {method: 'POST'})
       .then(response => response.json())
       .then(data => {
@@ -131,22 +405,20 @@ function confirmDeletePoint(sid, pointIndex, pointName) {
   }
 }
 
-// Funzione per confermare ed eliminare l'intero rilievo
 function confirmDeleteSurvey(sid, numPoints) {
   const msg = `ATTENZIONE!\n\nStai per eliminare il rilievo "${sid}" con ${numPoints} punti.\n\nQuesta azione è IRREVERSIBILE.\n\nScrivi "ELIMINA" per confermare:`;
   const confirmation = prompt(msg);
-  
-  if (confirmation === "ELIMINA") {
+  if (confirmation === 'ELIMINA') {
     fetch(`/survey/${sid}/delete`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({confirmation: "ELIMINA"})
+      body: JSON.stringify({confirmation: 'ELIMINA'})
     })
     .then(response => response.json())
     .then(data => {
       if (data.success) {
         alert('Rilievo eliminato');
-        window.location.href = '/';  // Torna alla home
+        window.location.href = '/';
       } else {
         alert('Errore: ' + data.error);
       }
@@ -159,6 +431,7 @@ function confirmDeleteSurvey(sid, numPoints) {
   }
 }
 
-
+populatePointFilter();
+renderAllVoiceNotes();
 </script>
 {% endblock %}

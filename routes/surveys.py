@@ -7,10 +7,10 @@ import json
 import math
 import os
 import time
-import threading
 from datetime import datetime
+from uuid import uuid4
 
-from flask import Blueprint, abort, make_response, render_template, request, send_from_directory
+from flask import Blueprint, abort, make_response, render_template, request, send_from_directory, jsonify
 
 from modules.state import STATE
 from modules.utils import sanitize_point_name, robust_avg, robust_avg_stats
@@ -18,7 +18,7 @@ from modules.survey import (
     list_survey_ids, load_survey, save_survey, create_survey,
     delete_survey_file, next_point_id, point_feature,
     flatten_point_for_csv, CSV_HEADER, SURVEY_DIR, survey_path, point_from_feature,
-    backup_survey
+    backup_survey, survey_audio_dir
 )
 from modules.exports import (
     build_dxf_advanced, export_geopackage, format_point_txt
@@ -42,6 +42,167 @@ def _redirect(url: str):
     return r
 
 
+def _json_response(payload, status=200):
+    return make_response(json.dumps(payload, ensure_ascii=False), status, {"Content-Type": "application/json; charset=utf-8"})
+
+
+def _safe_note_filename(note_id: str, point_ref: str, kind: str, ext: str = ".webm") -> str:
+    point_ref = sanitize_point_name(point_ref or kind or "nota")[:20] or kind
+    ext = (ext or ".webm").lower()
+    if not ext.startswith('.'):
+        ext = '.' + ext
+    allowed = {'.webm', '.wav', '.ogg', '.m4a', '.mp4', '.aac'}
+    if ext not in allowed:
+        ext = '.webm'
+    return f"{note_id}_{point_ref}{ext}"
+
+
+def _survey_note_sections(svy: dict):
+    props = svy.setdefault("properties", {})
+    return (
+        props.setdefault("voice_notes_session", []),
+        props.setdefault("voice_notes_pending", []),
+    )
+
+
+def _build_voice_note_meta(sid: str, *, kind: str, point_ref: str = "", point_name: str = "", codice: str = "",
+                           note_text: str = "", duration_s=None, mime: str = "audio/webm",
+                           filename: str = "", file_size: int = 0, snap: dict | None = None) -> dict:
+    snap = snap or {}
+    hp = snap.get("HPPOSLLH", {})
+    tpv = snap.get("TPV", {})
+    dop = snap.get("DOP", {})
+    note_id = datetime.now().strftime("vn_%Y%m%d_%H%M%S_") + uuid4().hex[:8]
+    return {
+        "id": note_id,
+        "kind": kind,
+        "survey_id": sid,
+        "point_ref": point_ref or "",
+        "point_name": point_name or point_ref or "",
+        "codice": codice or "",
+        "note_text": (note_text or "").strip()[:300],
+        "created": datetime.now().isoformat(timespec='seconds'),
+        "audio_file": filename,
+        "audio_mime": mime or "audio/webm",
+        "file_size": int(file_size or 0),
+        "duration_s": float(duration_s) if duration_s not in (None, "") else None,
+        "transcript": "",
+        "transcript_status": "pending",
+        "gnss_snapshot": {
+            "fix_type": tpv.get("rtk", "none"),
+            "mode": tpv.get("mode"),
+            "numSV": tpv.get("numSV"),
+            "time": tpv.get("time"),
+            "lat": hp.get("lat", tpv.get("lat")),
+            "lon": hp.get("lon", tpv.get("lon")),
+            "altHAE": hp.get("altHAE"),
+            "altMSL": hp.get("altMSL", tpv.get("altMSL")),
+            "hAcc": hp.get("hAcc", tpv.get("hAcc")),
+            "vAcc": hp.get("vAcc", tpv.get("vAcc")),
+            "pdop": dop.get("pdop"),
+            "hdop": dop.get("hdop"),
+            "vdop": dop.get("vdop"),
+        },
+    }
+
+
+def _note_audio_abspath(note: dict) -> str | None:
+    fn = os.path.basename(note.get("audio_file") or "")
+    sid = note.get("survey_id")
+    if not fn or not sid:
+        return None
+    return os.path.join(survey_audio_dir(sid), fn)
+
+
+def _iter_voice_notes(svy: dict):
+    session_notes, pending_notes = _survey_note_sections(svy)
+    for note in session_notes:
+        yield note, session_notes
+    for note in pending_notes:
+        yield note, pending_notes
+    for feat in svy.get("features", []):
+        notes = feat.get("properties", {}).get("voice_notes", [])
+        for note in notes:
+            yield note, notes
+
+
+def _find_voice_note(svy: dict, note_id: str):
+    for note, container in _iter_voice_notes(svy):
+        if note.get("id") == note_id:
+            return note, container
+    return None, None
+
+
+def _attach_pending_notes_to_feature(svy: dict, feat: dict, pid: str):
+    _, pending_notes = _survey_note_sections(svy)
+    matched = []
+    remaining = []
+    for note in pending_notes:
+        if note.get("point_ref") == pid:
+            note["point_id"] = pid
+            matched.append(note)
+        else:
+            remaining.append(note)
+    if matched:
+        feat.setdefault("properties", {}).setdefault("voice_notes", []).extend(matched)
+    svy.setdefault("properties", {})["voice_notes_pending"] = remaining
+
+
+def _note_public_payload(note: dict, point_id: str = "") -> dict:
+    payload = {
+        "id": note.get("id"),
+        "kind": note.get("kind"),
+        "point_ref": note.get("point_ref"),
+        "point_id": note.get("point_id") or point_id or note.get("point_ref"),
+        "point_name": note.get("point_name"),
+        "codice": note.get("codice"),
+        "note_text": note.get("note_text"),
+        "created": note.get("created"),
+        "duration_s": note.get("duration_s"),
+        "transcript": note.get("transcript", ""),
+        "transcript_status": note.get("transcript_status"),
+        "file_size": note.get("file_size"),
+        "gnss_snapshot": note.get("gnss_snapshot", {}),
+    }
+    if note.get("id") and note.get("survey_id"):
+        payload["audio_url"] = f"/survey/{note['survey_id']}/voice-note/{note['id']}/audio"
+    return payload
+
+
+def _collect_voice_notes_for_view(svy: dict):
+    props = svy.setdefault("properties", {})
+    session_notes = [_note_public_payload(n) for n in props.get("voice_notes_session", [])]
+    pending_notes = [_note_public_payload(n) for n in props.get("voice_notes_pending", [])]
+    point_notes = []
+    for feat in svy.get("features", []):
+        pid = feat.get("id", "")
+        point_name = feat.get("properties", {}).get("name", pid)
+        codice = feat.get("properties", {}).get("codice", "")
+        for note in feat.get("properties", {}).get("voice_notes", []):
+            payload = _note_public_payload(note, point_id=pid)
+            payload["point_ref"] = payload.get("point_ref") or pid
+            payload["point_name"] = payload.get("point_name") or point_name
+            payload["codice"] = payload.get("codice") or codice
+            point_notes.append(payload)
+
+    def _created_key(item):
+        return item.get("created") or ""
+
+    session_notes.sort(key=_created_key)
+    pending_notes.sort(key=_created_key)
+    point_notes.sort(key=_created_key)
+    return session_notes, pending_notes, point_notes
+
+
+def _delete_note_audio_file(note: dict):
+    abspath = _note_audio_abspath(note)
+    if abspath and os.path.isfile(abspath):
+        try:
+            os.remove(abspath)
+        except Exception:
+            pass
+
+
 def _tpv_age_seconds(snap: dict):
     """Return age of TPV data in seconds, or None if no timestamp."""
     tpv = snap.get("TPV", {})
@@ -53,228 +214,6 @@ def _tpv_age_seconds(snap: dict):
         return (datetime.now() - ts).total_seconds()
     except Exception:
         return None
-
-
-_MEASURE_LOCK = threading.Lock()
-_MEASURE_STATE = {}
-
-
-def _measure_get(sid: str):
-    with _MEASURE_LOCK:
-        st = dict(_MEASURE_STATE.get(sid, {}))
-    if not st:
-        return {"active": False, "phase": "idle", "progress": 0, "sid": sid}
-    st.setdefault("sid", sid)
-    st.setdefault("active", st.get("phase") in ("sampling", "saving"))
-    st.setdefault("progress", 0)
-    return st
-
-
-def _measure_set(sid: str, **kwargs):
-    with _MEASURE_LOCK:
-        cur = dict(_MEASURE_STATE.get(sid, {}))
-        cur.update(kwargs)
-        _MEASURE_STATE[sid] = cur
-        return dict(cur)
-
-
-def _default_interval(duration: float) -> float:
-    try:
-        d = float(duration)
-    except Exception:
-        d = 10.0
-    return 0.25 if d <= 2.0 else 0.5
-
-
-def _collect_key(samples, group, key):
-    vals = []
-    for s in samples:
-        g = s.get(group, {})
-        v = g.get(key, None)
-        if isinstance(v, (int, float)):
-            vals.append(v)
-    return robust_avg(vals)
-
-
-def _collect_vals(samples, group, key):
-    vals = []
-    for s in samples:
-        g = s.get(group, {})
-        v = g.get(key, None)
-        if isinstance(v, (int, float)):
-            vals.append(v)
-    return vals
-
-
-def _precheck_measurement(force: bool = False):
-    if force:
-        return {"ok": True}
-    pre_snap = STATE.snapshot()
-    age = _tpv_age_seconds(pre_snap)
-    if age is None or age > _GNSS_STALE_ERROR_S:
-        return {
-            "ok": False,
-            "error": "no_gnss_data",
-            "message": "Nessun dato GNSS ricevuto. Verificare la connessione."
-        }
-    if age < _GNSS_STALE_WARN_S:
-        cfg = _settings.load_settings()
-        if cfg.get("rtk_quality_gate", True):
-            tpv_pre = pre_snap.get("TPV", {})
-            hp_pre = pre_snap.get("HPPOSLLH", {})
-            dop_pre = pre_snap.get("DOP", {})
-            warnings = []
-
-            rtk_val = tpv_pre.get("rtk", "none")
-            if rtk_val == "none":
-                warnings.append(f"Nessun fix RTK (stato: {rtk_val})")
-
-            hacc = hp_pre.get("hAcc")
-            max_hacc = cfg.get("max_hacc", 0.05)
-            if hacc is not None and hacc > max_hacc:
-                warnings.append(f"Precisione orizzontale elevata: {hacc:.3f} m (soglia: {max_hacc} m)")
-
-            pdop = dop_pre.get("pdop")
-            max_pdop = cfg.get("max_pdop", 3.0)
-            if pdop is not None and pdop > max_pdop:
-                warnings.append(f"PDOP elevato: {pdop:.2f} (soglia: {max_pdop})")
-
-            numsv = tpv_pre.get("numSV")
-            min_sv = cfg.get("min_sv", 8)
-            if numsv is not None and numsv < min_sv:
-                warnings.append(f"Pochi satelliti: {numsv} (minimo: {min_sv})")
-
-            if warnings:
-                return {"ok": False, "quality_warning": True, "warnings": warnings}
-    return {"ok": True}
-
-
-def _finalize_measurement(sid: str, name: str, desc: str, codice: str, duration: float, interval: float, force: bool = False):
-    start_ts = datetime.now()
-    samples = []
-    n_iters = max(1, int(round(duration / interval)))
-    _measure_set(sid, phase="sampling", active=True, progress=0, message="Misura in corso…",
-                 duration_s=duration, interval_s=interval, started_at=start_ts.isoformat(timespec='seconds'))
-
-    for idx in range(n_iters):
-        samples.append(STATE.snapshot())
-        progress = int(round(((idx + 1) / max(1, n_iters)) * 100))
-        elapsed = min(duration, (idx + 1) * interval)
-        _measure_set(sid, phase="sampling", active=True, progress=progress, elapsed_s=round(elapsed, 2),
-                     samples=len(samples), message="Misura in corso…")
-        if idx < n_iters - 1:
-            time.sleep(interval)
-
-    end_ts = datetime.now()
-    _measure_set(sid, phase="saving", active=True, progress=100, elapsed_s=round(duration, 2),
-                 message="Elaborazione e salvataggio…")
-
-    mode = int(round(_collect_key(samples, "TPV", "mode") or 0))
-    rtk = samples[-1].get("TPV", {}).get("rtk", "-") if samples else "-"
-    numSV = int(round(_collect_key(samples, "TPV", "numSV") or 0))
-
-    lat = _collect_key(samples, "HPPOSLLH", "lat") or _collect_key(samples, "TPV", "lat")
-    lon = _collect_key(samples, "HPPOSLLH", "lon") or _collect_key(samples, "TPV", "lon")
-    altHAE = _collect_key(samples, "HPPOSLLH", "altHAE")
-    altMSL = _collect_key(samples, "HPPOSLLH", "altMSL") or _collect_key(samples, "TPV", "altMSL")
-    hAcc = _collect_key(samples, "HPPOSLLH", "hAcc") or _collect_key(samples, "TPV", "hAcc")
-    vAcc = _collect_key(samples, "HPPOSLLH", "vAcc") or _collect_key(samples, "TPV", "vAcc")
-
-    X = _collect_key(samples, "HPPOSECEF", "X")
-    Y = _collect_key(samples, "HPPOSECEF", "Y")
-    Z = _collect_key(samples, "HPPOSECEF", "Z")
-    pAcc = _collect_key(samples, "HPPOSECEF", "pAcc")
-
-    gdop = _collect_key(samples, "DOP", "gdop"); pdop = _collect_key(samples, "DOP", "pdop")
-    hdop = _collect_key(samples, "DOP", "hdop"); vdop = _collect_key(samples, "DOP", "vdop")
-    ndop = _collect_key(samples, "DOP", "ndop"); edop = _collect_key(samples, "DOP", "edop")
-    tdop = _collect_key(samples, "DOP", "tdop")
-
-    covNN = _collect_key(samples, "COV", "covNN"); covEE = _collect_key(samples, "COV", "covEE")
-    covDD = _collect_key(samples, "COV", "covDD"); covNE = _collect_key(samples, "COV", "covNE")
-    covND = _collect_key(samples, "COV", "covND"); covED = _collect_key(samples, "COV", "covED")
-
-    relN = _collect_key(samples, "RELPOS", "N"); relE = _collect_key(samples, "RELPOS", "E")
-    relD = _collect_key(samples, "RELPOS", "D")
-    relsN = _collect_key(samples, "RELPOS", "sN"); relsE = _collect_key(samples, "RELPOS", "sE")
-    relsD = _collect_key(samples, "RELPOS", "sD")
-    horiz = baseline = bearing = slope = None
-    if relN is not None and relE is not None and relD is not None:
-        horiz = math.hypot(relN, relE)
-        baseline = math.sqrt(horiz * horiz + relD * relD)
-        bearing = math.degrees(math.atan2(relE, relN))
-        bearing = bearing + 360 if bearing < 0 else bearing
-        slope = math.degrees(math.atan2(-relD, horiz)) if horiz else 0.0
-
-    _lat_stats = robust_avg_stats(_collect_vals(samples, "HPPOSLLH", "lat"))
-    _lon_stats = robust_avg_stats(_collect_vals(samples, "HPPOSLLH", "lon"))
-    _alt_stats = robust_avg_stats(_collect_vals(samples, "HPPOSLLH", "altHAE"))
-
-    _mean_lat_rad = math.radians(lat or 0.0)
-    sigma_N = sigma_E = sigma_U = None
-    n_kept = _alt_stats.get("n_kept", 0)
-    if _lat_stats.get("sigma") is not None:
-        sigma_N = _lat_stats["sigma"] * math.radians(1.0) * WGS84_A
-    if _lon_stats.get("sigma") is not None:
-        sigma_E = _lon_stats["sigma"] * math.radians(1.0) * WGS84_A * math.cos(_mean_lat_rad)
-    if _alt_stats.get("sigma") is not None:
-        sigma_U = _alt_stats["sigma"]
-
-    stats = {
-        "mode": mode, "rtk": rtk, "numSV": numSV,
-        "hAcc": hAcc, "vAcc": vAcc, "pAcc": pAcc,
-        "gdop": gdop, "pdop": pdop, "hdop": hdop, "vdop": vdop,
-        "ndop": ndop, "edop": edop, "tdop": tdop,
-        "covNN": covNN, "covEE": covEE, "covDD": covDD,
-        "covNE": covNE, "covND": covND, "covED": covED,
-        "relN": relN, "relE": relE, "relD": relD,
-        "relsN": relsN, "relsE": relsE, "relsD": relsD,
-        "baseline": baseline, "horiz": horiz, "bearing": bearing, "slope": slope,
-        "sigma_N": sigma_N, "sigma_E": sigma_E, "sigma_U": sigma_U, "n_kept": n_kept,
-    }
-
-    svy = load_survey(sid)
-    pid = next_point_id(svy)
-    start_iso = start_ts.isoformat(timespec='seconds')
-    end_iso = end_ts.isoformat(timespec='seconds')
-
-    feat = point_feature(pid, lat, lon, altHAE, altMSL, X, Y, Z, stats, {
-        "name": name, "codice": codice, "desc": desc, "duration": duration,
-        "interval": interval, "n_samples": len(samples), "start": start_iso, "end": end_iso
-    })
-    svy.setdefault("features", []).append(feat)
-    backup_survey(sid)
-    save_survey(sid, svy)
-
-    try:
-        log_event("point_saved", sid, {"pid": pid, "codice": codice, "rtk": rtk, "force": force})
-    except Exception:
-        pass
-
-    return {
-        "ok": True,
-        "pid": pid,
-        "rtk": rtk,
-        "redirect_url": f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}",
-        "savedname": name,
-        "savedcodice": codice,
-    }
-
-
-def _measurement_worker(sid: str, name: str, desc: str, codice: str, duration: float, interval: float, force: bool = False):
-    try:
-        result = _finalize_measurement(sid, name, desc, codice, duration, interval, force=force)
-        _measure_set(sid, phase="done", active=False, progress=100, message="Punto salvato.",
-                     finished_at=datetime.now().isoformat(timespec='seconds'), **result)
-    except Exception as e:
-        try:
-            log_event("point_failed", sid, {"reason": str(e)})
-        except Exception:
-            pass
-        _measure_set(sid, phase="error", active=False, progress=0,
-                     message=f"Errore durante la misura: {e}",
-                     finished_at=datetime.now().isoformat(timespec='seconds'))
-
 
 
 # ---------- List ----------
@@ -406,6 +345,13 @@ def survey_view(sid):
         )
     num_points = len(rows)
     num_columns = 19
+    session_notes, pending_notes, point_notes = _collect_voice_notes_for_view(svy)
+    note_counts = {
+        "session": len(session_notes),
+        "pending": len(pending_notes),
+        "point": len(point_notes),
+        "total": len(session_notes) + len(pending_notes) + len(point_notes),
+    }
     return render_template('rtk_survey_view.html',
                            sid=props.get("id", sid),
                            title=props.get("title", sid),
@@ -413,7 +359,11 @@ def survey_view(sid):
                            rows="\n".join(rows) or f"<tr><td colspan='{num_columns}'>(nessun punto)</td></tr>",
                            points_json=json.dumps(points_for_json),
                            num_points=str(num_points),
-                           active_sid=active_sid)
+                           active_sid=active_sid,
+                           voice_session_notes_json=json.dumps(session_notes),
+                           voice_pending_notes_json=json.dumps(pending_notes),
+                           voice_point_notes_json=json.dumps(point_notes),
+                           voice_note_counts=note_counts)
 
 
 # ---------- Update notes ----------
@@ -430,51 +380,6 @@ def survey_update_notes(sid):
 
 
 # ---------- Add point ----------
-@bp.route("/api/survey/<sid>/start_point", methods=["POST"])
-def survey_start_point(sid):
-    try:
-        load_survey(sid)
-    except FileNotFoundError:
-        return make_response(json.dumps({"ok": False, "error": "not_found"}), 404, {"Content-Type": "application/json"})
-
-    current = _measure_get(sid)
-    if current.get("phase") in ("sampling", "saving"):
-        return make_response(json.dumps({"ok": False, "error": "busy", "message": "Misura già in corso."}), 200, {"Content-Type": "application/json"})
-
-    name = sanitize_point_name(request.form.get("name", ""))
-    desc = (request.form.get("desc", "") or "").strip()[:300]
-    codice = (request.form.get("codice", "") or "").strip()[:20]
-    force = request.form.get("force", "0") == "1"
-    dur_form = request.form.get("dur", "").strip()
-    try:
-        duration = float(dur_form) if dur_form else 10.0
-    except Exception:
-        duration = 10.0
-    try:
-        interval = float(request.form.get("step", "").strip() or _default_interval(duration))
-    except Exception:
-        interval = _default_interval(duration)
-
-    pre = _precheck_measurement(force=force)
-    if not pre.get("ok"):
-        if pre.get("error") == "no_gnss_data":
-            try:
-                log_event("point_failed", sid, {"reason": "no_gnss_data"})
-            except Exception:
-                pass
-        return make_response(json.dumps(pre), 200, {"Content-Type": "application/json"})
-
-    _measure_set(sid, phase="queued", active=True, progress=0, message="Avvio misura…", name=name, codice=codice, duration_s=duration)
-    th = threading.Thread(target=_measurement_worker, args=(sid, name, desc, codice, duration, interval, force), daemon=True)
-    th.start()
-    return make_response(json.dumps({"ok": True, "started": True, "duration_s": duration, "interval_s": interval}), 200, {"Content-Type": "application/json"})
-
-
-@bp.route("/api/survey/<sid>/point_status")
-def survey_point_status(sid):
-    return make_response(json.dumps(_measure_get(sid)), 200, {"Content-Type": "application/json"})
-
-
 @bp.route("/survey/<sid>/point", methods=["GET", "POST"])
 def survey_point(sid):
     if request.method == "GET":
@@ -489,6 +394,9 @@ def survey_point(sid):
         saved = request.args.get("saved", "")
         savedname = request.args.get("savedname", "")
         savedcodice = request.args.get("savedcodice", "")
+        props = svy.setdefault("properties", {})
+        session_notes = [_note_public_payload(n) for n in props.get("voice_notes_session", [])[-8:]][::-1]
+        pending_notes = [_note_public_payload(n) for n in props.get("voice_notes_pending", []) if n.get("point_ref") == next_pid][-8:][::-1]
         return render_template('rtk_survey_point_form.html',
                                sid=sid,
                                next_pid=next_pid,
@@ -497,7 +405,9 @@ def survey_point(sid):
                                codici_json=json.dumps(codici_data),
                                saved=saved,
                                savedname=savedname,
-                               savedcodice=savedcodice)
+                               savedcodice=savedcodice,
+                               pending_notes_json=json.dumps(pending_notes),
+                               session_notes_json=json.dumps(session_notes))
 
     name = sanitize_point_name(request.form.get("name", ""))
     desc = (request.form.get("desc", "") or "").strip()[:300]
@@ -516,24 +426,316 @@ def survey_point(sid):
         except Exception:
             duration = 10.0
     try:
-        interval = float(request.args.get("step", _default_interval(duration)))
+        interval = float(request.args.get("step", 0.5))
     except Exception:
-        interval = _default_interval(duration)
+        interval = 0.5
 
-    pre = _precheck_measurement(force=force)
-    if not pre.get("ok"):
-        if pre.get("error") == "no_gnss_data":
+    # ---------- Pre-sampling GNSS checks ----------
+    if not force:
+        pre_snap = STATE.snapshot()
+        age = _tpv_age_seconds(pre_snap)
+
+        # Check for stale or missing GNSS data (>_GNSS_STALE_ERROR_S seconds)
+        if age is None or age > _GNSS_STALE_ERROR_S:
             try:
                 log_event("point_failed", sid, {"reason": "no_gnss_data"})
             except Exception:
                 pass
-        return make_response(json.dumps(pre), 200, {"Content-Type": "application/json"})
+            return make_response(json.dumps({
+                "ok": False,
+                "error": "no_gnss_data",
+                "message": "Nessun dato GNSS ricevuto. Verificare la connessione."
+            }), 200, {"Content-Type": "application/json"})
+
+        # Quality gate checks (only when GNSS data is fresh, i.e., age < _GNSS_STALE_WARN_S)
+        if age < _GNSS_STALE_WARN_S:
+            cfg = _settings.load_settings()
+            if cfg.get("rtk_quality_gate", True):
+                tpv_pre = pre_snap.get("TPV", {})
+                hp_pre = pre_snap.get("HPPOSLLH", {})
+                dop_pre = pre_snap.get("DOP", {})
+                warnings = []
+
+                rtk_val = tpv_pre.get("rtk", "none")
+                if rtk_val == "none":
+                    warnings.append(f"Nessun fix RTK (stato: {rtk_val})")
+
+                hacc = hp_pre.get("hAcc")
+                max_hacc = cfg.get("max_hacc", 0.05)
+                if hacc is not None and hacc > max_hacc:
+                    warnings.append(
+                        f"Precisione orizzontale elevata: {hacc:.3f} m (soglia: {max_hacc} m)"
+                    )
+
+                pdop = dop_pre.get("pdop")
+                max_pdop = cfg.get("max_pdop", 3.0)
+                if pdop is not None and pdop > max_pdop:
+                    warnings.append(f"PDOP elevato: {pdop:.2f} (soglia: {max_pdop})")
+
+                numsv = tpv_pre.get("numSV")
+                min_sv = cfg.get("min_sv", 8)
+                if numsv is not None and numsv < min_sv:
+                    warnings.append(f"Pochi satelliti: {numsv} (minimo: {min_sv})")
+
+                if warnings:
+                    return make_response(json.dumps({
+                        "ok": False,
+                        "quality_warning": True,
+                        "warnings": warnings
+                    }), 200, {"Content-Type": "application/json"})
+
+    start_ts = datetime.now()
+    samples = []
+    n_iters = max(1, int(duration / interval))
+    for _ in range(n_iters):
+        samples.append(STATE.snapshot())
+        time.sleep(interval)
+    end_ts = datetime.now()
+
+    def collect_key(group, key):
+        vals = []
+        for s in samples:
+            g = s.get(group, {})
+            v = g.get(key, None)
+            if isinstance(v, (int, float)):
+                vals.append(v)
+        return robust_avg(vals)
+
+    mode = int(round(collect_key("TPV", "mode") or 0))
+    rtk = samples[-1].get("TPV", {}).get("rtk", "-")
+    numSV = int(round(collect_key("TPV", "numSV") or 0))
+
+    lat = collect_key("HPPOSLLH", "lat") or collect_key("TPV", "lat")
+    lon = collect_key("HPPOSLLH", "lon") or collect_key("TPV", "lon")
+    altHAE = collect_key("HPPOSLLH", "altHAE")
+    altMSL = collect_key("HPPOSLLH", "altMSL") or collect_key("TPV", "altMSL")
+    hAcc = collect_key("HPPOSLLH", "hAcc") or collect_key("TPV", "hAcc")
+    vAcc = collect_key("HPPOSLLH", "vAcc") or collect_key("TPV", "vAcc")
+
+    X = collect_key("HPPOSECEF", "X")
+    Y = collect_key("HPPOSECEF", "Y")
+    Z = collect_key("HPPOSECEF", "Z")
+    pAcc = collect_key("HPPOSECEF", "pAcc")
+
+    gdop = collect_key("DOP", "gdop"); pdop = collect_key("DOP", "pdop")
+    hdop = collect_key("DOP", "hdop"); vdop = collect_key("DOP", "vdop")
+    ndop = collect_key("DOP", "ndop"); edop = collect_key("DOP", "edop")
+    tdop = collect_key("DOP", "tdop")
+
+    covNN = collect_key("COV", "covNN"); covEE = collect_key("COV", "covEE")
+    covDD = collect_key("COV", "covDD"); covNE = collect_key("COV", "covNE")
+    covND = collect_key("COV", "covND"); covED = collect_key("COV", "covED")
+
+    relN = collect_key("RELPOS", "N"); relE = collect_key("RELPOS", "E")
+    relD = collect_key("RELPOS", "D")
+    relsN = collect_key("RELPOS", "sN"); relsE = collect_key("RELPOS", "sE")
+    relsD = collect_key("RELPOS", "sD")
+    horiz = baseline = bearing = slope = None
+    if relN is not None and relE is not None and relD is not None:
+        horiz = math.hypot(relN, relE)
+        baseline = math.sqrt(horiz * horiz + relD * relD)
+        bearing = math.degrees(math.atan2(relE, relN))
+        bearing = bearing + 360 if bearing < 0 else bearing
+        slope = math.degrees(math.atan2(-relD, horiz)) if horiz else 0.0
+
+    # ---------- Sigma (std dev) of position samples ----------
+    def collect_vals(group, key):
+        vals = []
+        for s in samples:
+            g = s.get(group, {})
+            v = g.get(key, None)
+            if isinstance(v, (int, float)):
+                vals.append(v)
+        return vals
+
+    _lat_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lat"))
+    _lon_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lon"))
+    _alt_stats = robust_avg_stats(collect_vals("HPPOSLLH", "altHAE"))
+
+    _mean_lat_rad = math.radians(lat or 0.0)
+    sigma_N = None
+    sigma_E = None
+    sigma_U = None
+    n_kept = _alt_stats.get("n_kept", 0)
+    if _lat_stats.get("sigma") is not None:
+        sigma_N = _lat_stats["sigma"] * math.radians(1.0) * WGS84_A
+    if _lon_stats.get("sigma") is not None:
+        sigma_E = _lon_stats["sigma"] * math.radians(1.0) * WGS84_A * math.cos(_mean_lat_rad)
+    if _alt_stats.get("sigma") is not None:
+        sigma_U = _alt_stats["sigma"]
+
+    stats = {
+        "mode": mode, "rtk": rtk, "numSV": numSV,
+        "hAcc": hAcc, "vAcc": vAcc, "pAcc": pAcc,
+        "gdop": gdop, "pdop": pdop, "hdop": hdop, "vdop": vdop,
+        "ndop": ndop, "edop": edop, "tdop": tdop,
+        "covNN": covNN, "covEE": covEE, "covDD": covDD,
+        "covNE": covNE, "covND": covND, "covED": covED,
+        "relN": relN, "relE": relE, "relD": relD,
+        "relsN": relsN, "relsE": relsE, "relsD": relsD,
+        "baseline": baseline, "horiz": horiz, "bearing": bearing, "slope": slope,
+        "sigma_N": sigma_N, "sigma_E": sigma_E, "sigma_U": sigma_U, "n_kept": n_kept,
+    }
 
     try:
-        result = _finalize_measurement(sid, name, desc, codice, duration, interval, force=force)
+        svy = load_survey(sid)
     except FileNotFoundError:
         abort(404)
-    return _redirect(result["redirect_url"])
+    pid = next_point_id(svy)
+    start_iso = start_ts.isoformat(timespec='seconds')
+    end_iso = end_ts.isoformat(timespec='seconds')
+
+    feat = point_feature(
+        pid, lat, lon, altHAE, altMSL, X, Y, Z, stats,
+        {"name": name, "codice": codice, "desc": desc, "duration": duration,
+         "interval": interval, "n_samples": len(samples),
+         "start": start_iso, "end": end_iso}
+    )
+    _attach_pending_notes_to_feature(svy, feat, pid)
+    svy.setdefault("features", []).append(feat)
+    backup_survey(sid)
+    save_survey(sid, svy)
+
+    try:
+        log_event("point_saved", sid, {"pid": pid, "codice": codice, "rtk": rtk})
+    except Exception:
+        pass
+
+    return _redirect(f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}")
+
+
+# ---------- Voice notes ----------
+@bp.route("/api/survey/<sid>/voice-note", methods=["POST"])
+def survey_voice_note_upload(sid):
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+
+    audio = request.files.get("audio")
+    if not audio or not audio.filename:
+        return _json_response({"ok": False, "error": "missing_audio", "message": "Nessun file audio ricevuto."}, 400)
+
+    kind = (request.form.get("kind") or "point").strip().lower()
+    if kind not in ("point", "session"):
+        kind = "point"
+    point_ref = sanitize_point_name(request.form.get("point_ref", "") or "")[:20]
+    point_name = sanitize_point_name(request.form.get("point_name", "") or point_ref)[:20]
+    codice = (request.form.get("codice") or "").strip()[:20]
+    note_text = (request.form.get("note_text") or "").strip()[:300]
+    duration_s = request.form.get("duration_s")
+    mime = (request.form.get("mime") or audio.mimetype or "audio/webm").strip()[:80]
+
+    snap = STATE.snapshot()
+    tmp_meta = _build_voice_note_meta(sid, kind=kind, point_ref=point_ref, point_name=point_name,
+                                      codice=codice, note_text=note_text, duration_s=duration_s,
+                                      mime=mime, filename="", file_size=0, snap=snap)
+    ext = os.path.splitext(audio.filename or "")[1] or ('.' + mime.split('/')[-1].split(';')[0] if '/' in mime else '.webm')
+    filename = _safe_note_filename(tmp_meta['id'], point_ref or point_name or kind, ext=ext, kind=kind)
+    abspath = os.path.join(survey_audio_dir(sid), filename)
+    audio.save(abspath)
+    file_size = os.path.getsize(abspath) if os.path.exists(abspath) else 0
+
+    note = _build_voice_note_meta(sid, kind=kind, point_ref=point_ref, point_name=point_name,
+                                  codice=codice, note_text=note_text, duration_s=duration_s,
+                                  mime=mime, filename=filename, file_size=file_size, snap=snap)
+    note['id'] = tmp_meta['id']
+
+    session_notes, pending_notes = _survey_note_sections(svy)
+    if kind == 'session':
+        session_notes.append(note)
+    else:
+        pending_notes.append(note)
+
+    backup_survey(sid)
+    save_survey(sid, svy)
+    try:
+        log_event("voice_note_saved", sid, {"note_id": note["id"], "kind": kind, "point_ref": point_ref})
+    except Exception:
+        pass
+    return _json_response({"ok": True, "note": _note_public_payload(note)})
+
+
+@bp.route("/survey/<sid>/voice-note/<note_id>/audio")
+def survey_voice_note_audio(sid, note_id):
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+    note, _ = _find_voice_note(svy, note_id)
+    if not note:
+        abort(404)
+    abspath = _note_audio_abspath(note)
+    if not abspath or not os.path.isfile(abspath):
+        abort(404)
+    return send_from_directory(os.path.dirname(abspath), os.path.basename(abspath), mimetype=note.get('audio_mime') or 'audio/webm')
+
+
+@bp.route("/api/survey/<sid>/voice-notes")
+def survey_voice_notes_list(sid):
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+    session_notes, pending_notes, point_notes = _collect_voice_notes_for_view(svy)
+    return _json_response({
+        "ok": True,
+        "session_notes": session_notes,
+        "pending_notes": pending_notes,
+        "point_notes": point_notes,
+    })
+
+
+@bp.route("/api/survey/<sid>/voice-note/<note_id>", methods=["POST"])
+def survey_voice_note_update(sid, note_id):
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+    note, _container = _find_voice_note(svy, note_id)
+    if not note:
+        return _json_response({"ok": False, "error": "not_found", "message": "Nota non trovata."}, 404)
+
+    payload = request.get_json(silent=True) or {}
+    note_text = (request.form.get("note_text") if request.form else None)
+    if note_text is None:
+        note_text = payload.get("note_text", note.get("note_text", ""))
+    note["note_text"] = (note_text or "").strip()[:300]
+
+    if note.get("kind") == "session":
+        if (request.form and "point_name" in request.form) or (not request.form and "point_name" in payload):
+            note["point_name"] = ((request.form.get("point_name") if request.form else payload.get("point_name")) or "").strip()[:80]
+        if (request.form and "codice" in request.form) or (not request.form and "codice" in payload):
+            note["codice"] = ((request.form.get("codice") if request.form else payload.get("codice")) or "").strip()[:20]
+
+    backup_survey(sid)
+    save_survey(sid, svy)
+    try:
+        log_event("voice_note_updated", sid, {"note_id": note_id})
+    except Exception:
+        pass
+    return _json_response({"ok": True, "note": _note_public_payload(note, point_id=note.get("point_id") or note.get("point_ref") or "")})
+
+
+@bp.route("/api/survey/<sid>/voice-note/<note_id>/delete", methods=["POST"])
+def survey_voice_note_delete(sid, note_id):
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+    note, container = _find_voice_note(svy, note_id)
+    if not note or container is None:
+        return _json_response({"ok": False, "error": "not_found", "message": "Nota non trovata."}, 404)
+
+    _delete_note_audio_file(note)
+    container[:] = [n for n in container if n.get("id") != note_id]
+    backup_survey(sid)
+    save_survey(sid, svy)
+    try:
+        log_event("voice_note_deleted", sid, {"note_id": note_id})
+    except Exception:
+        pass
+    return _json_response({"ok": True, "deleted_id": note_id})
 
 
 # ---------- Downloads ----------
@@ -678,14 +880,14 @@ def delete_point(sid, point_index):
     if point_index < 0 or point_index >= len(features):
         return make_response({"error": f"Point not found at index {point_index}"}, 404)
     removed = features.pop(point_index)
+    for note in removed.get("properties", {}).get("voice_notes", []):
+        _delete_note_audio_file(note)
     save_survey(sid, svy)
     return make_response({
         "success": True,
         "message": f"Punto {removed.get('id', '')} eliminato"
     }, 200)
 
-
-from flask import jsonify
 
 @bp.route("/survey/<sid>/delete", methods=["POST"])
 def delete_survey(sid):

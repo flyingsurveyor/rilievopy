@@ -5,24 +5,41 @@
 
 {% block head %}
 <style>
-.container { max-width: 800px; margin: 0 auto; padding: 0 10px; }
-.active-header { background: #2c3e50; color: white; padding: 10px 16px; border-radius: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.container { max-width: 860px; margin: 0 auto; padding: 0 10px 18px; }
+.active-header { background: #2c3e50; color: white; padding: 12px 16px; border-radius: 10px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .active-header .hdr-title { font-weight: 700; font-size: 16px; }
-.active-header .hdr-info { font-size: 13px; opacity: 0.85; }
-.active-header a { color: #aed6f1; text-decoration: none; font-size: 13px; }
+.active-header .hdr-info { font-size: 13px; opacity: .9; }
+.active-header a { color: #d6eaf8; text-decoration: none; font-size: 13px; }
 .active-header a:hover { color: white; text-decoration: underline; }
-.flash-ok { background: #27ae60; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 15px; font-weight: 600; }
-.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-input, textarea, select { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #333; font-size: 16px; box-sizing: border-box; }
-label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; font-size: 14px; }
-.btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
+.flash-ok, .flash-error { color: white; padding: 12px 16px; border-radius: 10px; margin-bottom: 12px; font-size: 15px; font-weight: 600; }
+.flash-ok { background: #27ae60; }
+.flash-error { background: #e74c3c; }
+.card { background: white; border-radius: 12px; padding: 18px; margin-bottom: 16px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.card h3 { margin: 0 0 10px; color: #2c3e50; font-size: 18px; }
+input, textarea, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #d9e0e6; background: white; color: #333; font-size: 16px; box-sizing: border-box; }
+textarea { resize: vertical; min-height: 70px; }
+label { display: block; margin: 14px 0 6px; color: #2c3e50; font-weight: 700; font-size: 14px; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.btn { background: #3498db; color: white; border: none; padding: 11px 15px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background .2s ease, opacity .2s ease; font-size: 14px; }
 .btn:hover { background: #2980b9; }
-.btn-misura { background: #27ae60; font-size: 18px; font-weight: 700; padding: 18px; width: 100%; margin-top: 20px; border-radius: 8px; letter-spacing: 1px; }
+.btn[disabled] { opacity: .6; cursor: not-allowed; }
+.btn-misura { background: #27ae60; font-size: 19px; font-weight: 800; padding: 18px; width: 100%; margin-top: 18px; border-radius: 12px; letter-spacing: .8px; }
 .btn-misura:hover { background: #1e8449; }
-.hint { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
-.flash-error { background: #e74c3c; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 15px; font-weight: 600; }
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; }
-.modal-content { background: white; padding: 24px; border-radius: 12px; max-width: 480px; width: 90%; color: #333; }
+.btn-secondary { background: #7f8c8d; }
+.btn-secondary:hover { background: #6b7778; }
+.btn-record { background: #c0392b; }
+.btn-record:hover { background: #a93226; }
+.btn-stop { background: #8e44ad; }
+.btn-stop:hover { background: #7d3c98; }
+.hint { font-size: 12px; color: #6d7b88; margin-top: 5px; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.badge { background: #eef4f8; color: #2c3e50; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
+.progress-wrap { margin-top: 14px; }
+.progress-bar { width: 100%; height: 16px; background: #e9eef3; border-radius: 999px; overflow: hidden; }
+.progress-fill { width: 0%; height: 100%; background: #27ae60; transition: width .15s linear; }
+.progress-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: #2c3e50; margin-top: 8px; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+.modal-content { background: white; padding: 24px; border-radius: 14px; max-width: 480px; width: 92%; color: #333; }
 .modal-content h3 { margin-top: 0; color: #e67e22; }
 .modal-content ul { margin: 12px 0 16px; padding-left: 20px; }
 .modal-content li { margin-bottom: 6px; }
@@ -31,85 +48,157 @@ label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; fo
 .btn-cancel:hover { background: #c0392b; }
 .btn-force { background: #e67e22; }
 .btn-force:hover { background: #d35400; }
-@media screen and (max-width: 768px) {
+.voice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.voice-status { margin: 10px 0 0; font-size: 13px; color: #2c3e50; font-weight: 700; }
+.voice-timer { font-size: 28px; font-weight: 800; color: #c0392b; letter-spacing: 1px; margin-top: 8px; }
+.voice-rec-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #c0392b; margin-right: 8px; vertical-align: middle; animation: blink 1s infinite; }
+.voice-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.note-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.note-item { border: 1px solid #e1e8ef; border-radius: 10px; padding: 12px; background: #fbfdff; }
+.note-item .top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.note-item .title { font-size: 14px; font-weight: 800; color: #2c3e50; }
+.note-item .meta { font-size: 12px; color: #5f6f7c; }
+.note-item .sub { font-size: 12px; color: #2c3e50; margin-top: 6px; }
+.note-item audio { width: 100%; margin-top: 10px; }
+.note-empty { color: #6d7b88; font-size: 13px; }
+.section-subtitle { margin: 14px 0 6px; font-size: 13px; font-weight: 800; color: #2c3e50; text-transform: uppercase; letter-spacing: .03em; }
+.hidden { display: none !important; }
+@keyframes blink { 0%, 45% { opacity: 1; } 50%, 100% { opacity: .25; } }
+@media (max-width: 768px) {
   body { font-size: 14px; padding: 0; margin: 0; }
-  .container { padding: 5px; margin: 0; }
-  .card { padding: 12px; margin-bottom: 10px; }
-  .btn { min-height: 44px; }
+  .container { padding: 0 6px 14px; }
+  .card { padding: 14px; margin-bottom: 12px; }
+  .row-2, .voice-grid { grid-template-columns: 1fr; }
+  .btn { min-height: 46px; }
+  .btn-misura { min-height: 58px; position: sticky; bottom: 10px; z-index: 20; box-shadow: 0 6px 16px rgba(0,0,0,.18); }
 }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
+  <div class="active-header">
+    <span>
+      <span class="hdr-title">📋 {{ active_title }}</span>
+      <span class="hdr-info"> — {{ num_points }} punt{% if num_points == 1 %}o{% else %}i{% endif %}</span>
+    </span>
+    <span>
+      <a href="/survey/{{ sid }}">← Rilievo</a> &nbsp;
+      <a href="/surveys">📋 Lista rilievi</a>
+    </span>
+  </div>
 
-<div class="active-header">
-  <span>
-    <span class="hdr-title">📋 {{ active_title }}</span>
-    <span class="hdr-info"> — {{ num_points }} punt{% if num_points == 1 %}o{% else %}i{% endif %}</span>
-  </span>
-  <span>
-    <a href="/survey/{{ sid }}">← Rilievo</a> &nbsp;
-    <a href="/surveys">📋 Lista rilievi</a>
-  </span>
-</div>
+  {% if saved %}
+  <div class="flash-ok" id="flash-ok">
+    ✅ Punto {{ saved }}{% if savedname %} ({{ savedname }}){% endif %}{% if savedcodice %} — {{ savedcodice }}{% endif %} salvato.
+  </div>
+  {% endif %}
 
-{% if saved %}
-<div class="flash-ok" id="flash-ok">
-  ✅ Punto {{ saved }}{% if savedname %} ({{ savedname }}){% endif %}{% if savedcodice %} — {{ savedcodice }}{% endif %} salvato!
-</div>
-{% endif %}
+  <div id="flash-error" class="flash-error hidden"></div>
 
-<div id="flash-error" class="flash-error" style="display:none;"></div>
-
-<!-- Quality warning modal -->
-<div id="quality-modal" class="modal-overlay" style="display:none;">
-  <div class="modal-content">
-    <h3>⚠️ Attenzione — Qualità GNSS</h3>
-    <ul id="quality-warnings-list"></ul>
-    <div class="modal-buttons">
-      <button class="btn btn-cancel" id="modal-cancel">🚫 Annulla</button>
-      <button class="btn btn-force" id="modal-force">⚠️ Misura comunque</button>
+  <div id="quality-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>⚠️ Attenzione — Qualità GNSS</h3>
+      <ul id="quality-warnings-list"></ul>
+      <div class="modal-buttons">
+        <button class="btn btn-cancel" id="modal-cancel">🚫 Annulla</button>
+        <button class="btn btn-force" id="modal-force">⚠️ Misura comunque</button>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="card">
-<form method="POST" action="/survey/{{ sid }}/point" id="point-form">
+  <div class="card">
+    <h3>Nuovo punto</h3>
+    <div class="badges">
+      <span class="badge" id="badge-point">Punto {{ next_pid }}</span>
+      <span class="badge" id="badge-cat">Categoria —</span>
+      <span class="badge" id="badge-cod">Codice —</span>
+      <span class="badge" id="badge-dur">Durata 10 s</span>
+    </div>
 
-  <label for="cat-select">Categoria</label>
-  <select id="cat-select">
-    <option value="">— seleziona categoria —</option>
-  </select>
+    <form method="POST" action="/survey/{{ sid }}/point" id="point-form">
+      <div class="row-2">
+        <div>
+          <label for="cat-select">Categoria</label>
+          <select id="cat-select">
+            <option value="">— seleziona categoria —</option>
+          </select>
+        </div>
+        <div>
+          <label for="codice-select">Codice punto</label>
+          <select id="codice-select">
+            <option value="">— seleziona codice —</option>
+          </select>
+          <input type="hidden" name="codice" id="codice-hidden" value="">
+        </div>
+      </div>
 
-  <label for="codice-select">Codice punto</label>
-  <select id="codice-select">
-    <option value="">— seleziona codice —</option>
-  </select>
-  <input type="hidden" name="codice" id="codice-hidden" value="">
+      <div class="row-2">
+        <div>
+          <label for="name-input">ID / Nome punto</label>
+          <input type="text" id="name-input" name="name" maxlength="20" required value="{{ next_pid }}" placeholder="es. P001"/>
+        </div>
+        <div>
+          <label for="dur-select">Durata registrazione</label>
+          <select id="dur-select" name="dur">
+            <option value="1">1 secondo</option>
+            <option value="5">5 secondi</option>
+            <option value="10" selected>10 secondi</option>
+            <option value="20">20 secondi</option>
+            <option value="30">30 secondi</option>
+            <option value="60">60 secondi</option>
+          </select>
+        </div>
+      </div>
 
-  <label for="name-input">ID / Nome punto</label>
-  <input type="text" id="name-input" name="name" maxlength="20" required
-         value="{{ next_pid }}" placeholder="es. P001"/>
+      <label for="desc-input">Note punto</label>
+      <textarea id="desc-input" name="desc" maxlength="300" rows="3" aria-label="Note aggiuntive sul punto" placeholder="Dettagli aggiuntivi sul punto..."></textarea>
+      <div class="hint">Categoria, codice e durata restano memorizzati sulla pagina anche dopo il salvataggio.</div>
 
-  <label for="desc-input">Note</label>
-  <textarea id="desc-input" name="desc" maxlength="300" rows="2"
-            aria-label="Note aggiuntive sul punto"
-            placeholder="Dettagli aggiuntivi..."></textarea>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div id="measure-progress-fill" class="progress-fill"></div></div>
+        <div class="progress-meta">
+          <span id="measure-status">Pronto a misurare</span>
+          <span id="measure-remaining">0 s</span>
+        </div>
+      </div>
 
-  <label for="dur-select">Durata registrazione</label>
-  <select id="dur-select" name="dur">
-    <option value="5">5 secondi</option>
-    <option value="10" selected>10 secondi</option>
-    <option value="20">20 secondi</option>
-    <option value="30">30 secondi</option>
-    <option value="60">60 secondi</option>
-  </select>
+      <button class="btn btn-misura" id="measure-btn" type="submit">🎯 MISURA</button>
+      <input type="hidden" name="force" id="force-field" value="0">
+    </form>
+  </div>
 
-  <button class="btn btn-misura" type="submit">🎯 MISURA</button>
-  <input type="hidden" name="force" id="force-field" value="0">
-</form>
-</div>
+  <div class="card">
+    <h3>Note vocali</h3>
+    <div class="voice-grid">
+      <div>
+        <div class="section-subtitle">Nota del punto corrente</div>
+        <div class="hint">Associata al punto in preparazione ({{ next_pid }}) e agganciata al rilievo quando salvi il punto.</div>
+        <div class="voice-controls">
+          <button class="btn btn-record" id="btn-record-point" type="button">🎙 Registra nota punto</button>
+          <button class="btn btn-stop hidden" id="btn-stop-point" type="button">⏹ Stop</button>
+        </div>
+      </div>
+      <div>
+        <div class="section-subtitle">Nota di sessione</div>
+        <div class="hint">Promemoria generale georeferenziato per altezza antenna, offset, anomalie o appunti da ufficio.</div>
+        <div class="voice-controls">
+          <button class="btn btn-secondary" id="btn-record-session" type="button">📝 Registra nota sessione</button>
+          <button class="btn btn-stop hidden" id="btn-stop-session" type="button">⏹ Stop</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="voice-status" class="voice-status">Microfono inattivo</div>
+    <div id="voice-timer" class="voice-timer hidden">00:00</div>
+    <div class="hint">L'audio viene salvato subito sul rilievo. La trascrizione offline batch si potrà lanciare dopo.</div>
+
+    <div class="section-subtitle">Note punto in attesa</div>
+    <div id="pending-note-list" class="note-list"></div>
+
+    <div class="section-subtitle">Note sessione recenti</div>
+    <div id="session-note-list" class="note-list"></div>
+  </div>
 </div>
 {% endblock %}
 
@@ -117,94 +206,225 @@ label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; fo
 <script>
 (function() {
   const codiciData = {{ codici_json|safe }};
+  const pendingNotesInitial = {{ pending_notes_json|safe }};
+  const sessionNotesInitial = {{ session_notes_json|safe }};
   const categorie = codiciData.categorie || [];
+  const sid = {{ sid|tojson }};
 
   const catSel = document.getElementById('cat-select');
   const codSel = document.getElementById('codice-select');
   const codHidden = document.getElementById('codice-hidden');
-
-  // Populate category select
-  categorie.forEach(cat => {
-    const opt = document.createElement('option');
-    opt.value = cat.id;
-    opt.textContent = cat.label;
-    catSel.appendChild(opt);
-  });
-
-  function updateCodici(catId) {
-    codSel.innerHTML = '<option value="">— seleziona codice —</option>';
-    codHidden.value = '';
-    if (!catId) return;
-    const cat = categorie.find(c => c.id === catId);
-    if (!cat) return;
-    cat.codici.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.cod;
-      opt.textContent = c.cod + ' — ' + c.label;
-      codSel.appendChild(opt);
-    });
-    // Restore last codice for this category
-    const lastCod = localStorage.getItem('lastCodice_' + catId);
-    if (lastCod) {
-      codSel.value = lastCod;
-      codHidden.value = lastCod;
-    }
-  }
-
-  catSel.addEventListener('change', function() {
-    localStorage.setItem('lastCat', this.value);
-    updateCodici(this.value);
-  });
-
-  codSel.addEventListener('change', function() {
-    codHidden.value = this.value;
-    if (catSel.value) {
-      localStorage.setItem('lastCodice_' + catSel.value, this.value);
-    }
-  });
-
-  // Restore last category on load
-  const lastCat = localStorage.getItem('lastCat');
-  if (lastCat) {
-    catSel.value = lastCat;
-    updateCodici(lastCat);
-  }
-
-  // Auto-dismiss flash after 3 seconds
-  const flash = document.getElementById('flash-ok');
-  if (flash) {
-    setTimeout(() => { flash.style.display = 'none'; }, 3000);
-  }
-
-  // ---- Form submit via fetch to handle quality gate responses ----
+  const nameInput = document.getElementById('name-input');
+  const durSel = document.getElementById('dur-select');
   const form = document.getElementById('point-form');
   const forceField = document.getElementById('force-field');
   const flashError = document.getElementById('flash-error');
   const qualityModal = document.getElementById('quality-modal');
   const warningsList = document.getElementById('quality-warnings-list');
+  const measureBtn = document.getElementById('measure-btn');
+  const measureFill = document.getElementById('measure-progress-fill');
+  const measureStatus = document.getElementById('measure-status');
+  const measureRemaining = document.getElementById('measure-remaining');
+  const badgePoint = document.getElementById('badge-point');
+  const badgeCat = document.getElementById('badge-cat');
+  const badgeCod = document.getElementById('badge-cod');
+  const badgeDur = document.getElementById('badge-dur');
+  const pendingNoteList = document.getElementById('pending-note-list');
+  const sessionNoteList = document.getElementById('session-note-list');
+  const voiceStatus = document.getElementById('voice-status');
+  const voiceTimer = document.getElementById('voice-timer');
+  const btnRecordPoint = document.getElementById('btn-record-point');
+  const btnStopPoint = document.getElementById('btn-stop-point');
+  const btnRecordSession = document.getElementById('btn-record-session');
+  const btnStopSession = document.getElementById('btn-stop-session');
+
+  let pendingNotes = Array.isArray(pendingNotesInitial) ? pendingNotesInitial.slice() : [];
+  let sessionNotes = Array.isArray(sessionNotesInitial) ? sessionNotesInitial.slice() : [];
+  let measureTimer = null;
+  let measureStartedAt = 0;
+  let measureDurationMs = 0;
+  let mediaRecorder = null;
+  let mediaChunks = [];
+  let recordKind = null;
+  let recordStartedAt = 0;
+  let voiceTimerInt = null;
+  let activeStream = null;
+
+  function setHidden(el, hidden) { el.classList.toggle('hidden', !!hidden); }
 
   function showError(msg) {
     flashError.textContent = msg;
-    flashError.style.display = 'block';
-    window.scrollTo(0, 0);
+    flashError.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function clearError() {
+    flashError.textContent = '';
+    flashError.classList.add('hidden');
+  }
+
+  function updateBadges() {
+    badgePoint.textContent = 'Punto ' + (nameInput.value || '{{ next_pid }}');
+    const cat = categorie.find(c => c.id === catSel.value);
+    badgeCat.textContent = 'Categoria ' + (cat ? cat.label : '—');
+    badgeCod.textContent = 'Codice ' + (codSel.value || '—');
+    badgeDur.textContent = 'Durata ' + (durSel.value || '0') + ' s';
+  }
+
+  function populateCategories() {
+    categorie.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat.id;
+      opt.textContent = cat.label;
+      catSel.appendChild(opt);
+    });
+  }
+
+  function updateCodici(catId) {
+    codSel.innerHTML = '<option value="">— seleziona codice —</option>';
+    codHidden.value = '';
+    if (!catId) {
+      updateBadges();
+      return;
+    }
+    const cat = categorie.find(c => c.id === catId);
+    if (!cat) {
+      updateBadges();
+      return;
+    }
+    (cat.codici || []).forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.cod;
+      opt.textContent = c.cod + ' — ' + c.label;
+      codSel.appendChild(opt);
+    });
+    const lastCod = localStorage.getItem('lastCodice_' + catId);
+    if (lastCod) {
+      codSel.value = lastCod;
+      codHidden.value = lastCod;
+    }
+    updateBadges();
+  }
+
+  function restorePersistentChoices() {
+    const lastCat = localStorage.getItem('lastCat');
+    const lastDur = localStorage.getItem('lastDur');
+    if (lastCat) {
+      catSel.value = lastCat;
+      updateCodici(lastCat);
+    }
+    if (lastDur) durSel.value = lastDur;
+    codHidden.value = codSel.value || '';
+    updateBadges();
+  }
+
+  function renderNoteItem(note) {
+    const snap = note.gnss_snapshot || {};
+    const wrap = document.createElement('div');
+    wrap.className = 'note-item';
+    const title = note.kind === 'session'
+      ? 'Nota sessione'
+      : 'Nota punto ' + (note.point_ref || note.point_name || '');
+    const created = note.created || '';
+    const fix = snap.fix_type || '—';
+    const hAcc = (typeof snap.hAcc === 'number') ? (' • hAcc ' + snap.hAcc.toFixed(3) + ' m') : '';
+    const pdop = (typeof snap.pdop === 'number') ? (' • PDOP ' + snap.pdop.toFixed(2)) : '';
+    const noteText = note.note_text ? `<div class="sub">${escapeHtml(note.note_text)}</div>` : '';
+    wrap.innerHTML = `
+      <div class="top">
+        <div class="title">${escapeHtml(title)}</div>
+        <div class="meta">${escapeHtml(created)}</div>
+      </div>
+      <div class="sub">Fix ${escapeHtml(String(fix))}${hAcc}${pdop}</div>
+      ${noteText}
+      <audio controls preload="none" src="${escapeHtml(note.audio_url || '')}"></audio>
+    `;
+    return wrap;
+  }
+
+  function renderNotes(container, notes, emptyText) {
+    container.innerHTML = '';
+    if (!notes.length) {
+      const empty = document.createElement('div');
+      empty.className = 'note-empty';
+      empty.textContent = emptyText;
+      container.appendChild(empty);
+      return;
+    }
+    notes.slice().reverse().forEach(note => container.appendChild(renderNoteItem(note)));
+  }
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function setMeasureUiBusy(isBusy) {
+    [...form.querySelectorAll('input, textarea, select, button')].forEach(el => {
+      if (el.id !== 'force-field') el.disabled = isBusy;
+    });
+    btnRecordPoint.disabled = isBusy || !!mediaRecorder;
+    btnRecordSession.disabled = isBusy || !!mediaRecorder;
+    btnStopPoint.disabled = !mediaRecorder || recordKind !== 'point';
+    btnStopSession.disabled = !mediaRecorder || recordKind !== 'session';
+  }
+
+  function resetMeasureProgress() {
+    if (measureTimer) clearInterval(measureTimer);
+    measureTimer = null;
+    measureFill.style.width = '0%';
+    measureStatus.textContent = 'Pronto a misurare';
+    measureRemaining.textContent = '0 s';
+  }
+
+  function startMeasureProgress(durationSeconds) {
+    if (measureTimer) clearInterval(measureTimer);
+    measureStartedAt = Date.now();
+    measureDurationMs = Math.max(250, durationSeconds * 1000);
+    measureStatus.textContent = 'Misura in corso…';
+    measureRemaining.textContent = durationSeconds.toFixed(durationSeconds < 2 ? 1 : 0) + ' s';
+    measureFill.style.width = '0%';
+    measureTimer = setInterval(() => {
+      const elapsed = Date.now() - measureStartedAt;
+      const pct = Math.min(100, (elapsed / measureDurationMs) * 100);
+      const rem = Math.max(0, (measureDurationMs - elapsed) / 1000);
+      measureFill.style.width = pct.toFixed(1) + '%';
+      measureRemaining.textContent = rem.toFixed(rem < 2 ? 1 : 0) + ' s';
+      if (elapsed >= measureDurationMs) {
+        clearInterval(measureTimer);
+        measureTimer = null;
+        measureStatus.textContent = 'Elaborazione e salvataggio…';
+        measureRemaining.textContent = 'attendere';
+      }
+    }, 120);
   }
 
   async function submitForm() {
     const fd = new FormData(form);
-    flashError.style.display = 'none';
+    clearError();
+    const durationSeconds = Number(fd.get('dur') || 10);
+    setMeasureUiBusy(true);
+    startMeasureProgress(durationSeconds);
 
     let resp;
     try {
-      resp = await fetch(form.action, {method: 'POST', body: fd});
-    } catch(e) {
+      resp = await fetch(form.action, { method: 'POST', body: fd });
+    } catch (e) {
+      setMeasureUiBusy(false);
+      resetMeasureProgress();
       showError('Errore di rete: ' + e);
       return;
     }
 
-    // If redirected (302 followed by fetch), check content-type
     const ct = resp.headers.get('content-type') || '';
     if (ct.includes('application/json') || ct.includes('text/json')) {
       const data = await resp.json();
+      setMeasureUiBusy(false);
+      resetMeasureProgress();
       if (data.error === 'no_gnss_data') {
         showError('❌ ' + (data.message || 'Nessun dato GNSS. Verificare la connessione.'));
         return;
@@ -216,7 +436,7 @@ label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; fo
           li.textContent = w;
           warningsList.appendChild(li);
         });
-        qualityModal.style.display = 'flex';
+        qualityModal.classList.remove('hidden');
         return;
       }
       if (!data.ok) {
@@ -225,13 +445,138 @@ label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; fo
       }
     }
 
-    // Success: follow the redirect URL from response
     if (resp.redirected) {
       window.location.href = resp.url;
     } else {
       window.location.href = resp.url || form.action;
     }
   }
+
+  async function startRecording(kind) {
+    clearError();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+      showError('Il browser non supporta la registrazione audio da questa pagina.');
+      return;
+    }
+    if (mediaRecorder) return;
+    try {
+      activeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaChunks = [];
+      mediaRecorder = new MediaRecorder(activeStream);
+      recordKind = kind;
+      recordStartedAt = Date.now();
+      mediaRecorder.ondataavailable = ev => {
+        if (ev.data && ev.data.size > 0) mediaChunks.push(ev.data);
+      };
+      mediaRecorder.onstop = () => finishRecordingUpload().catch(err => {
+        stopMediaStream();
+        resetRecordingUi();
+        showError('Errore salvataggio nota audio: ' + err);
+      });
+      mediaRecorder.start();
+      updateRecordingUi(true, kind);
+    } catch (err) {
+      stopMediaStream();
+      resetRecordingUi();
+      showError('Impossibile usare il microfono: ' + err);
+    }
+  }
+
+  function stopMediaStream() {
+    if (activeStream) {
+      activeStream.getTracks().forEach(t => t.stop());
+      activeStream = null;
+    }
+  }
+
+  function updateRecordingUi(isRec, kind) {
+    btnRecordPoint.disabled = isRec;
+    btnRecordSession.disabled = isRec;
+    setHidden(btnStopPoint, !(isRec && kind === 'point'));
+    setHidden(btnStopSession, !(isRec && kind === 'session'));
+    if (isRec) {
+      voiceStatus.innerHTML = '<span class="voice-rec-dot"></span>Registrazione ' + (kind === 'point' ? 'nota punto' : 'nota sessione') + ' in corso';
+      voiceTimer.classList.remove('hidden');
+      voiceTimer.textContent = '00:00';
+      if (voiceTimerInt) clearInterval(voiceTimerInt);
+      voiceTimerInt = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - recordStartedAt) / 1000);
+        const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const ss = String(elapsed % 60).padStart(2, '0');
+        voiceTimer.textContent = mm + ':' + ss;
+      }, 200);
+    }
+  }
+
+  function resetRecordingUi() {
+    if (voiceTimerInt) clearInterval(voiceTimerInt);
+    voiceTimerInt = null;
+    voiceStatus.textContent = 'Microfono inattivo';
+    voiceTimer.classList.add('hidden');
+    setHidden(btnStopPoint, true);
+    setHidden(btnStopSession, true);
+    btnRecordPoint.disabled = false;
+    btnRecordSession.disabled = false;
+    mediaRecorder = null;
+    recordKind = null;
+    mediaChunks = [];
+  }
+
+  function stopRecording(kind) {
+    if (!mediaRecorder || recordKind !== kind) return;
+    voiceStatus.textContent = 'Salvataggio nota audio…';
+    if (voiceTimerInt) clearInterval(voiceTimerInt);
+    voiceTimerInt = null;
+    mediaRecorder.stop();
+  }
+
+  async function finishRecordingUpload() {
+    const durationS = (Date.now() - recordStartedAt) / 1000;
+    const blob = new Blob(mediaChunks, { type: mediaRecorder && mediaRecorder.mimeType ? mediaRecorder.mimeType : 'audio/webm' });
+    const ext = blob.type && blob.type.includes('ogg') ? 'ogg' : 'webm';
+    const fd = new FormData();
+    fd.append('audio', blob, 'nota_' + recordKind + '.' + ext);
+    fd.append('kind', recordKind);
+    fd.append('point_ref', nameInput.value || '{{ next_pid }}');
+    fd.append('point_name', nameInput.value || '{{ next_pid }}');
+    fd.append('codice', codSel.value || '');
+    fd.append('note_text', document.getElementById('desc-input').value || '');
+    fd.append('duration_s', durationS.toFixed(1));
+    fd.append('mime', blob.type || 'audio/webm');
+
+    try {
+      const resp = await fetch('/api/survey/' + encodeURIComponent(sid) + '/voice-note', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error((data && data.message) || 'upload fallito');
+      const note = data.note;
+      if (recordKind === 'session') sessionNotes.push(note);
+      else pendingNotes.push(note);
+      renderNotes(pendingNoteList, pendingNotes, 'Nessuna nota punto registrata per il punto corrente.');
+      renderNotes(sessionNoteList, sessionNotes, 'Nessuna nota sessione salvata.');
+      voiceStatus.textContent = 'Nota audio salvata';
+      setTimeout(() => {
+        if (!mediaRecorder) voiceStatus.textContent = 'Microfono inattivo';
+      }, 1800);
+    } finally {
+      stopMediaStream();
+      resetRecordingUi();
+    }
+  }
+
+  catSel.addEventListener('change', function() {
+    localStorage.setItem('lastCat', this.value);
+    updateCodici(this.value);
+  });
+  codSel.addEventListener('change', function() {
+    codHidden.value = this.value;
+    if (catSel.value) localStorage.setItem('lastCodice_' + catSel.value, this.value);
+    updateBadges();
+  });
+  durSel.addEventListener('change', function() {
+    localStorage.setItem('lastDur', this.value);
+    updateBadges();
+  });
+  nameInput.addEventListener('input', updateBadges);
 
   form.addEventListener('submit', function(e) {
     e.preventDefault();
@@ -240,15 +585,28 @@ label { display: block; margin: 14px 0 5px; color: #2c3e50; font-weight: 600; fo
   });
 
   document.getElementById('modal-cancel').addEventListener('click', () => {
-    qualityModal.style.display = 'none';
+    qualityModal.classList.add('hidden');
     forceField.value = '0';
   });
-
   document.getElementById('modal-force').addEventListener('click', () => {
-    qualityModal.style.display = 'none';
+    qualityModal.classList.add('hidden');
     forceField.value = '1';
     submitForm();
   });
+
+  btnRecordPoint.addEventListener('click', () => startRecording('point'));
+  btnRecordSession.addEventListener('click', () => startRecording('session'));
+  btnStopPoint.addEventListener('click', () => stopRecording('point'));
+  btnStopSession.addEventListener('click', () => stopRecording('session'));
+
+  populateCategories();
+  restorePersistentChoices();
+  renderNotes(pendingNoteList, pendingNotes, 'Nessuna nota punto registrata per il punto corrente.');
+  renderNotes(sessionNoteList, sessionNotes, 'Nessuna nota sessione salvata.');
+  resetMeasureProgress();
+
+  const flash = document.getElementById('flash-ok');
+  if (flash) setTimeout(() => { flash.style.display = 'none'; }, 3200);
 })();
 </script>
 {% endblock %}
