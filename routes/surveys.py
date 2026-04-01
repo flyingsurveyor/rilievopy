@@ -8,7 +8,6 @@ import math
 import os
 import time
 from datetime import datetime
-from uuid import uuid4
 
 from flask import Blueprint, abort, make_response, render_template, request, send_from_directory, jsonify
 
@@ -18,7 +17,8 @@ from modules.survey import (
     list_survey_ids, load_survey, save_survey, create_survey,
     delete_survey_file, next_point_id, point_feature,
     flatten_point_for_csv, CSV_HEADER, SURVEY_DIR, survey_path, point_from_feature,
-    backup_survey, survey_audio_dir
+    backup_survey, survey_audio_dir, build_voice_notes_index, move_pending_notes_to_feature,
+    remove_note_by_id, find_voice_note, cleanup_note_file
 )
 from modules.exports import (
     build_dxf_advanced, export_geopackage, format_point_txt
@@ -42,167 +42,6 @@ def _redirect(url: str):
     return r
 
 
-def _json_response(payload, status=200):
-    return make_response(json.dumps(payload, ensure_ascii=False), status, {"Content-Type": "application/json; charset=utf-8"})
-
-
-def _safe_note_filename(note_id: str, point_ref: str, kind: str, ext: str = ".webm") -> str:
-    point_ref = sanitize_point_name(point_ref or kind or "nota")[:20] or kind
-    ext = (ext or ".webm").lower()
-    if not ext.startswith('.'):
-        ext = '.' + ext
-    allowed = {'.webm', '.wav', '.ogg', '.m4a', '.mp4', '.aac'}
-    if ext not in allowed:
-        ext = '.webm'
-    return f"{note_id}_{point_ref}{ext}"
-
-
-def _survey_note_sections(svy: dict):
-    props = svy.setdefault("properties", {})
-    return (
-        props.setdefault("voice_notes_session", []),
-        props.setdefault("voice_notes_pending", []),
-    )
-
-
-def _build_voice_note_meta(sid: str, *, kind: str, point_ref: str = "", point_name: str = "", codice: str = "",
-                           note_text: str = "", duration_s=None, mime: str = "audio/webm",
-                           filename: str = "", file_size: int = 0, snap: dict | None = None) -> dict:
-    snap = snap or {}
-    hp = snap.get("HPPOSLLH", {})
-    tpv = snap.get("TPV", {})
-    dop = snap.get("DOP", {})
-    note_id = datetime.now().strftime("vn_%Y%m%d_%H%M%S_") + uuid4().hex[:8]
-    return {
-        "id": note_id,
-        "kind": kind,
-        "survey_id": sid,
-        "point_ref": point_ref or "",
-        "point_name": point_name or point_ref or "",
-        "codice": codice or "",
-        "note_text": (note_text or "").strip()[:300],
-        "created": datetime.now().isoformat(timespec='seconds'),
-        "audio_file": filename,
-        "audio_mime": mime or "audio/webm",
-        "file_size": int(file_size or 0),
-        "duration_s": float(duration_s) if duration_s not in (None, "") else None,
-        "transcript": "",
-        "transcript_status": "pending",
-        "gnss_snapshot": {
-            "fix_type": tpv.get("rtk", "none"),
-            "mode": tpv.get("mode"),
-            "numSV": tpv.get("numSV"),
-            "time": tpv.get("time"),
-            "lat": hp.get("lat", tpv.get("lat")),
-            "lon": hp.get("lon", tpv.get("lon")),
-            "altHAE": hp.get("altHAE"),
-            "altMSL": hp.get("altMSL", tpv.get("altMSL")),
-            "hAcc": hp.get("hAcc", tpv.get("hAcc")),
-            "vAcc": hp.get("vAcc", tpv.get("vAcc")),
-            "pdop": dop.get("pdop"),
-            "hdop": dop.get("hdop"),
-            "vdop": dop.get("vdop"),
-        },
-    }
-
-
-def _note_audio_abspath(note: dict) -> str | None:
-    fn = os.path.basename(note.get("audio_file") or "")
-    sid = note.get("survey_id")
-    if not fn or not sid:
-        return None
-    return os.path.join(survey_audio_dir(sid), fn)
-
-
-def _iter_voice_notes(svy: dict):
-    session_notes, pending_notes = _survey_note_sections(svy)
-    for note in session_notes:
-        yield note, session_notes
-    for note in pending_notes:
-        yield note, pending_notes
-    for feat in svy.get("features", []):
-        notes = feat.get("properties", {}).get("voice_notes", [])
-        for note in notes:
-            yield note, notes
-
-
-def _find_voice_note(svy: dict, note_id: str):
-    for note, container in _iter_voice_notes(svy):
-        if note.get("id") == note_id:
-            return note, container
-    return None, None
-
-
-def _attach_pending_notes_to_feature(svy: dict, feat: dict, pid: str):
-    _, pending_notes = _survey_note_sections(svy)
-    matched = []
-    remaining = []
-    for note in pending_notes:
-        if note.get("point_ref") == pid:
-            note["point_id"] = pid
-            matched.append(note)
-        else:
-            remaining.append(note)
-    if matched:
-        feat.setdefault("properties", {}).setdefault("voice_notes", []).extend(matched)
-    svy.setdefault("properties", {})["voice_notes_pending"] = remaining
-
-
-def _note_public_payload(note: dict, point_id: str = "") -> dict:
-    payload = {
-        "id": note.get("id"),
-        "kind": note.get("kind"),
-        "point_ref": note.get("point_ref"),
-        "point_id": note.get("point_id") or point_id or note.get("point_ref"),
-        "point_name": note.get("point_name"),
-        "codice": note.get("codice"),
-        "note_text": note.get("note_text"),
-        "created": note.get("created"),
-        "duration_s": note.get("duration_s"),
-        "transcript": note.get("transcript", ""),
-        "transcript_status": note.get("transcript_status"),
-        "file_size": note.get("file_size"),
-        "gnss_snapshot": note.get("gnss_snapshot", {}),
-    }
-    if note.get("id") and note.get("survey_id"):
-        payload["audio_url"] = f"/survey/{note['survey_id']}/voice-note/{note['id']}/audio"
-    return payload
-
-
-def _collect_voice_notes_for_view(svy: dict):
-    props = svy.setdefault("properties", {})
-    session_notes = [_note_public_payload(n) for n in props.get("voice_notes_session", [])]
-    pending_notes = [_note_public_payload(n) for n in props.get("voice_notes_pending", [])]
-    point_notes = []
-    for feat in svy.get("features", []):
-        pid = feat.get("id", "")
-        point_name = feat.get("properties", {}).get("name", pid)
-        codice = feat.get("properties", {}).get("codice", "")
-        for note in feat.get("properties", {}).get("voice_notes", []):
-            payload = _note_public_payload(note, point_id=pid)
-            payload["point_ref"] = payload.get("point_ref") or pid
-            payload["point_name"] = payload.get("point_name") or point_name
-            payload["codice"] = payload.get("codice") or codice
-            point_notes.append(payload)
-
-    def _created_key(item):
-        return item.get("created") or ""
-
-    session_notes.sort(key=_created_key)
-    pending_notes.sort(key=_created_key)
-    point_notes.sort(key=_created_key)
-    return session_notes, pending_notes, point_notes
-
-
-def _delete_note_audio_file(note: dict):
-    abspath = _note_audio_abspath(note)
-    if abspath and os.path.isfile(abspath):
-        try:
-            os.remove(abspath)
-        except Exception:
-            pass
-
-
 def _tpv_age_seconds(snap: dict):
     """Return age of TPV data in seconds, or None if no timestamp."""
     tpv = snap.get("TPV", {})
@@ -214,6 +53,59 @@ def _tpv_age_seconds(snap: dict):
         return (datetime.now() - ts).total_seconds()
     except Exception:
         return None
+
+
+def _json_ok(**payload):
+    payload.setdefault("ok", True)
+    return make_response(json.dumps(payload, ensure_ascii=False), 200, {"Content-Type": "application/json; charset=utf-8"})
+
+
+def _json_err(message: str, status: int = 400, **payload):
+    payload.setdefault("ok", False)
+    payload.setdefault("error", message)
+    return make_response(json.dumps(payload, ensure_ascii=False), status, {"Content-Type": "application/json; charset=utf-8"})
+
+
+def _current_gnss_snapshot():
+    snap = STATE.snapshot()
+    tpv = snap.get("TPV", {})
+    hp = snap.get("HPPOSLLH", {})
+    dop = snap.get("DOP", {})
+    return {
+        "time": tpv.get("time"),
+        "mode": tpv.get("mode"),
+        "rtk": tpv.get("rtk"),
+        "numSV": tpv.get("numSV"),
+        "lat": hp.get("lat") if hp.get("lat") is not None else tpv.get("lat"),
+        "lon": hp.get("lon") if hp.get("lon") is not None else tpv.get("lon"),
+        "altHAE": hp.get("altHAE"),
+        "altMSL": hp.get("altMSL") if hp.get("altMSL") is not None else tpv.get("altMSL"),
+        "hAcc": hp.get("hAcc") if hp.get("hAcc") is not None else tpv.get("hAcc"),
+        "vAcc": hp.get("vAcc") if hp.get("vAcc") is not None else tpv.get("vAcc"),
+        "pdop": dop.get("pdop"),
+        "hdop": dop.get("hdop"),
+        "vdop": dop.get("vdop"),
+    }
+
+
+def _new_note_payload(sid: str, kind: str, filename: str, point_name: str = "", point_code: str = "", client_note: str = ""):
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return {
+        "id": f"vn_{stamp}_{int(time.time()*1000)%1000:03d}",
+        "kind": kind,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "audio_filename": filename,
+        "audio_file": f"media/{sid}/audio/{filename}",
+        "audio_url": f"/survey/{sid}/media/audio/{filename}",
+        "point_id": None,
+        "point_name": (point_name or "").strip()[:40],
+        "point_code": (point_code or "").strip()[:20],
+        "note": (client_note or "").strip()[:300],
+        "transcript": "",
+        "transcript_status": "pending",
+        "gnss": _current_gnss_snapshot(),
+    }
+
 
 
 # ---------- List ----------
@@ -298,6 +190,7 @@ def survey_view(sid):
     active_sid = get_active_survey_id()
     rows = []
     points_for_json = []
+    point_cards = []
     for idx, f in enumerate(svy.get("features", [])):
         p = f.get("properties", {})
         hp = p.get("HPPOSLLH", {})
@@ -343,15 +236,24 @@ def survey_view(sid):
             f"<td><button class='btn-delete-point' onclick=\"confirmDeletePoint('{sid}', {idx}, '{point_name}')\">🗑️</button></td>"
             "</tr>"
         )
+        point_cards.append({
+            "idx": idx,
+            "id": point_id,
+            "name": point_name,
+            "codice": codice,
+            "lat": fnum(hp.get('lat'), '{:.9f}'),
+            "lon": fnum(hp.get('lon'), '{:.9f}'),
+            "hae": fnum(hp.get('altHAE'), '{:.3f}'),
+            "pdop": fnum(dop.get('pdop'), '{:.2f}'),
+            "hdop": fnum(dop.get('hdop'), '{:.2f}'),
+            "vdop": fnum(dop.get('vdop'), '{:.2f}'),
+            "sigma_n": fsig(sigma_N),
+            "sigma_e": fsig(sigma_E),
+            "sigma_u": fsig(sigma_U),
+        })
     num_points = len(rows)
     num_columns = 19
-    session_notes, pending_notes, point_notes = _collect_voice_notes_for_view(svy)
-    note_counts = {
-        "session": len(session_notes),
-        "pending": len(pending_notes),
-        "point": len(point_notes),
-        "total": len(session_notes) + len(pending_notes) + len(point_notes),
-    }
+    voice_notes = build_voice_notes_index(sid, svy)
     return render_template('rtk_survey_view.html',
                            sid=props.get("id", sid),
                            title=props.get("title", sid),
@@ -360,10 +262,84 @@ def survey_view(sid):
                            points_json=json.dumps(points_for_json),
                            num_points=str(num_points),
                            active_sid=active_sid,
-                           voice_session_notes_json=json.dumps(session_notes),
-                           voice_pending_notes_json=json.dumps(pending_notes),
-                           voice_point_notes_json=json.dumps(point_notes),
-                           voice_note_counts=note_counts)
+                           voice_notes=voice_notes,
+                           point_cards=point_cards,
+                           gnss_now=_current_gnss_snapshot())
+
+
+@bp.route("/survey/<sid>/media/audio/<path:filename>")
+def survey_media_audio(sid, filename):
+    directory = survey_audio_dir(sid)
+    return send_from_directory(directory, filename, as_attachment=False)
+
+
+@bp.route("/survey/<sid>/voice-note", methods=["POST"])
+def survey_voice_note_create(sid):
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+    file = request.files.get("audio")
+    if not file or not file.filename:
+        return _json_err("Nessun file audio ricevuto")
+    kind = (request.form.get("kind") or "point").strip().lower()
+    if kind not in ("point", "session"):
+        kind = "point"
+    ext = os.path.splitext(file.filename)[1].lower() or ".webm"
+    if ext not in (".webm", ".wav", ".ogg", ".mp3", ".m4a"):
+        ext = ".webm"
+    filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{int(time.time()*1000)%1000:03d}_{kind}{ext}"
+    path = os.path.join(survey_audio_dir(sid), filename)
+    file.save(path)
+    note = _new_note_payload(
+        sid=sid,
+        kind=kind,
+        filename=filename,
+        point_name=request.form.get("point_name", ""),
+        point_code=request.form.get("point_code", ""),
+        client_note=request.form.get("note", ""),
+    )
+    props = svy.setdefault("properties", {})
+    if kind == "session":
+        props.setdefault("voice_notes_session", []).append(note)
+    else:
+        props.setdefault("voice_notes_pending", []).append(note)
+    backup_survey(sid)
+    save_survey(sid, svy)
+    return _json_ok(note=note)
+
+
+@bp.route("/survey/<sid>/voice-note/<note_id>", methods=["POST"])
+def survey_voice_note_update(sid, note_id):
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+    kind, notes, idx, note, feat = find_voice_note(svy, note_id)
+    if note is None:
+        return _json_err("Nota non trovata", 404)
+    note["note"] = (request.form.get("note") or note.get("note", "")).strip()[:300]
+    if kind in ("voice_notes_session", "voice_notes_pending") or kind == "feature":
+        if request.form.get("point_name") is not None:
+            note["point_name"] = (request.form.get("point_name") or "").strip()[:40]
+        if request.form.get("point_code") is not None:
+            note["point_code"] = (request.form.get("point_code") or "").strip()[:20]
+    backup_survey(sid)
+    save_survey(sid, svy)
+    return _json_ok(note=note)
+
+
+@bp.route("/survey/<sid>/voice-note/<note_id>/delete", methods=["POST"])
+def survey_voice_note_delete(sid, note_id):
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+    if not remove_note_by_id(sid, svy, note_id):
+        return _json_err("Nota non trovata", 404)
+    backup_survey(sid)
+    save_survey(sid, svy)
+    return _json_ok(message="Nota eliminata")
 
 
 # ---------- Update notes ----------
@@ -394,9 +370,6 @@ def survey_point(sid):
         saved = request.args.get("saved", "")
         savedname = request.args.get("savedname", "")
         savedcodice = request.args.get("savedcodice", "")
-        props = svy.setdefault("properties", {})
-        session_notes = [_note_public_payload(n) for n in props.get("voice_notes_session", [])[-8:]][::-1]
-        pending_notes = [_note_public_payload(n) for n in props.get("voice_notes_pending", []) if n.get("point_ref") == next_pid][-8:][::-1]
         return render_template('rtk_survey_point_form.html',
                                sid=sid,
                                next_pid=next_pid,
@@ -406,8 +379,7 @@ def survey_point(sid):
                                saved=saved,
                                savedname=savedname,
                                savedcodice=savedcodice,
-                               pending_notes_json=json.dumps(pending_notes),
-                               session_notes_json=json.dumps(session_notes))
+                               gnss_now=_current_gnss_snapshot())
 
     name = sanitize_point_name(request.form.get("name", ""))
     desc = (request.form.get("desc", "") or "").strip()[:300]
@@ -591,7 +563,7 @@ def survey_point(sid):
          "interval": interval, "n_samples": len(samples),
          "start": start_iso, "end": end_iso}
     )
-    _attach_pending_notes_to_feature(svy, feat, pid)
+    move_pending_notes_to_feature(svy, feat, name, codice)
     svy.setdefault("features", []).append(feat)
     backup_survey(sid)
     save_survey(sid, svy)
@@ -602,140 +574,6 @@ def survey_point(sid):
         pass
 
     return _redirect(f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}")
-
-
-# ---------- Voice notes ----------
-@bp.route("/api/survey/<sid>/voice-note", methods=["POST"])
-def survey_voice_note_upload(sid):
-    try:
-        svy = load_survey(sid)
-    except FileNotFoundError:
-        abort(404)
-
-    audio = request.files.get("audio")
-    if not audio or not audio.filename:
-        return _json_response({"ok": False, "error": "missing_audio", "message": "Nessun file audio ricevuto."}, 400)
-
-    kind = (request.form.get("kind") or "point").strip().lower()
-    if kind not in ("point", "session"):
-        kind = "point"
-    point_ref = sanitize_point_name(request.form.get("point_ref", "") or "")[:20]
-    point_name = sanitize_point_name(request.form.get("point_name", "") or point_ref)[:20]
-    codice = (request.form.get("codice") or "").strip()[:20]
-    note_text = (request.form.get("note_text") or "").strip()[:300]
-    duration_s = request.form.get("duration_s")
-    mime = (request.form.get("mime") or audio.mimetype or "audio/webm").strip()[:80]
-
-    snap = STATE.snapshot()
-    tmp_meta = _build_voice_note_meta(sid, kind=kind, point_ref=point_ref, point_name=point_name,
-                                      codice=codice, note_text=note_text, duration_s=duration_s,
-                                      mime=mime, filename="", file_size=0, snap=snap)
-    ext = os.path.splitext(audio.filename or "")[1] or ('.' + mime.split('/')[-1].split(';')[0] if '/' in mime else '.webm')
-    filename = _safe_note_filename(tmp_meta['id'], point_ref or point_name or kind, ext=ext, kind=kind)
-    abspath = os.path.join(survey_audio_dir(sid), filename)
-    audio.save(abspath)
-    file_size = os.path.getsize(abspath) if os.path.exists(abspath) else 0
-
-    note = _build_voice_note_meta(sid, kind=kind, point_ref=point_ref, point_name=point_name,
-                                  codice=codice, note_text=note_text, duration_s=duration_s,
-                                  mime=mime, filename=filename, file_size=file_size, snap=snap)
-    note['id'] = tmp_meta['id']
-
-    session_notes, pending_notes = _survey_note_sections(svy)
-    if kind == 'session':
-        session_notes.append(note)
-    else:
-        pending_notes.append(note)
-
-    backup_survey(sid)
-    save_survey(sid, svy)
-    try:
-        log_event("voice_note_saved", sid, {"note_id": note["id"], "kind": kind, "point_ref": point_ref})
-    except Exception:
-        pass
-    return _json_response({"ok": True, "note": _note_public_payload(note)})
-
-
-@bp.route("/survey/<sid>/voice-note/<note_id>/audio")
-def survey_voice_note_audio(sid, note_id):
-    try:
-        svy = load_survey(sid)
-    except FileNotFoundError:
-        abort(404)
-    note, _ = _find_voice_note(svy, note_id)
-    if not note:
-        abort(404)
-    abspath = _note_audio_abspath(note)
-    if not abspath or not os.path.isfile(abspath):
-        abort(404)
-    return send_from_directory(os.path.dirname(abspath), os.path.basename(abspath), mimetype=note.get('audio_mime') or 'audio/webm')
-
-
-@bp.route("/api/survey/<sid>/voice-notes")
-def survey_voice_notes_list(sid):
-    try:
-        svy = load_survey(sid)
-    except FileNotFoundError:
-        abort(404)
-    session_notes, pending_notes, point_notes = _collect_voice_notes_for_view(svy)
-    return _json_response({
-        "ok": True,
-        "session_notes": session_notes,
-        "pending_notes": pending_notes,
-        "point_notes": point_notes,
-    })
-
-
-@bp.route("/api/survey/<sid>/voice-note/<note_id>", methods=["POST"])
-def survey_voice_note_update(sid, note_id):
-    try:
-        svy = load_survey(sid)
-    except FileNotFoundError:
-        abort(404)
-    note, _container = _find_voice_note(svy, note_id)
-    if not note:
-        return _json_response({"ok": False, "error": "not_found", "message": "Nota non trovata."}, 404)
-
-    payload = request.get_json(silent=True) or {}
-    note_text = (request.form.get("note_text") if request.form else None)
-    if note_text is None:
-        note_text = payload.get("note_text", note.get("note_text", ""))
-    note["note_text"] = (note_text or "").strip()[:300]
-
-    if note.get("kind") == "session":
-        if (request.form and "point_name" in request.form) or (not request.form and "point_name" in payload):
-            note["point_name"] = ((request.form.get("point_name") if request.form else payload.get("point_name")) or "").strip()[:80]
-        if (request.form and "codice" in request.form) or (not request.form and "codice" in payload):
-            note["codice"] = ((request.form.get("codice") if request.form else payload.get("codice")) or "").strip()[:20]
-
-    backup_survey(sid)
-    save_survey(sid, svy)
-    try:
-        log_event("voice_note_updated", sid, {"note_id": note_id})
-    except Exception:
-        pass
-    return _json_response({"ok": True, "note": _note_public_payload(note, point_id=note.get("point_id") or note.get("point_ref") or "")})
-
-
-@bp.route("/api/survey/<sid>/voice-note/<note_id>/delete", methods=["POST"])
-def survey_voice_note_delete(sid, note_id):
-    try:
-        svy = load_survey(sid)
-    except FileNotFoundError:
-        abort(404)
-    note, container = _find_voice_note(svy, note_id)
-    if not note or container is None:
-        return _json_response({"ok": False, "error": "not_found", "message": "Nota non trovata."}, 404)
-
-    _delete_note_audio_file(note)
-    container[:] = [n for n in container if n.get("id") != note_id]
-    backup_survey(sid)
-    save_survey(sid, svy)
-    try:
-        log_event("voice_note_deleted", sid, {"note_id": note_id})
-    except Exception:
-        pass
-    return _json_response({"ok": True, "deleted_id": note_id})
 
 
 # ---------- Downloads ----------
@@ -880,13 +718,14 @@ def delete_point(sid, point_index):
     if point_index < 0 or point_index >= len(features):
         return make_response({"error": f"Point not found at index {point_index}"}, 404)
     removed = features.pop(point_index)
-    for note in removed.get("properties", {}).get("voice_notes", []):
-        _delete_note_audio_file(note)
+    for note in list(removed.get("properties", {}).get("voice_notes", []) or []):
+        cleanup_note_file(sid, note)
     save_survey(sid, svy)
-    return make_response({
+    return jsonify({
         "success": True,
         "message": f"Punto {removed.get('id', '')} eliminato"
-    }, 200)
+    }), 200
+
 
 
 @bp.route("/survey/<sid>/delete", methods=["POST"])

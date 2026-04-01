@@ -7,6 +7,7 @@ import re
 import json
 import shutil
 import threading
+from uuid import uuid4
 from typing import Dict, Any, List, Optional, Tuple
 
 from .utils import now_iso
@@ -17,7 +18,6 @@ os.makedirs(SURVEY_DIR, exist_ok=True)
 
 SURVEY_LOCK = threading.Lock()
 SURVEY_EXT = ".geojson"
-MEDIA_DIRNAME = "media"
 
 
 # ---------- Helpers ----------
@@ -31,22 +31,6 @@ def sanitize_survey_id(s: str) -> str:
 
 def survey_path(sid: str) -> str:
     return os.path.join(SURVEY_DIR, f"{sid}{SURVEY_EXT}")
-
-
-def survey_media_dir(sid: str) -> str:
-    path = os.path.join(SURVEY_DIR, MEDIA_DIRNAME, sanitize_survey_id(sid))
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
-def survey_audio_dir(sid: str) -> str:
-    path = os.path.join(survey_media_dir(sid), "audio")
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
-def survey_note_relpath(sid: str, filename: str) -> str:
-    return os.path.join(MEDIA_DIRNAME, sanitize_survey_id(sid), "audio", filename).replace('\\', '/')
 
 
 # ---------- CRUD ----------
@@ -103,14 +87,14 @@ def create_survey(title: str, desc: str) -> str:
 
 def delete_survey_file(sid: str) -> bool:
     path = survey_path(sid)
-    media_path = os.path.join(SURVEY_DIR, MEDIA_DIRNAME, sanitize_survey_id(sid))
     removed = False
     if os.path.exists(path):
         os.remove(path)
         removed = True
-    if os.path.isdir(media_path):
-        shutil.rmtree(media_path, ignore_errors=True)
-        removed = True
+    media_dir = survey_media_dir(sid)
+    if os.path.isdir(media_dir):
+        shutil.rmtree(media_dir, ignore_errors=True)
+        removed = True or removed
     return removed
 
 
@@ -174,6 +158,103 @@ def point_feature(pid: str,
         }
     }
 
+
+
+
+# ---------- Media / voice notes ----------
+def survey_media_dir(sid: str) -> str:
+    return os.path.join(SURVEY_DIR, "media", sid)
+
+
+def survey_audio_dir(sid: str) -> str:
+    path = os.path.join(survey_media_dir(sid), "audio")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def note_file_url(sid: str, filename: str) -> str:
+    return f"/survey/{sid}/media/audio/{filename}"
+
+
+def _survey_note_lists(svy: Dict[str, Any]):
+    props = svy.setdefault("properties", {})
+    yield props.setdefault("voice_notes_session", [])
+    yield props.setdefault("voice_notes_pending", [])
+    for feat in svy.get("features", []):
+        yield feat.setdefault("properties", {}).setdefault("voice_notes", [])
+
+
+def find_voice_note(svy: Dict[str, Any], note_id: str):
+    props = svy.setdefault("properties", {})
+    for name in ("voice_notes_session", "voice_notes_pending"):
+        notes = props.setdefault(name, [])
+        for idx, note in enumerate(notes):
+            if note.get("id") == note_id:
+                return name, notes, idx, note, None
+    for feat in svy.get("features", []):
+        notes = feat.setdefault("properties", {}).setdefault("voice_notes", [])
+        for idx, note in enumerate(notes):
+            if note.get("id") == note_id:
+                return "feature", notes, idx, note, feat
+    return None, None, None, None, None
+
+
+def cleanup_note_file(sid: str, note: Dict[str, Any]):
+    filename = note.get("audio_filename") or os.path.basename(note.get("audio_file", ""))
+    if not filename:
+        return
+    path = os.path.join(survey_audio_dir(sid), filename)
+    try:
+        if os.path.isfile(path):
+            os.remove(path)
+    except Exception:
+        pass
+
+
+def remove_note_by_id(sid: str, svy: Dict[str, Any], note_id: str) -> bool:
+    kind, notes, idx, note, feat = find_voice_note(svy, note_id)
+    if note is None:
+        return False
+    cleanup_note_file(sid, note)
+    notes.pop(idx)
+    return True
+
+
+def move_pending_notes_to_feature(svy: Dict[str, Any], feat: Dict[str, Any], name: str, codice: str):
+    props = svy.setdefault("properties", {})
+    pending = props.setdefault("voice_notes_pending", [])
+    remaining = []
+    attached = feat.setdefault("properties", {}).setdefault("voice_notes", [])
+    for note in pending:
+        if note.get("point_name") == name and (not codice or note.get("point_code") in (None, "", codice)):
+            note["point_id"] = feat.get("id")
+            note["point_name"] = feat.get("properties", {}).get("name", name)
+            note["point_code"] = feat.get("properties", {}).get("codice", codice)
+            note["kind"] = "point"
+            attached.append(note)
+        else:
+            remaining.append(note)
+    props["voice_notes_pending"] = remaining
+
+
+def build_voice_notes_index(sid: str, svy: Dict[str, Any]) -> Dict[str, Any]:
+    props = svy.setdefault("properties", {})
+    session = list(props.get("voice_notes_session", []))
+    pending = list(props.get("voice_notes_pending", []))
+    point = []
+    for feat in svy.get("features", []):
+        fp = feat.get("properties", {})
+        for note in fp.get("voice_notes", []) or []:
+            item = dict(note)
+            item.setdefault("point_id", feat.get("id"))
+            item.setdefault("point_name", fp.get("name", feat.get("id")))
+            item.setdefault("point_code", fp.get("codice", ""))
+            point.append(item)
+    for group in (session, pending, point):
+        for note in group:
+            if note.get("audio_filename") and not note.get("audio_url"):
+                note["audio_url"] = note_file_url(sid, note["audio_filename"])
+    return {"session": session, "pending": pending, "point": point}
 
 # ---------- CSV flatten ----------
 CSV_HEADER = [

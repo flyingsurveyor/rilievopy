@@ -5,150 +5,169 @@
 
 {% block head %}
 <style>
-.container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
-.card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-.card h1, .card h2, .card h3 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
-.card h3 { font-size: 18px; }
-button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
-button:hover, .btn:hover { background: #2980b9; }
-.btn-secondary { background: #95a5a6; }
-.btn-secondary:hover { background: #7f8c8d; }
-.btn-danger { background: #e74c3c; }
-.btn-danger:hover { background: #c0392b; }
-.btn-delete-point { background: none; border: none; cursor: pointer; font-size: 1.2em; opacity: 0.75; color: #e74c3c; margin: 0; padding: 2px 6px; }
-.btn-delete-point:hover { opacity: 1; background: transparent; }
-table { border-collapse: collapse; width: 100%; margin: 12px 0; }
-th { background: #ecf0f1; color: #2c3e50; font-weight: 600; text-align: left; }
-th, td { border: 1px solid #ddd; padding: 10px; }
-tr:nth-child(even) { background: #f9f9f9; }
-tr:hover { background: #f1f1f1; }
-textarea, input[type=text], select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #d4dde5; background: white; color: #333; font-size: 15px; box-sizing: border-box; }
-textarea { min-height: 92px; resize: vertical; }
-input[type=checkbox] { margin-right: 5px; }
-.actions-inline { display: flex; gap: 8px; flex-wrap: wrap; }
-.muted { color: #637381; font-size: 13px; }
-.badge-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
-.badge { background: #eef5fb; color: #2c3e50; border: 1px solid #d9e8f5; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
-.notes-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
-.notes-toolbar .filter-box { min-width: 220px; flex: 1 1 220px; }
-.note-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.note-col { border: 1px solid #e2eaf1; border-radius: 12px; padding: 14px; background: #fbfdff; }
-.note-col h4 { margin: 0 0 12px 0; color: #2c3e50; font-size: 16px; }
-.note-list { display: flex; flex-direction: column; gap: 12px; }
-.note-empty { color: #6d7b88; font-size: 14px; padding: 10px 2px; }
-.note-card { border: 1px solid #dfe8f0; border-radius: 12px; padding: 12px; background: #fff; }
-.note-card .top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
-.note-card .title { font-size: 15px; font-weight: 800; color: #2c3e50; }
-.note-card .meta { font-size: 12px; color: #5f6f7c; }
-.note-card .sub { font-size: 12px; color: #415365; margin-top: 6px; }
-.note-card .pill { display: inline-block; margin-right: 6px; margin-top: 6px; background: #f0f7ff; color: #244864; border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 700; }
-.note-card audio { width: 100%; margin-top: 10px; }
-.note-card .edit-box { margin-top: 10px; }
-.note-card .edit-box textarea { min-height: 82px; font-size: 14px; }
-.note-card .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-.note-card .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.note-card .actions button { margin: 0; }
-.status-text { font-size: 13px; margin-top: 4px; }
-.status-ok { color: #0c7a43; }
-.status-err { color: #c0392b; }
-.danger-zone { margin-top: 40px; padding: 20px; border: 2px solid #e74c3c; border-radius: 12px; background-color: #fff1f1; }
-.danger-zone h3 { color: #e74c3c; margin-top: 0; border: none; }
-@media screen and (max-width: 980px) {
-  .note-columns { grid-template-columns: 1fr; }
-}
-@media screen and (max-width: 768px) {
-  body { font-size: 14px; padding: 0; margin: 0; }
-  .container { padding: 6px; margin: 0; }
-  .card { padding: 14px; margin-bottom: 12px; }
-  button, .btn { min-height: 46px; padding: 10px 12px; font-size: 14px; width: 100%; margin-bottom: 8px; }
-  .actions-inline { flex-direction: column; }
-  table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
-  th, td { padding: 6px 8px; font-size: 12px; }
-  .note-card .row-2 { grid-template-columns: 1fr; }
-}
+:root{--bg:#f3f6f9;--card:#fff;--line:#d7e0e7;--text:#20303c;--muted:#62727e;--accent:#1d5f8f;--soft:#eef5fb;--danger:#c0392b;--ok:#27ae60}
+body{background:var(--bg)}
+.container{max-width:1180px;margin:12px auto;padding:0 10px 24px}.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.hero{display:grid;grid-template-columns:1.2fr .9fr;gap:12px;align-items:stretch}.hero-main{display:flex;flex-direction:column;justify-content:space-between}.hero-title{font-size:24px;font-weight:900;color:var(--text);margin:0}.muted{color:var(--muted);font-size:13px}.toolbar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:12px}.btn{background:#3498db;color:#fff;border:none;padding:12px 14px;border-radius:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:800;gap:8px}.btn:hover{background:#2980b9}.btn-danger{background:var(--danger)}.btn-soft{background:var(--soft);color:var(--accent)}
+textarea,input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:15px;box-sizing:border-box}
+.gnss-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.gnss-box{border:1px solid #e3eaf0;border-radius:14px;padding:12px;background:#f7fafc}.gnss-box .k{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase}.gnss-box .v{font-size:24px;font-weight:900;color:var(--text);margin-top:6px}
+.table-wrap{overflow:auto}.points-table{border-collapse:collapse;width:100%;margin-top:10px}th,td{border:1px solid #dde5ea;padding:8px}th{background:#eef3f6;text-align:left}tr:nth-child(even){background:#fafcfd}
+.mobile-points{display:none;gap:10px}.point-card{border:1px solid #dbe4ea;border-radius:14px;padding:12px;background:#fbfdff}.point-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}.point-name{font-size:18px;font-weight:900;color:var(--text)}.point-code{display:inline-block;background:var(--soft);color:var(--accent);padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}.point-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.point-grid .cell{border:1px solid #e6edf2;border-radius:10px;padding:8px;background:#fff}.point-grid .cell .k{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase}.point-grid .cell .v{font-size:14px;font-weight:800;color:var(--text);margin-top:4px}.point-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+.btn-delete-point{background:none;border:none;cursor:pointer;font-size:18px;color:var(--danger)}.danger-zone{border:2px solid #efc0bc;background:#fff1f0}.note-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.note-card{border:1px solid #dbe4ea;border-radius:12px;padding:12px;background:#fbfdff}.note-card audio{width:100%;margin:8px 0}.note-meta{font-size:12px;color:#62727e;margin-bottom:8px}.note-actions{display:flex;gap:8px;flex-wrap:wrap}.section-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.voice-rec-box{border:1px solid #dbe4ea;border-radius:14px;background:#f8fbfd;padding:12px;margin-top:12px}.voice-rec-actions{display:flex;gap:8px;flex-wrap:wrap}.voice-rec-status{display:none;margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff4df;color:#7a4d00;font-weight:800}.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:10000}.confirm-box{background:#fff;border-radius:16px;padding:18px;max-width:420px;width:92%;box-shadow:0 8px 24px rgba(0,0,0,.18)}.confirm-actions{display:flex;gap:10px;margin-top:14px}.confirm-title{font-size:18px;font-weight:900;color:var(--text)}
+@media (max-width:900px){.toolbar{grid-template-columns:repeat(3,minmax(0,1fr))}.hero{grid-template-columns:1fr}.gnss-strip{grid-template-columns:1fr 1fr 1fr}}
+@media (max-width:768px){.container{padding:0 6px}.card{padding:12px;border-radius:18px}.toolbar{grid-template-columns:1fr 1fr}.table-wrap{display:none}.mobile-points{display:grid}.gnss-strip{grid-template-columns:1fr 1fr 1fr}}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
-  <div class="card">
-    <h1>Rilievo: {{ title }}</h1>
-    <form method="POST" action="/survey/{{ sid }}/notes">
-      <label>Note generali</label>
-      <textarea name="notes" rows="4" maxlength="1000" placeholder="tipo base, altezza base, altezza rover, ecc.">{{ notes|safe }}</textarea>
-      <div class="actions-inline" style="margin-top:8px;">
-        <button class="btn" type="submit">💾 Salva note</button>
-        <a class="btn" href="/surveys">← Rilievi</a>
-        <a class="btn" href="/survey/{{ sid }}/point">➕ Nuovo punto</a>
+  {% set rtk = gnss_now.rtk if gnss_now and gnss_now.rtk is not none else '—' %}
+  <div class="card hero">
+    <div class="hero-main">
+      <div>
+        <h1 class="hero-title">{{ title }}</h1>
+        <div class="muted">Rilievo {{ sid }} · {{ num_points }} punti</div>
       </div>
-    </form>
-    <p><b>Visualizza:</b>
-      <a class="btn" href="/survey/{{ sid }}/cad">📐 CAD</a>
-      <a class="btn" href="/survey/{{ sid }}/map">🗺 Mappa</a>
-    </p>
-    <p><b>Export:</b>
-      <a class="btn" href="/survey/{{ sid }}.geojson">GeoJSON</a>
-      <a class="btn" href="/survey/{{ sid }}.csv">CSV</a>
-      <a class="btn" href="/survey/{{ sid }}.dxf">DXF 3D</a>
-      <a class="btn" href="/survey/{{ sid }}_2d.dxf">DXF 2D</a>
-      <a class="btn" href="/survey/{{ sid }}.gpkg">GPKG</a>
-    </p>
-    <p><b>Topografia:</b>
-      <a class="btn" href="/cad">📐 CAD</a>
-      <a class="btn" href="/dtm">🔺 DTM</a>
-    </p>
-    <p><b>COGO:</b>
-      <a class="btn" href="/cogo">📐 Strumenti COGO</a>
-    </p>
-    <div class="badge-row">
-      <div class="badge">Totale note vocali: {{ voice_note_counts.total }}</div>
-      <div class="badge">Punto salvate: {{ voice_note_counts.point }}</div>
-      <div class="badge">In attesa: {{ voice_note_counts.pending }}</div>
-      <div class="badge">Sessione: {{ voice_note_counts.session }}</div>
+      <form method="POST" action="/survey/{{ sid }}/notes">
+        <label><b>Note generali</b></label>
+        <textarea name="notes" rows="4" maxlength="1000" placeholder="Base, altezze antenna, note operative...">{{ notes|safe }}</textarea>
+        <div class="toolbar">
+          <button class="btn" type="submit">💾 Salva note</button>
+          <a class="btn" href="/survey/{{ sid }}/point">➕ Nuovo punto</a>
+          <a class="btn btn-soft" href="/survey/{{ sid }}/map">🗺 Mappa</a>
+          <a class="btn btn-soft" href="/survey/{{ sid }}/cad">📐 CAD</a>
+          <a class="btn btn-soft" href="/surveys">← Rilievi</a>
+          <a class="btn btn-soft" href="/survey/{{ sid }}.geojson">GeoJSON</a>
+        </div>
+      </form>
+      <div class="voice-rec-box">
+        <div class="section-head">
+          <div>
+            <div style="font-size:18px;font-weight:900;color:var(--text)">🎙️ Nota vocale di sessione</div>
+            <div class="muted">Per altezza antenna, anomalie, offset o appunti generali del rilievo.</div>
+          </div>
+          <div class="voice-rec-actions">
+            <button class="btn btn-soft" type="button" id="btn-record-session">Registra nota sessione</button>
+          </div>
+        </div>
+        <div class="voice-rec-status" id="rec-status">Registrazione nota sessione… <span id="rec-timer">0.0 s</span></div>
+      </div>
+    </div>
+    <div class="gnss-strip">
+      <div class="gnss-box"><div class="k">RTK</div><div class="v">{{ rtk|upper }}</div></div>
+      <div class="gnss-box"><div class="k">hAcc</div><div class="v">{% if gnss_now.hAcc is not none %}{{ '%.1f cm'|format(gnss_now.hAcc * 100) }}{% else %}—{% endif %}</div></div>
+      <div class="gnss-box"><div class="k">PDOP</div><div class="v">{% if gnss_now.pdop is not none %}{{ '%.2f'|format(gnss_now.pdop) }}{% else %}—{% endif %}</div></div>
     </div>
   </div>
 
   <div class="card">
-    <h3>Punti</h3>
-    <table><thead>
-      <tr>
-        <th>Sel</th><th>ID</th><th>Nome</th><th>Codice</th>
-        <th>Lat</th><th>Lon</th><th>HAE</th>
-        <th>PDOP</th><th>HDOP</th><th>VDOP</th>
-        <th>N</th><th>E</th><th>D</th><th>|baseline|</th>
-        <th>σN</th><th>σE</th><th>σU</th>
-        <th>TXT</th><th>🗑️</th>
-      </tr></thead><tbody>
-      {{ rows|safe }}
-    </tbody></table>
+    <div class="section-head"><h3 style="margin:0">Punti</h3><div class="muted">Vista compatta mobile + tabella completa desktop</div></div>
+
+    <div class="mobile-points">
+      {% for p in point_cards %}
+      <div class="point-card">
+        <div class="point-head">
+          <div>
+            <div class="point-name">{{ p.name or p.id }}</div>
+            <div class="muted">ID {{ p.id }}</div>
+          </div>
+          <div class="point-code">{{ p.codice or '—' }}</div>
+        </div>
+        <div class="point-grid">
+          <div class="cell"><div class="k">Lat</div><div class="v">{{ p.lat }}</div></div>
+          <div class="cell"><div class="k">Lon</div><div class="v">{{ p.lon }}</div></div>
+          <div class="cell"><div class="k">HAE</div><div class="v">{{ p.hae }}</div></div>
+          <div class="cell"><div class="k">PDOP</div><div class="v">{{ p.pdop }}</div></div>
+          <div class="cell"><div class="k">σN</div><div class="v">{{ p.sigma_n }}</div></div>
+          <div class="cell"><div class="k">σE</div><div class="v">{{ p.sigma_e }}</div></div>
+        </div>
+        <div class="point-actions">
+          <a class="btn btn-soft" href="/survey/{{ sid }}/point/{{ p.id }}.txt">TXT</a>
+          <button class="btn-delete-point" onclick="confirmDeletePoint('{{ sid }}', {{ p.idx }}, '{{ p.name|replace("'", "\\'") }}')">🗑️</button>
+        </div>
+      </div>
+      {% else %}
+      <div class="muted">Nessun punto nel rilievo.</div>
+      {% endfor %}
+    </div>
+
+    <div class="table-wrap">
+      <table class="points-table"><thead>
+        <tr><th>Sel</th><th>ID</th><th>Nome</th><th>Codice</th><th>Lat</th><th>Lon</th><th>HAE</th><th>PDOP</th><th>HDOP</th><th>VDOP</th><th>N</th><th>E</th><th>D</th><th>|baseline|</th><th>σN</th><th>σE</th><th>σU</th><th>TXT</th><th>🗑️</th></tr>
+      </thead><tbody>{{ rows|safe }}</tbody></table>
+    </div>
   </div>
 
   <div class="card">
-    <h3>Note vocali del rilievo</h3>
-    <div class="notes-toolbar">
-      <div class="filter-box">
-        <label for="notes-point-filter" class="muted">Filtra note punto per ID/nome punto</label>
-        <select id="notes-point-filter">
-          <option value="">Tutti i punti</option>
-        </select>
-      </div>
-      <div class="actions-inline">
-        <button type="button" class="btn btn-secondary" onclick="refreshVoiceNotes()">↻ Aggiorna note</button>
-      </div>
+    <div class="section-head">
+      <h3 style="margin:0">🎙️ Note vocali del rilievo</h3>
+      <select id="note-filter">
+        <option value="">Tutti i punti</option>
+        <option value="__session__">Solo sessione</option>
+        {% for p in (voice_notes.point + voice_notes.pending) %}
+          {% if p.point_name %}<option value="{{ p.point_name }}">{{ p.point_name }}</option>{% endif %}
+        {% endfor %}
+      </select>
     </div>
 
-    <div class="note-columns">
-      <div class="note-col">
-        <h4>Note punto salvate</h4>
-        <div id="point-note-list" class="note-list"></div>
+    <h4>Note punto salvate</h4>
+    <div class="note-grid" id="notes-point-grid">
+      {% for note in voice_notes.point %}
+      <div class="note-card" data-point-name="{{ note.point_name }}">
+        <div class="note-meta">{{ note.created_at }} · punto {{ note.point_id or '-' }} · {{ note.point_name or '-' }} {% if note.point_code %}· {{ note.point_code }}{% endif %}</div>
+        <audio controls src="{{ note.audio_url }}"></audio>
+        <textarea rows="3" class="note-text">{{ note.note or '' }}</textarea>
+        <div class="note-actions">
+          <button class="btn save-note-btn" data-id="{{ note.id }}">Salva testo</button>
+          <button class="btn btn-danger delete-note-btn" data-id="{{ note.id }}">Elimina</button>
+        </div>
       </div>
-      <div class="note-col">
-        <h4>Note punto in attesa</h4>
-        <div id="pending-note-list" class="note-list"></div>
+      {% else %}<div class="muted">Nessuna nota punto salvata.</div>{% endfor %}
+    </div>
+
+    <h4 style="margin-top:18px">Note punto in attesa</h4>
+    <div class="note-grid" id="notes-pending-grid">
+      {% for note in voice_notes.pending %}
+      <div class="note-card" data-point-name="{{ note.point_name }}">
+        <div class="note-meta">{{ note.created_at }} · in attesa aggancio · {{ note.point_name or '-' }} {% if note.point_code %}· {{ note.point_code }}{% endif %}</div>
+        <audio controls src="{{ note.audio_url }}"></audio>
+        <input class="note-point-name" value="{{ note.point_name or '' }}" placeholder="Nome punto">
+        <input class="note-point-code" value="{{ note.point_code or '' }}" placeholder="Codice punto">
+        <textarea rows="3" class="note-text">{{ note.note or '' }}</textarea>
+        <div class="note-actions">
+          <button class="btn save-note-btn" data-id="{{ note.id }}">Salva</button>
+          <button class="btn btn-danger delete-note-btn" data-id="{{ note.id }}">Elimina</button>
+        </div>
       </div>
-      <div class="note-col">
-        <h4>Note sessione</h4>
-        <div id="session-note-list" class="note-list"></div>
+      {% else %}<div class="muted">Nessuna nota punto in attesa.</div>{% endfor %}
+    </div>
+
+    <h4 style="margin-top:18px">Note sessione</h4>
+    <div class="note-grid" id="notes-session-grid">
+      {% for note in voice_notes.session %}
+      <div class="note-card" data-point-name="__session__">
+        <div class="note-meta">{{ note.created_at }} · sessione{% if note.gnss and note.gnss.rtk %} · {{ note.gnss.rtk }}{% endif %}</div>
+        <audio controls src="{{ note.audio_url }}"></audio>
+        <input class="note-point-name" value="{{ note.point_name or '' }}" placeholder="Riferimento libero / nome punto">
+        <input class="note-point-code" value="{{ note.point_code or '' }}" placeholder="Codice punto opzionale">
+        <textarea rows="3" class="note-text">{{ note.note or '' }}</textarea>
+        <div class="note-actions">
+          <button class="btn save-note-btn" data-id="{{ note.id }}">Salva</button>
+          <button class="btn btn-danger delete-note-btn" data-id="{{ note.id }}">Elimina</button>
+        </div>
+      </div>
+      {% else %}<div class="muted">Nessuna nota sessione.</div>{% endfor %}
+    </div>
+  </div>
+
+  <div id="delete-note-modal" class="confirm-overlay">
+    <div class="confirm-box">
+      <div class="confirm-title">Elimina nota vocale</div>
+      <div class="muted">Verrà eliminata anche la registrazione audio associata.</div>
+      <div class="confirm-actions">
+        <button class="btn btn-danger" type="button" id="delete-note-cancel">Annulla</button>
+        <button class="btn btn-soft" type="button" id="delete-note-confirm">Elimina</button>
       </div>
     </div>
   </div>
@@ -156,282 +175,140 @@ input[type=checkbox] { margin-right: 5px; }
   <div class="card danger-zone">
     <h3>⚠️ Zona pericolosa</h3>
     <p>L'eliminazione del rilievo è irreversibile.</p>
-    <button class="btn-danger" onclick="confirmDeleteSurvey('{{ sid }}', {{ num_points }})">🗑️ Elimina rilievo</button>
+    <button class="btn btn-danger" onclick="confirmDeleteSurvey('{{ sid }}', {{ num_points }})">🗑️ Elimina rilievo</button>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const points = {{ points_json|safe }};
-const sid = "{{ sid }}";
-let sessionNotes = {{ voice_session_notes_json|safe }};
-let pendingNotes = {{ voice_pending_notes_json|safe }};
-let pointNotes = {{ voice_point_notes_json|safe }};
+const sid = {{ sid|tojson }};
+function confirmDeletePoint(sid, pointIndex, pointName) {
+  if (!confirm(`Vuoi eliminare il punto "${pointName}"?`)) return;
+  fetch(`/survey/${sid}/point/${pointIndex}/delete`, {method: 'POST'})
+    .then(r => r.json()).then(data => { if (data.success) location.reload(); else alert('Errore: ' + data.error); })
+    .catch(err => alert('Errore di rete: ' + err));
+}
+function confirmDeleteSurvey(sid, numPoints) {
+  const confirmation = prompt(`ATTENZIONE!
 
-const pointNoteList = document.getElementById('point-note-list');
-const pendingNoteList = document.getElementById('pending-note-list');
-const sessionNoteList = document.getElementById('session-note-list');
-const notesPointFilter = document.getElementById('notes-point-filter');
+Stai per eliminare il rilievo "${sid}" con ${numPoints} punti.
 
-function escapeHtml(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+Scrivi "ELIMINA" per confermare:`);
+  if (confirmation !== 'ELIMINA') return;
+  fetch(`/survey/${sid}/delete`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({confirmation:'ELIMINA'})})
+    .then(r => r.json()).then(data => { if (data.success) window.location.href = '/surveys'; else alert('Errore: ' + data.error); })
+    .catch(err => alert('Errore di rete: ' + err));
 }
 
-function fmtDuration(v) {
-  const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) return '';
-  return n.toFixed(1).replace(/\.0$/, '') + ' s';
-}
+document.querySelectorAll('.save-note-btn').forEach(btn => btn.addEventListener('click', async ev => {
+  const card = ev.target.closest('.note-card');
+  const fd = new FormData();
+  fd.append('note', card.querySelector('.note-text')?.value || '');
+  if (card.querySelector('.note-point-name')) fd.append('point_name', card.querySelector('.note-point-name').value || '');
+  if (card.querySelector('.note-point-code')) fd.append('point_code', card.querySelector('.note-point-code').value || '');
+  const resp = await fetch(`/survey/${sid}/voice-note/${btn.dataset.id}`, {method:'POST', body:fd});
+  const data = await resp.json();
+  if (!data.ok) { alert('Errore salvataggio nota'); return; }
+  alert('Nota aggiornata');
+}));
 
-function noteTitle(note, type) {
-  if (type === 'session') return 'Nota sessione';
-  const ref = note.point_id || note.point_ref || '—';
-  const pointName = note.point_name ? (' • ' + note.point_name) : '';
-  return 'Nota punto ' + ref + pointName;
+let pendingDelete = null;
+function openDeleteNoteModal(noteId, element) {
+  pendingDelete = {noteId, element};
+  document.getElementById('delete-note-modal').style.display = 'flex';
 }
+document.getElementById('delete-note-cancel')?.addEventListener('click', () => {
+  pendingDelete = null;
+  document.getElementById('delete-note-modal').style.display = 'none';
+});
+document.getElementById('delete-note-confirm')?.addEventListener('click', async () => {
+  if (!pendingDelete) return;
+  const resp = await fetch(`/survey/${sid}/voice-note/${pendingDelete.noteId}/delete`, {method:'POST'});
+  const data = await resp.json();
+  if (!data.ok) { alert('Errore eliminazione'); return; }
+  pendingDelete.element?.remove();
+  pendingDelete = null;
+  document.getElementById('delete-note-modal').style.display = 'none';
+});
+document.querySelectorAll('.delete-note-btn').forEach(btn => btn.addEventListener('click', ev => {
+  openDeleteNoteModal(btn.dataset.id, ev.target.closest('.note-card'));
+}));
 
-function buildPills(note) {
-  const snap = note.gnss_snapshot || {};
-  const pills = [];
-  const fix = snap.fix_type || '—';
-  pills.push(`<span class="pill">Fix ${escapeHtml(String(fix))}</span>`);
-  if (note.codice) pills.push(`<span class="pill">Cod ${escapeHtml(note.codice)}</span>`);
-  if (fmtDuration(note.duration_s)) pills.push(`<span class="pill">Durata ${escapeHtml(fmtDuration(note.duration_s))}</span>`);
-  if (typeof snap.hAcc === 'number') pills.push(`<span class="pill">hAcc ${snap.hAcc.toFixed(3)} m</span>`);
-  if (typeof snap.pdop === 'number') pills.push(`<span class="pill">PDOP ${snap.pdop.toFixed(2)}</span>`);
-  return pills.join('');
-}
+document.getElementById('note-filter')?.addEventListener('change', function() {
+  const val = this.value;
+  document.querySelectorAll('.note-card').forEach(card => {
+    const p = card.dataset.pointName || '';
+    card.style.display = (!val || p === val || (val === '__session__' && p === '__session__')) ? '' : 'none';
+  });
+});
 
-function buildMetaLine(note) {
-  const snap = note.gnss_snapshot || {};
-  const parts = [note.created || ''];
-  if (typeof snap.lat === 'number' && typeof snap.lon === 'number') {
-    parts.push(`${snap.lat.toFixed(8)}, ${snap.lon.toFixed(8)}`);
-  }
-  return parts.filter(Boolean).map(escapeHtml).join(' • ');
-}
-
-function createNoteCard(note, type) {
+const recStatus = document.getElementById('rec-status');
+let mediaRecorder = null, chunks = [], recTick = null, recStarted = 0;
+function prependSessionNote(note) {
+  const grid = document.getElementById('notes-session-grid');
+  const empty = grid.querySelector('.muted'); if (empty) empty.remove();
   const card = document.createElement('div');
   card.className = 'note-card';
-  card.dataset.noteId = note.id || '';
-  card.dataset.pointId = note.point_id || note.point_ref || '';
-  const isSession = type === 'session';
-  const pointNameValue = escapeHtml(note.point_name || '');
-  const codiceValue = escapeHtml(note.codice || '');
-  const noteTextValue = escapeHtml(note.note_text || '');
+  card.dataset.pointName = '__session__';
   card.innerHTML = `
-    <div class="top">
-      <div class="title">${escapeHtml(noteTitle(note, type))}</div>
-      <div class="meta">${buildMetaLine(note)}</div>
-    </div>
-    <div class="sub">${buildPills(note)}</div>
-    <audio controls preload="none" src="${escapeHtml(note.audio_url || '')}"></audio>
-    <div class="edit-box">
-      ${isSession ? `
-        <div class="row-2">
-          <div>
-            <label class="muted">Riferimento libero</label>
-            <input type="text" class="js-point-name" maxlength="80" value="${pointNameValue}" placeholder="es. antenna, offset, base...">
-          </div>
-          <div>
-            <label class="muted">Codice</label>
-            <input type="text" class="js-codice" maxlength="20" value="${codiceValue}" placeholder="codice opzionale">
-          </div>
-        </div>` : ''}
-      <label class="muted">Testo nota</label>
-      <textarea class="js-note-text" maxlength="300" placeholder="Descrizione rapida della nota">${noteTextValue}</textarea>
-      <div class="status-text" id="status-${escapeHtml(note.id || '')}"></div>
-      <div class="actions">
-        <button type="button" class="btn" data-action="save">💾 Salva modifica</button>
-        <button type="button" class="btn-danger" data-action="delete">🗑️ Elimina</button>
-      </div>
-    </div>
-  `;
-  card.querySelector('[data-action="save"]').addEventListener('click', () => saveVoiceNote(card, type));
-  card.querySelector('[data-action="delete"]').addEventListener('click', () => deleteVoiceNote(card, type));
-  return card;
-}
-
-function renderNoteList(container, notes, type, emptyText) {
-  container.innerHTML = '';
-  if (!notes.length) {
-    const empty = document.createElement('div');
-    empty.className = 'note-empty';
-    empty.textContent = emptyText;
-    container.appendChild(empty);
-    return;
-  }
-  const filterVal = (notesPointFilter.value || '').trim();
-  const filtered = (type === 'session') ? notes : notes.filter(n => {
-    if (!filterVal) return true;
-    const pid = (n.point_id || n.point_ref || '').trim();
-    return pid === filterVal;
+    <div class="note-meta">${note.created_at} · sessione${note.gnss && note.gnss.rtk ? (' · ' + note.gnss.rtk) : ''}</div>
+    <audio controls src="${note.audio_url}"></audio>
+    <input class="note-point-name" value="${note.point_name || ''}" placeholder="Riferimento libero / nome punto">
+    <input class="note-point-code" value="${note.point_code || ''}" placeholder="Codice punto opzionale">
+    <textarea rows="3" class="note-text">${note.note || ''}</textarea>
+    <div class="note-actions">
+      <button class="btn save-note-btn" data-id="${note.id}">Salva</button>
+      <button class="btn btn-danger delete-note-btn" data-id="${note.id}">Elimina</button>
+    </div>`;
+  grid.prepend(card);
+  card.querySelector('.save-note-btn')?.addEventListener('click', async ev => {
+    const fd = new FormData();
+    fd.append('note', card.querySelector('.note-text')?.value || '');
+    fd.append('point_name', card.querySelector('.note-point-name')?.value || '');
+    fd.append('point_code', card.querySelector('.note-point-code')?.value || '');
+    const resp = await fetch(`/survey/${sid}/voice-note/${note.id}`, {method:'POST', body:fd});
+    const data = await resp.json();
+    if (!data.ok) { alert('Errore salvataggio nota'); return; }
+    alert('Nota aggiornata');
   });
-  if (!filtered.length) {
-    const empty = document.createElement('div');
-    empty.className = 'note-empty';
-    empty.textContent = 'Nessuna nota per il filtro selezionato.';
-    container.appendChild(empty);
-    return;
-  }
-  filtered.slice().reverse().forEach(note => container.appendChild(createNoteCard(note, type)));
+  card.querySelector('.delete-note-btn')?.addEventListener('click', ev => openDeleteNoteModal(note.id, card));
 }
-
-function renderAllVoiceNotes() {
-  renderNoteList(pointNoteList, pointNotes, 'point', 'Nessuna nota già agganciata ai punti.');
-  renderNoteList(pendingNoteList, pendingNotes, 'pending', 'Nessuna nota punto in attesa di salvataggio punto.');
-  renderNoteList(sessionNoteList, sessionNotes, 'session', 'Nessuna nota sessione.');
-}
-
-function populatePointFilter() {
-  const current = notesPointFilter.value || '';
-  const used = new Map();
-  points.forEach(p => used.set(p.id, p.name || ''));
-  pendingNotes.forEach(n => {
-    const key = n.point_ref || n.point_id || '';
-    if (key && !used.has(key)) used.set(key, n.point_name || '');
-  });
-  pointNotes.forEach(n => {
-    const key = n.point_id || n.point_ref || '';
-    if (key && !used.has(key)) used.set(key, n.point_name || '');
-  });
-
-  notesPointFilter.innerHTML = '<option value="">Tutti i punti</option>';
-  Array.from(used.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, {numeric: true})).forEach(([id, name]) => {
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = name ? `${id} — ${name}` : id;
-    notesPointFilter.appendChild(opt);
-  });
-  notesPointFilter.value = current && used.has(current) ? current : '';
-}
-
-function setStatus(card, text, cls='') {
-  const el = card.querySelector('.status-text');
-  if (!el) return;
-  el.className = 'status-text ' + cls;
-  el.textContent = text || '';
-}
-
-async function saveVoiceNote(card, type) {
-  const noteId = card.dataset.noteId;
-  if (!noteId) return;
+async function uploadSessionRecording(blob) {
   const fd = new FormData();
-  fd.append('note_text', card.querySelector('.js-note-text')?.value || '');
-  if (type === 'session') {
-    fd.append('point_name', card.querySelector('.js-point-name')?.value || '');
-    fd.append('codice', card.querySelector('.js-codice')?.value || '');
-  }
-  setStatus(card, 'Salvataggio...', '');
+  fd.append('audio', new File([blob], `nota_sessione_${Date.now()}.webm`, {type: blob.type || 'audio/webm'}));
+  fd.append('kind', 'session');
+  const resp = await fetch(`/survey/${sid}/voice-note`, {method:'POST', body:fd});
+  const data = await resp.json();
+  if (!data.ok) throw new Error(data.error || 'Upload fallito');
+  prependSessionNote(data.note);
+}
+document.getElementById('btn-record-session')?.addEventListener('click', async () => {
+  if (!navigator.mediaDevices || !window.MediaRecorder) { alert('Browser senza supporto registrazione audio'); return; }
+  if (mediaRecorder && mediaRecorder.state === 'recording') { mediaRecorder.stop(); return; }
   try {
-    const resp = await fetch(`/api/survey/${encodeURIComponent(sid)}/voice-note/${encodeURIComponent(noteId)}`, { method: 'POST', body: fd });
-    const data = await resp.json();
-    if (!resp.ok || !data.ok) throw new Error(data.message || data.error || 'Errore salvataggio');
-    replaceNoteInState(data.note, type);
-    setStatus(card, 'Modifica salvata.', 'status-ok');
-    renderAllVoiceNotes();
-  } catch (err) {
-    setStatus(card, String(err), 'status-err');
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    chunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      clearInterval(recTick);
+      recStatus.style.display = 'none';
+      const blob = new Blob(chunks, {type: mediaRecorder.mimeType || 'audio/webm'});
+      stream.getTracks().forEach(t => t.stop());
+      try { await uploadSessionRecording(blob); }
+      catch (e) { alert('Nota audio non salvata: ' + e.message); }
+    };
+    mediaRecorder.start();
+    recStarted = Date.now();
+    recStatus.style.display = 'block';
+    recTick = setInterval(() => {
+      const el = document.getElementById('rec-timer');
+      if (el) el.textContent = (((Date.now()-recStarted)/1000).toFixed(1)) + ' s';
+    }, 100);
+  } catch (e) {
+    alert('Microfono non disponibile: ' + e.message);
   }
-}
-
-async function deleteVoiceNote(card, type) {
-  const noteId = card.dataset.noteId;
-  if (!noteId) return;
-  if (!confirm('Eliminare questa nota vocale? Verrà rimosso anche il file audio.')) return;
-  setStatus(card, 'Eliminazione...', '');
-  try {
-    const resp = await fetch(`/api/survey/${encodeURIComponent(sid)}/voice-note/${encodeURIComponent(noteId)}/delete`, { method: 'POST' });
-    const data = await resp.json();
-    if (!resp.ok || !data.ok) throw new Error(data.message || data.error || 'Errore eliminazione');
-    removeNoteFromState(noteId, type);
-    populatePointFilter();
-    renderAllVoiceNotes();
-  } catch (err) {
-    setStatus(card, String(err), 'status-err');
-  }
-}
-
-function replaceNoteInState(note, type) {
-  const target = type === 'session' ? sessionNotes : (type === 'pending' ? pendingNotes : pointNotes);
-  const idx = target.findIndex(n => n.id === note.id);
-  if (idx >= 0) target[idx] = note;
-}
-
-function removeNoteFromState(noteId, type) {
-  if (type === 'session') sessionNotes = sessionNotes.filter(n => n.id !== noteId);
-  else if (type === 'pending') pendingNotes = pendingNotes.filter(n => n.id !== noteId);
-  else pointNotes = pointNotes.filter(n => n.id !== noteId);
-}
-
-async function refreshVoiceNotes() {
-  try {
-    const resp = await fetch(`/api/survey/${encodeURIComponent(sid)}/voice-notes`);
-    const data = await resp.json();
-    if (!resp.ok || !data.ok) throw new Error(data.message || 'Errore aggiornamento note');
-    sessionNotes = data.session_notes || [];
-    pendingNotes = data.pending_notes || [];
-    pointNotes = data.point_notes || [];
-    populatePointFilter();
-    renderAllVoiceNotes();
-  } catch (err) {
-    alert('Errore aggiornamento note: ' + err);
-  }
-}
-
-notesPointFilter.addEventListener('change', renderAllVoiceNotes);
-
-function confirmDeletePoint(sid, pointIndex, pointName) {
-  if (confirm(`Vuoi eliminare il punto "${pointName}"? Le sue note vocali verranno eliminate insieme al punto.`)) {
-    fetch(`/survey/${sid}/point/${pointIndex}/delete`, {method: 'POST'})
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          location.reload();
-        } else {
-          alert('Errore: ' + data.error);
-        }
-      })
-      .catch(err => {
-        alert('Errore di rete: ' + err);
-      });
-  }
-}
-
-function confirmDeleteSurvey(sid, numPoints) {
-  const msg = `ATTENZIONE!\n\nStai per eliminare il rilievo "${sid}" con ${numPoints} punti.\n\nQuesta azione è IRREVERSIBILE.\n\nScrivi "ELIMINA" per confermare:`;
-  const confirmation = prompt(msg);
-  if (confirmation === 'ELIMINA') {
-    fetch(`/survey/${sid}/delete`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({confirmation: 'ELIMINA'})
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        alert('Rilievo eliminato');
-        window.location.href = '/';
-      } else {
-        alert('Errore: ' + data.error);
-      }
-    })
-    .catch(err => {
-      alert('Errore di rete: ' + err);
-    });
-  } else if (confirmation !== null) {
-    alert('Conferma non valida. Il rilievo NON è stato eliminato.');
-  }
-}
-
-populatePointFilter();
-renderAllVoiceNotes();
+});
 </script>
 {% endblock %}
