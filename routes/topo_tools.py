@@ -23,9 +23,14 @@ from modules.traverses import (
     calcola_poligonale_chiusa, dividi_area_con_dividenti,
     calcola_livellazione,
 )
-from modules.survey import load_survey, list_survey_ids, SURVEY_DIR
+from modules.survey import load_survey, list_survey_ids, SURVEY_DIR, get_survey_dir
 
 bp = Blueprint('topo_tools', __name__)
+
+
+def _cad_dir():
+    return os.path.join(get_survey_dir(), "cad_projects")
+
 
 CAD_DIR = os.path.join(SURVEY_DIR, "cad_projects")
 os.makedirs(CAD_DIR, exist_ok=True)
@@ -260,7 +265,9 @@ def api_cad_save():
         if not name:
             name = datetime.now().strftime("CAD_%Y%m%d_%H%M%S")
         safe = "".join(c for c in name if c.isalnum() or c in "_-")[:40] or "project"
-        filepath = os.path.join(CAD_DIR, f"{safe}.json")
+        cad_dir = _cad_dir()
+        os.makedirs(cad_dir, exist_ok=True)
+        filepath = os.path.join(cad_dir, f"{safe}.json")
         project = {"name": name, "saved": datetime.now().isoformat(timespec="seconds"),
             "survey_id": data.get("survey_id", ""), "origin": data.get("origin"),
             "points": data.get("points", []), "entities": data.get("entities", []),
@@ -273,7 +280,7 @@ def api_cad_save():
 
 @bp.route("/api/cad/load/<name>")
 def api_cad_load(name):
-    filepath = os.path.join(CAD_DIR, f"{name}.json")
+    filepath = os.path.join(_cad_dir(), f"{name}.json")
     if not os.path.exists(filepath):
         return jsonify({"error": "Progetto non trovato"}), 404
     try:
@@ -285,10 +292,13 @@ def api_cad_load(name):
 @bp.route("/api/cad/list_projects")
 def api_cad_list_projects():
     projects = []
-    for fn in sorted(os.listdir(CAD_DIR)):
+    cad_dir = _cad_dir()
+    if not os.path.isdir(cad_dir):
+        return jsonify({"projects": []})
+    for fn in sorted(os.listdir(cad_dir)):
         if fn.endswith(".json"):
             try:
-                with open(os.path.join(CAD_DIR, fn), "r") as f:
+                with open(os.path.join(cad_dir, fn), "r") as f:
                     d = json.load(f)
                 projects.append({"name": fn[:-5], "title": d.get("name", fn[:-5]),
                     "saved": d.get("saved", ""), "n_points": len(d.get("points", [])),

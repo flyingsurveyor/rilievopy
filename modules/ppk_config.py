@@ -33,20 +33,38 @@ def _find_binary(name, project_path):
     return project_path
 
 
+def _get_ppk_conf_dir() -> str:
+    """Return the workspace-aware PPK conf directory."""
+    try:
+        from modules.workspace import ppk_conf_dir
+        return ppk_conf_dir()
+    except Exception:
+        return os.path.join(BASE_DIR, 'data', 'conf')
+
+
+class _ClassProperty:
+    """Descriptor that acts like @property but for class-level access."""
+    def __init__(self, func):
+        self._func = func
+
+    def __get__(self, obj, objtype=None):
+        return self._func(objtype or type(obj))
+
+
 class PPKConfig:
     """PPK-specific configuration."""
 
-    # Directories
+    # Non-user directories (uploads, rinex, results, pos, antex) still live
+    # under data/ by default; only conf is workspace-aware.
     DATA_DIR = os.path.join(BASE_DIR, 'data')
     UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
     RINEX_DIR = os.path.join(DATA_DIR, 'rinex')
     RESULTS_DIR = os.path.join(DATA_DIR, 'results')
     POS_DIR = os.path.join(DATA_DIR, 'pos')
-    CONF_DIR = os.path.join(DATA_DIR, 'conf')
     ANTEX_DIR = os.path.join(DATA_DIR, 'antex')
     DEFAULT_CONF_DIR = os.path.join(BASE_DIR, 'conf')
 
-    # RTKLIB binaries
+    # RTKLIB binaries (always under project tools/)
     TOOLS_DIR = os.path.join(BASE_DIR, 'tools')
     CONVBIN_BIN = _find_binary('convbin', os.path.join(TOOLS_DIR, 'convbin'))
     RNX2RTKP_BIN = _find_binary('rnx2rtkp', os.path.join(TOOLS_DIR, 'rnx2rtkp'))
@@ -57,6 +75,8 @@ class PPKConfig:
     MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 2GB
     RINEX_MAX_EPOCHS_DEFAULT = 5000
     RINEX_DECIMATE_DEFAULT = 1
+
+    CONF_DIR = _ClassProperty(lambda cls: _get_ppk_conf_dir())
 
     @classmethod
     def ensure_dirs(cls):

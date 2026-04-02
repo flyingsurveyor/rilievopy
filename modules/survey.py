@@ -13,7 +13,30 @@ from typing import Dict, Any, List, Optional, Tuple
 from .utils import now_iso
 
 # ---------- Configuration ----------
-SURVEY_DIR = os.path.abspath(os.path.join(os.getcwd(), "surveys"))
+# SURVEY_DIR is now workspace-aware.  Use get_survey_dir() at call time.
+# The module-level SURVEY_DIR is kept for backward compatibility but is
+# re-evaluated on every access via the property-like helper below.
+
+def _legacy_survey_dir() -> str:
+    """Fallback: project-root surveys/ (used only when workspace is unavailable)."""
+    return os.path.abspath(os.path.join(os.getcwd(), "surveys"))
+
+
+def get_survey_dir() -> str:
+    """Return the active workspace surveys directory, creating it if needed."""
+    try:
+        from .workspace import surveys_dir
+        d = surveys_dir()
+    except Exception:
+        d = _legacy_survey_dir()
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+# Module-level SURVEY_DIR kept for compatibility; callers that cached this
+# value at import time will get the legacy path — all internal code now uses
+# get_survey_dir() directly.
+SURVEY_DIR = _legacy_survey_dir()
 os.makedirs(SURVEY_DIR, exist_ok=True)
 
 SURVEY_LOCK = threading.Lock()
@@ -30,14 +53,15 @@ def sanitize_survey_id(s: str) -> str:
 
 
 def survey_path(sid: str) -> str:
-    return os.path.join(SURVEY_DIR, f"{sid}{SURVEY_EXT}")
+    return os.path.join(get_survey_dir(), f"{sid}{SURVEY_EXT}")
 
 
 # ---------- CRUD ----------
 def list_survey_ids() -> List[str]:
     ids = []
+    survey_dir = get_survey_dir()
     try:
-        for fn in os.listdir(SURVEY_DIR):
+        for fn in os.listdir(survey_dir):
             if fn.endswith(SURVEY_EXT):
                 ids.append(fn[:-len(SURVEY_EXT)])
     except FileNotFoundError:
@@ -163,7 +187,7 @@ def point_feature(pid: str,
 
 # ---------- Media / voice notes ----------
 def survey_media_dir(sid: str) -> str:
-    return os.path.join(SURVEY_DIR, "media", sid)
+    return os.path.join(get_survey_dir(), "media", sid)
 
 
 def survey_audio_dir(sid: str) -> str:

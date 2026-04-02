@@ -18,7 +18,7 @@ from modules.survey import (
     delete_survey_file, next_point_id, point_feature,
     flatten_point_for_csv, CSV_HEADER, SURVEY_DIR, survey_path, point_from_feature,
     backup_survey, survey_audio_dir, build_voice_notes_index, move_pending_notes_to_feature,
-    remove_note_by_id, find_voice_note, cleanup_note_file
+    remove_note_by_id, find_voice_note, cleanup_note_file, get_survey_dir
 )
 from modules.exports import (
     build_dxf_advanced, export_geopackage, format_point_txt
@@ -582,7 +582,7 @@ def survey_download_geojson(sid):
     path = survey_path(sid)
     if not os.path.isfile(path):
         abort(404)
-    return send_from_directory(SURVEY_DIR, os.path.basename(path),
+    return send_from_directory(get_survey_dir(), os.path.basename(path),
                                as_attachment=True, download_name=f"{sid}.geojson")
 
 
@@ -813,10 +813,11 @@ def survey_redirect():
 
 @bp.route("/files/<path:filename>")
 def files_route(filename):
-    path = os.path.join(SURVEY_DIR, filename)
+    survey_dir = get_survey_dir()
+    path = os.path.join(survey_dir, filename)
     if not os.path.isfile(path):
         abort(404)
-    return send_from_directory(SURVEY_DIR, filename, as_attachment=True)
+    return send_from_directory(survey_dir, filename, as_attachment=True)
 
 
 # ---------- Session log ----------
