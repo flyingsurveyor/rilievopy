@@ -13,6 +13,10 @@ from .utils import now_iso
 
 # ---------- Defaults ----------
 DEFAULTS: Dict[str, Any] = {
+    # Workspace (user data directory: surveys + ppk/conf).
+    # Empty string means "use the auto-detected default" (see modules.workspace).
+    "workspace_dir": "",
+
     # GNSS connection
     "gnss_host": "",
     "gnss_port": 1234,
@@ -57,13 +61,29 @@ DEFAULTS: Dict[str, Any] = {
 }
 
 # ---------- File path ----------
-_SETTINGS_DIR = os.path.abspath(os.path.join(os.getcwd(), "surveys"))
-_SETTINGS_FILE = os.path.join(_SETTINGS_DIR, "rilievo_settings.json")
+# Settings are stored next to the modules package (project root).
+# This must NOT be inside the workspace directory so that workspace_dir
+# can be read before the workspace exists.
+_PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SETTINGS_FILE = os.path.join(_PROJECT_DIR, "rilievo_settings.json")
+
+# Backward-compat: if old location still exists but new doesn't, migrate silently.
+_OLD_SETTINGS_FILE = os.path.join(_PROJECT_DIR, "surveys", "rilievo_settings.json")
 _lock = threading.Lock()
 
 
+def _migrate_settings_once():
+    """Move settings from the old surveys/ location to project root on first run."""
+    if not os.path.isfile(_SETTINGS_FILE) and os.path.isfile(_OLD_SETTINGS_FILE):
+        try:
+            import shutil
+            shutil.copy2(_OLD_SETTINGS_FILE, _SETTINGS_FILE)
+        except Exception:
+            pass
+
+
 def _ensure_dir():
-    os.makedirs(_SETTINGS_DIR, exist_ok=True)
+    os.makedirs(_PROJECT_DIR, exist_ok=True)
 
 
 def settings_path() -> str:
@@ -74,6 +94,7 @@ def settings_path() -> str:
 def load_settings() -> Dict[str, Any]:
     """Load settings from JSON file. Returns defaults if file doesn't exist."""
     _ensure_dir()
+    _migrate_settings_once()
     settings = dict(DEFAULTS)
     try:
         with _lock:

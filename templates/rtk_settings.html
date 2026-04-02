@@ -174,10 +174,60 @@
     </div>
   </div>
 
-  </form>
-</div>
 
-<div id="toast" class="toast"></div>
+  </form>
+
+  <!-- Workspace section (outside settingsForm to avoid submit confusion) -->
+  <div class="card" id="workspaceCard">
+    <h2><span class="ico">&#128193;</span> Workspace (cartella di lavoro)</h2>
+
+    <div class="field">
+      <label>Cartella di lavoro attiva</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="ws_path" value="{{ workspace_dir }}" style="flex:1;font-family:monospace;font-size:13px;"/>
+        <button type="button" class="btn btn-outline" style="white-space:nowrap;padding:8px 12px;" onclick="wsInit()">&#128193; Inizializza</button>
+      </div>
+      <div class="hint">
+        On Android (Termux), use <code>~/storage/shared/RilievoGNSS</code> to make data visible in the File Manager.<br>
+        Default auto-detected: <code id="ws_default">{{ workspace_default }}</code>
+      </div>
+    </div>
+
+    <div id="ws_info" style="background:#f8f9fa;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;display:none;">
+      <span id="ws_info_text"></span>
+    </div>
+
+    <!-- Copy / migration -->
+    <div style="border:1px solid #e0e0e0;border-radius:6px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:600;margin-bottom:8px;font-size:14px;">&#128260; Copia dati in nuovo workspace</div>
+      <div class="field">
+        <label>Workspace di destinazione</label>
+        <input type="text" id="ws_dst" placeholder="es. ~/storage/shared/RilievoGNSS" style="font-family:monospace;font-size:13px;"/>
+      </div>
+      <div id="ws_dst_info" data-has-data="0" style="font-size:12px;color:#888;margin-bottom:8px;"></div>
+      <div class="toggle-row" style="margin-bottom:8px;">
+        <label class="switch"><input type="checkbox" id="ws_delete_old"/><span class="slider"></span></label>
+        <label>Elimina i vecchi dati dopo la copia riuscita</label>
+      </div>
+      <button type="button" class="btn btn-primary" style="font-size:13px;padding:8px 16px;" onclick="wsCopy()">&#128260; Copia dati</button>
+    </div>
+
+    <!-- Backup / Restore -->
+    <div style="border:1px solid #e0e0e0;border-radius:6px;padding:12px;">
+      <div style="font-weight:600;margin-bottom:8px;font-size:14px;">&#128228; Backup &amp; Restore</div>
+      <div class="actions" style="margin-top:0;">
+        <a href="/api/workspace/backup" class="btn btn-success" style="font-size:13px;padding:8px 16px;">&#11015; Download backup (.zip)</a>
+        <label class="btn btn-outline" style="cursor:pointer;font-size:13px;padding:8px 16px;">
+          &#11014; Ripristina backup (.zip)
+          <input type="file" id="ws_restore_file" accept=".zip" style="display:none;" onchange="wsRestore(this)"/>
+        </label>
+      </div>
+      <div class="hint" style="margin-top:8px;">Il backup include surveys/ e ppk/conf/ con un manifest di timestamp e versione.</div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -269,5 +319,121 @@ function updateStatus() {
 
 updateStatus();
 setInterval(updateStatus, 3000);
+
+// ── Workspace helpers ──────────────────────────────────────────────────
+function wsShowInfo(msg, ok) {
+  var el = document.getElementById('ws_info');
+  var txt = document.getElementById('ws_info_text');
+  el.style.display = 'block';
+  el.style.background = ok ? '#d5f5e3' : '#fdebd0';
+  el.style.color = ok ? '#1e8449' : '#935116';
+  txt.textContent = msg;
+}
+
+function wsCheckDst() {
+  var dst = document.getElementById('ws_dst').value.trim();
+  var info = document.getElementById('ws_dst_info');
+  if (!dst) { info.textContent = ''; return; }
+  fetch('/api/workspace/check_destination', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({workspace_dir: dst})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.surveys_count || d.ppk_conf_count) {
+        info.setAttribute('data-has-data', '1');
+        info.textContent = 'Attenzione: il workspace di destinazione contiene già ' +
+          d.surveys_count + ' rilievi e ' + d.ppk_conf_count + ' conf. I file verranno sovrascritti.';
+        info.style.color = '#e67e22';
+      } else {
+        info.setAttribute('data-has-data', '0');
+        info.textContent = 'Workspace di destinazione vuoto.';
+        info.style.color = '#27ae60';
+      }
+    }).catch(function(){ info.textContent = ''; });
+}
+
+document.getElementById('ws_dst').addEventListener('blur', wsCheckDst);
+
+function wsInit() {
+  var ws = document.getElementById('ws_path').value.trim();
+  if (!ws) { showToast('Inserisci un percorso workspace', false); return; }
+  fetch('/api/workspace/init', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({workspace_dir: ws})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        // also persist the new path
+        fetch('/api/workspace/set', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({workspace_dir: ws})
+        });
+        showToast('Workspace inizializzato: ' + d.workspace_dir, true);
+        wsShowInfo('Workspace: ' + d.workspace_dir, true);
+      } else {
+        showToast('Errore: ' + (d.error || '?'), false);
+      }
+    }).catch(function(){ showToast('Errore di rete', false); });
+}
+
+function wsCopy() {
+  var dst = document.getElementById('ws_dst').value.trim();
+  if (!dst) { showToast('Inserisci un workspace di destinazione', false); return; }
+  var deleteOld = document.getElementById('ws_delete_old').checked;
+  var hasData = document.getElementById('ws_dst_info').getAttribute('data-has-data') === '1';
+  if (hasData && !confirm('Il workspace di destinazione contiene già dei dati. Continuare e sovrascrivere?')) return;
+  showToast('Copia in corso...', true);
+  fetch('/api/workspace/copy', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      dst_workspace: dst,
+      delete_old: deleteOld,
+      set_active: true
+    })
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        var msg = 'Copiati: ' + (d.copied.surveys || []).length + ' surveys, ' +
+                  (d.copied.ppk_conf || []).length + ' conf PPK.';
+        if (d.deleted) msg += ' Vecchi dati eliminati.';
+        if (d.delete_error) msg += ' Errore eliminazione: ' + d.delete_error;
+        showToast(msg, true);
+        document.getElementById('ws_path').value = d.workspace_dir;
+        wsShowInfo('Workspace attivo: ' + d.workspace_dir, true);
+      } else {
+        showToast('Errore: ' + (d.error || '?'), false);
+      }
+    }).catch(function(){ showToast('Errore di rete', false); });
+}
+
+function wsRestore(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (!confirm('Ripristinare il backup ' + file.name + ' nel workspace attivo?')) {
+    input.value = '';
+    return;
+  }
+  var fd = new FormData();
+  fd.append('file', file);
+  showToast('Ripristino in corso...', true);
+  fetch('/api/workspace/restore', {
+    method: 'POST',
+    body: fd
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      input.value = '';
+      if (d.ok) {
+        var r = d.restored;
+        showToast('Ripristinati: ' + r.surveys + ' surveys, ' + r.ppk_conf + ' conf. Saltati: ' + r.skipped, true);
+      } else {
+        showToast('Errore: ' + (d.error || '?'), false);
+      }
+    }).catch(function(){ input.value = ''; showToast('Errore di rete', false); });
+}
+
 </script>
 {% endblock %}
