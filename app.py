@@ -57,6 +57,10 @@ def create_app():
     from routes.topo_tools import bp as topo_bp
     app.register_blueprint(topo_bp)
 
+    # Register RTKino integration blueprint
+    from routes.rtkino import bp as rtkino_bp
+    app.register_blueprint(rtkino_bp)
+
     return app
 
 
@@ -119,6 +123,12 @@ def main():
 
     # Start GNSS connection in background
     start_gnss_if_configured(s)
+
+    # Start RTKino polling if configured
+    if s.get("rtkino_host") and s.get("rtkino_polling", False):
+        from modules.rtkino_manager import RTKINO
+        RTKINO.start_polling()
+        print(f"# {now_iso()} [rtkino] polling avviato → {s.get('rtkino_host')}:{s.get('rtkino_port', 80)}")
 
     # Create Flask app
     app = create_app()

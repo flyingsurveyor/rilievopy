@@ -58,6 +58,20 @@ DEFAULTS: Dict[str, Any] = {
     "ble_autoconnect": False,
     "ble_tts": True,
     "ble_tts_lang": "it",
+
+    # RTKino HTTP integration
+    "rtkino_host": "",
+    "rtkino_port": 80,
+    "rtkino_polling": False,
+    "rtkino_poll_interval": 2.0,
+
+    # NTRIP client per BLE-only
+    "rtkino_ntrip_host": "",
+    "rtkino_ntrip_port": 2101,
+    "rtkino_ntrip_mountpoint": "",
+    "rtkino_ntrip_user": "",
+    "rtkino_ntrip_password": "",
+    "rtkino_ntrip_gga_interval": 5.0,
 }
 
 # ---------- File path ----------

@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% set active = "rtkino" %}
+
+{% block title %}RTKino — Rilievo GNSS{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 900px; margin: 20px auto; padding: 0 16px; }
+.card {
+  background: #fff; border-radius: 10px; padding: 18px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08); margin-bottom: 16px;
+}
+.card h2 {
+  color: #2c3e50; margin: 0 0 14px; font-size: 16px;
+  border-bottom: 2px solid #3498db; padding-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card h2 .ico { font-size: 20px; }
+
+/* Status badges */
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 700; letter-spacing: .3px;
+}
+.badge-ok    { background: #d5f5e3; color: #1a7a43; }
+.badge-warn  { background: #fef9c3; color: #856404; }
+.badge-off   { background: #f2f3f4; color: #888; }
+.badge-fixed { background: #d5f5e3; color: #1a7a43; }
+.badge-float { background: #fff3cd; color: #856404; }
+.badge-nofix { background: #fde8e8; color: #a93226; }
+.badge-conn  { background: #d1ecf1; color: #0c5460; }
+
+/* Grid for status fields */
+.info-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px; margin-top: 6px;
+}
+.info-cell { }
+.info-cell .lbl { font-size: 11px; color: #999; font-weight: 600; text-transform: uppercase; }
+.info-cell .val { font-size: 15px; font-weight: 700; color: #2c3e50; }
+
+/* Command buttons */
+.cmd-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;
+}
+.btn {
+  padding: 9px 18px; border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .2s, transform .1s; text-decoration: none;
+}
+.btn:active { transform: scale(.96); }
+.btn-primary  { background: #3498db; color: #fff; }
+.btn-primary:hover { background: #2980b9; }
+.btn-success  { background: #2ecc71; color: #fff; }
+.btn-success:hover { background: #27ae60; }
+.btn-warning  { background: #f39c12; color: #fff; }
+.btn-warning:hover { background: #e67e22; }
+.btn-danger   { background: #e74c3c; color: #fff; }
+.btn-danger:hover { background: #c0392b; }
+.btn-outline  { background: transparent; border: 1px solid #ddd; color: #555; }
+.btn-outline:hover { background: #f8f8f8; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* Status row */
+.status-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+
+/* Spinner */
+.spinner { display: inline-block; width: 14px; height: 14px;
+  border: 2px solid #ccc; border-top-color: #3498db;
+  border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Survey progress bar */
+.progress-bar-wrap { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+.progress-bar      { height: 100%; background: #3498db; border-radius: 4px; transition: width .4s; }
+
+/* Toast */
+.toast { position: fixed; bottom: 24px; right: 20px; padding: 12px 20px; border-radius: 8px;
+  color: #fff; font-weight: 600; z-index: 2000; transform: translateY(60px); opacity: 0;
+  transition: transform .3s, opacity .3s; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-ok  { background: #2ecc71; }
+.toast-err { background: #e74c3c; }
+
+/* Disconnected overlay */
+.disconnected-note { background: #fff3cd; border: 1px solid #ffc107;
+  border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;
+  font-size: 13px; color: #856404; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- Header -->
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; padding-top:8px;">
+    <span style="font-size:28px;">🛰️</span>
+    <div>
+      <h1 style="margin:0; font-size:20px; color:#2c3e50;">RTKino Dashboard</h1>
+      <p style="margin:0; font-size:12px; color:#999;">Controllo remoto via HTTP API</p>
+    </div>
+    <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+      <span id="connBadge" class="badge badge-off">—</span>
+      <button class="btn btn-outline btn-sm" onclick="refresh()">↻ Aggiorna</button>
+    </div>
+  </div>
+
+  <!-- Disconnected note -->
+  <div id="disconnNote" class="disconnected-note" style="display:none;">
+    ⚠️ RTKino non raggiungibile. Verifica host/IP in <a href="/settings">Impostazioni</a>.
+  </div>
+
+  <!-- Row: System status + Position -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+
+    <!-- System status -->
+    <div class="card">
+      <h2><span class="ico">📊</span> Stato sistema</h2>
+      <div id="sysStatus">
+        <div class="status-row">
+          <span class="lbl" style="font-size:11px; color:#999;">WiFi</span>
+          <span id="s_wifi" class="badge badge-off">—</span>
+          <span class="lbl" style="font-size:11px; color:#999; margin-left:8px;">NTRIP</span>
+          <span id="s_ntrip" class="badge badge-off">—</span>
+        </div>
+        <div class="status-row">
+          <span class="lbl" style="font-size:11px; color:#999;">Mode</span>
+          <span id="s_mode" class="badge badge-off">—</span>
+          <span class="lbl" style="font-size:11px; color:#999; margin-left:8px;">Logging</span>
+          <span id="s_log" class="badge badge-off">—</span>
+        </div>
+        <div class="status-row">
+          <span class="lbl" style="font-size:11px; color:#999;">BLE</span>
+          <span id="s_ble" class="badge badge-off">—</span>
+          <span class="lbl" style="font-size:11px; color:#999; margin-left:8px;">TCP</span>
+          <span id="s_tcp" class="badge badge-off">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Position -->
+    <div class="card">
+      <h2><span class="ico">📍</span> Posizione live</h2>
+      <div id="posGrid" class="info-grid">
+        <div class="info-cell"><div class="lbl">Fix</div><div class="val" id="p_fix">—</div></div>
+        <div class="info-cell"><div class="lbl">Lat</div><div class="val" id="p_lat">—</div></div>
+        <div class="info-cell"><div class="lbl">Lon</div><div class="val" id="p_lon">—</div></div>
+        <div class="info-cell"><div class="lbl">Alt</div><div class="val" id="p_alt">—</div></div>
+        <div class="info-cell"><div class="lbl">SV</div><div class="val" id="p_sv">—</div></div>
+        <div class="info-cell"><div class="lbl">hAcc</div><div class="val" id="p_hacc">—</div></div>
+        <div class="info-cell"><div class="lbl">PDOP</div><div class="val" id="p_pdop">—</div></div>
+        <div class="info-cell"><div class="lbl">Age</div><div class="val" id="p_age">—</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Quick commands -->
+  <div class="card">
+    <h2><span class="ico">⚡</span> Comandi rapidi</h2>
+    <div class="cmd-grid">
+      <button class="btn btn-success" onclick="sendCmd('ntrip_on')">▶ NTRIP On</button>
+      <button class="btn btn-warning" onclick="sendCmd('ntrip_off')">■ NTRIP Off</button>
+      <button class="btn btn-primary" onclick="sendCmd('log_start')">● Log Start</button>
+      <button class="btn btn-outline" onclick="sendCmd('log_stop')">■ Log Stop</button>
+      <button class="btn btn-outline" onclick="confirmCmd('switch_rover','Passare a modalità Rover?')">🔄 → Rover</button>
+      <button class="btn btn-danger btn-sm" onclick="confirmCmd('zed_reset_hot','Reset HOT del ZED-F9P?')">♻ ZED Hot Reset</button>
+      <button class="btn btn-danger btn-sm" onclick="confirmCmd('zed_reset_cold','Reset COLD del ZED-F9P? (perde ephemeris)')">♻ ZED Cold Reset</button>
+    </div>
+  </div>
+
+  <!-- Survey-in status (shown only when active) -->
+  <div id="surveyCard" class="card" style="display:none;">
+    <h2><span class="ico">📐</span> Survey-in (media base)</h2>
+    <div class="info-grid">
+      <div class="info-cell"><div class="lbl">Stato</div><div class="val" id="sv_state">—</div></div>
+      <div class="info-cell"><div class="lbl">Progresso</div><div class="val" id="sv_prog">—</div></div>
+      <div class="info-cell"><div class="lbl">Campioni</div><div class="val" id="sv_samples">—</div></div>
+      <div class="info-cell"><div class="lbl">StdDev</div><div class="val" id="sv_std">—</div></div>
+    </div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="sv_bar" style="width:0%"></div></div>
+  </div>
+
+  <!-- Nav links -->
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+    <a href="/rtkino/surveys" class="btn btn-outline">📋 Rilievi RTKino</a>
+    <a href="/rtkino/ntrip" class="btn btn-outline">📡 NTRIP BLE-only</a>
+    <a href="/settings" class="btn btn-outline btn-sm">⚙ Impostazioni</a>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var AUTO_REFRESH = 2500; // ms
+var _timer = null;
+
+function showToast(msg, ok) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err');
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+function badge(el, text, cls) {
+  el.textContent = text;
+  el.className = 'badge ' + cls;
+}
+
+function refresh() {
+  fetch('/api/rtkino/status')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var conn = d.conn_mode;
+      var note = document.getElementById('disconnNote');
+
+      // Connection badge
+      var cb = document.getElementById('connBadge');
+      if (conn === 'tcp')           badge(cb, '🟢 TCP', 'badge-conn');
+      else if (conn === 'ble')      badge(cb, '🔵 BLE', 'badge-conn');
+      else                          badge(cb, '⚫ offline', 'badge-off');
+      note.style.display = (conn === 'disconnected') ? '' : 'none';
+
+      // System status
+      var rs = d.rtkino_status || {};
+      badge(document.getElementById('s_wifi'),  rs.wifi  ? 'WiFi'   : 'no WiFi',  rs.wifi  ? 'badge-ok'   : 'badge-off');
+      badge(document.getElementById('s_ntrip'), rs.ntrip ? 'ON'     : 'OFF',      rs.ntrip ? 'badge-ok'   : 'badge-off');
+      badge(document.getElementById('s_mode'),  rs.mode  || '—',                  'badge-conn');
+      badge(document.getElementById('s_log'),   rs.log   ? 'ON'     : 'OFF',      rs.log   ? 'badge-ok'   : 'badge-off');
+      badge(document.getElementById('s_ble'),   rs.ble   ? 'ON'     : 'OFF',      rs.ble   ? 'badge-ok'   : 'badge-off');
+      badge(document.getElementById('s_tcp'),   rs.tcpIn ? 'ON'     : 'OFF',      rs.tcpIn ? 'badge-ok'   : 'badge-off');
+
+      // Position
+      var rp = d.rtkino_position || {};
+      var fixCls = rp.carrSoln === 2 ? 'badge-fixed' : rp.carrSoln === 1 ? 'badge-float' : 'badge-nofix';
+      document.getElementById('p_fix').innerHTML  = '<span class="badge ' + fixCls + '">' + (rp.fixStr || '—') + '</span>';
+      document.getElementById('p_lat').textContent  = rp.lat   != null ? rp.lat.toFixed(8)  : '—';
+      document.getElementById('p_lon').textContent  = rp.lon   != null ? rp.lon.toFixed(8)  : '—';
+      document.getElementById('p_alt').textContent  = rp.alt   != null ? rp.alt.toFixed(3) + ' m' : '—';
+      document.getElementById('p_sv').textContent   = rp.numSV != null ? rp.numSV           : '—';
+      document.getElementById('p_hacc').textContent = rp.hAcc  != null ? (rp.hAcc*100).toFixed(1) + ' cm' : '—';
+      document.getElementById('p_pdop').textContent = rp.pdop  != null ? rp.pdop.toFixed(2) : '—';
+      document.getElementById('p_age').textContent  = rp.age   != null ? rp.age.toFixed(1) + ' s' : '—';
+
+    })
+    .catch(function(){ /* silent */ });
+
+  // Survey status
+  fetch('/api/rtkino/status')
+    .then(function(r){ return r.json(); })
+    .catch(function(){ return {}; });
+}
+
+function sendCmd(cmd) {
+  fetch('/api/rtkino/command', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({cmd: cmd})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    showToast(d.ok ? 'Comando eseguito ✓' : ('Errore: ' + (d.error||'?')), d.ok);
+    if (d.ok) setTimeout(refresh, 800);
+  })
+  .catch(function(){ showToast('Errore di rete', false); });
+}
+
+function confirmCmd(cmd, msg) {
+  if (confirm(msg)) sendCmd(cmd);
+}
+
+// Auto refresh
+function startAutoRefresh() {
+  if (_timer) clearInterval(_timer);
+  _timer = setInterval(refresh, AUTO_REFRESH);
+}
+
+refresh();
+startAutoRefresh();
+</script>
+{% endblock %}
