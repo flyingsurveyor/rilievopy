@@ -18,11 +18,16 @@
   .k { color: #666; }
   .v { font-variant-numeric: tabular-nums; font-weight: 700; color: #333; }
   .direction { text-align: center; font-size: 48px; margin: 20px 0; }
-  .distance { text-align: center; font-size: 32px; font-weight: 700; color: #2ecc71; margin: 10px 0; }
+  .distance { text-align: center; font-size: 36px; font-weight: 700; color: #2ecc71; margin: 10px 0; }
   .reached { background: #d5f4e6; color: #27ae60; padding: 20px; text-align: center; font-size: 24px; font-weight: 700; border-radius: 8px; border: 2px solid #2ecc71; }
   .progress-bar { background: #ecf0f1; height: 20px; border-radius: 10px; overflow: hidden; margin: 10px 0; }
   .progress-fill { background: #2ecc71; height: 100%; transition: width 0.3s; }
   #manual-form { display: none; margin-top: 10px; }
+  .compass-wrap { display: flex; flex-direction: column; align-items: center; margin: 8px 0; }
+  #compass-canvas { display: block; touch-action: none; }
+  .imu-status { font-size: 13px; color: #666; text-align: center; margin: 4px 0 8px; }
+  #btn-imu-perm { background: #e67e22; font-size: 16px; padding: 12px 20px; }
+  #btn-imu-perm:hover { background: #d35400; }
   @media screen and (max-width: 768px) {
   body { font-size: 14px; padding: 0; margin: 0; }
   .container { padding: 5px; margin: 0; }
@@ -63,7 +68,12 @@
   <div class="card" id="stakeout-data" style="display:none;">
     <h3>Stato picchettamento</h3>
     <div id="reached-msg" class="reached" style="display:none;">✅ Punto raggiunto!</div>
-    <div class="direction" id="direction">⬆️</div>
+    <button id="btn-imu-perm" style="display:none;" onclick="requestIMU()">🧭 Attiva bussola</button>
+    <div class="compass-wrap">
+      <canvas id="compass-canvas" width="240" height="240"></canvas>
+    </div>
+    <div id="imu-status" class="imu-status">🧭 Inizializzazione bussola...</div>
+    <div class="direction" id="direction" style="display:none;">⬆️</div>
     <div class="distance" id="distance">-</div>
     <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%;"></div></div>
     <div class="kv"><span class="k">Target</span><span class="v" id="target-name">-</span></div>
@@ -72,6 +82,11 @@
     <div class="kv"><span class="k">ΔU (Up)</span><span class="v" id="deltaU">-</span></div>
     <div class="kv"><span class="k">Distanza 2D</span><span class="v" id="dist2d">-</span></div>
     <div class="kv"><span class="k">Distanza 3D</span><span class="v" id="dist3d">-</span></div>
+    <div class="kv"><span class="k">Bearing target</span><span class="v" id="bearing-val">-</span></div>
+    <div class="kv"><span class="k">Heading telefono</span><span class="v" id="heading-val">-</span></div>
+    <div class="kv"><span class="k">RTK status</span><span class="v" id="rtk-val">-</span></div>
+    <div class="kv"><span class="k">hAcc / vAcc</span><span class="v" id="acc-val">-</span></div>
+    <div class="kv"><span class="k">Satelliti</span><span class="v" id="numSV-val">-</span></div>
   </div>
 </div>
 {% endblock %}
@@ -81,51 +96,240 @@
 const $=id=>document.getElementById(id);
 let es = null;
 
-$('target-select').addEventListener('change', (e) => {
-  if(e.target.value === '_manual') {
-    $('manual-form').style.display = 'block';
-  } else {
-    $('manual-form').style.display = 'none';
+// ── IMU / compass state ──────────────────────────────────────────────────────
+let deviceHeading = null;   // degrees, 0=North clockwise
+let imuAvailable = false;
+let imuChecked = false;
+
+function onOrientation(event) {
+  if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
+    // iOS: already magnetic-north-relative heading
+    deviceHeading = event.webkitCompassHeading;
+  } else if (event.alpha !== null) {
+    // Android: alpha is CCW from North in screen-relative frame, convert to CW
+    deviceHeading = (360 - event.alpha) % 360;
   }
+  if (deviceHeading !== null) {
+    imuAvailable = true;
+    $('imu-status').textContent = '🧭 Bussola attiva';
+    $('heading-val').textContent = deviceHeading.toFixed(0) + '°';
+  }
+}
+
+function requestIMU() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13+: must be called from a user gesture
+    DeviceOrientationEvent.requestPermission().then(response => {
+      if (response === 'granted') {
+        window.addEventListener('deviceorientation', onOrientation, true);
+        $('btn-imu-perm').style.display = 'none';
+        imuAvailable = true;
+      } else {
+        $('imu-status').textContent = '🧭 Permesso negato — modalità cardinale';
+        showCardinalFallback();
+      }
+    }).catch(() => {
+      $('imu-status').textContent = '🧭 Errore permesso — modalità cardinale';
+      showCardinalFallback();
+    });
+  } else {
+    // Android / non-iOS: attach directly
+    window.addEventListener('deviceorientation', onOrientation, true);
+    setTimeout(() => {
+      if (!imuChecked) {
+        imuChecked = true;
+        if (deviceHeading === null) {
+          $('imu-status').textContent = '🧭 Bussola non disponibile — modalità cardinale';
+          showCardinalFallback();
+        }
+      }
+    }, 2000);
+  }
+}
+
+function showCardinalFallback() {
+  imuAvailable = false;
+  $('direction').style.display = 'block';
+}
+
+function initIMU() {
+  if (typeof DeviceOrientationEvent === 'undefined') {
+    $('imu-status').textContent = '🧭 Bussola non disponibile — modalità cardinale';
+    showCardinalFallback();
+    return;
+  }
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS: show permission button, do not auto-request
+    $('btn-imu-perm').style.display = 'inline-block';
+    $('imu-status').textContent = '🧭 Premi il pulsante per attivare la bussola';
+  } else {
+    requestIMU();
+  }
+}
+
+// ── Canvas compass ───────────────────────────────────────────────────────────
+let latestBearing = null;
+let latestDist2d = null;
+let latestReached = false;
+let prevDist2d = null;
+let animFrameId = null;
+
+function drawCompass() {
+  const canvas = $('compass-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const R = Math.min(cx, cy) - 8;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Outer ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fill();
+  ctx.strokeStyle = '#3498db';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Tick marks (rotate ring with heading so N always points to geographic North on screen)
+  const headingRad = imuAvailable && deviceHeading !== null
+    ? deviceHeading * Math.PI / 180
+    : 0;
+
+  for (let i = 0; i < 36; i++) {
+    const angle = (i * 10) * Math.PI / 180 - headingRad;
+    const isCard = i % 9 === 0;
+    const r1 = isCard ? R - 28 : R - 16;
+    const r2 = R - 6;
+    ctx.beginPath();
+    ctx.moveTo(cx + r1 * Math.sin(angle), cy - r1 * Math.cos(angle));
+    ctx.lineTo(cx + r2 * Math.sin(angle), cy - r2 * Math.cos(angle));
+    ctx.strokeStyle = isCard ? '#7f8c8d' : '#2c3e50';
+    ctx.lineWidth = isCard ? 2 : 1;
+    ctx.stroke();
+  }
+
+  // Cardinal labels (rotate with heading)
+  const cardinals = [['N', 0, '#e74c3c'], ['E', 90, '#95a5a6'], ['S', 180, '#95a5a6'], ['O', 270, '#95a5a6']];
+  ctx.font = 'bold 15px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  cardinals.forEach(([lbl, deg, color]) => {
+    const ang = deg * Math.PI / 180 - headingRad;
+    ctx.fillStyle = color;
+    ctx.fillText(lbl, cx + (R - 20) * Math.sin(ang), cy - (R - 20) * Math.cos(ang));
+  });
+
+  if (latestReached) {
+    // Target reached: show checkmark
+    ctx.font = '56px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('✅', cx, cy);
+  } else if (latestBearing !== null) {
+    const approaching = prevDist2d !== null && latestDist2d !== null && latestDist2d < prevDist2d;
+    const arrowColor = approaching ? '#2ecc71' : '#e74c3c';
+
+    // Arrow direction: heading-relative if IMU available, else North-up
+    let arrowRad;
+    if (imuAvailable && deviceHeading !== null) {
+      const relative = (latestBearing - deviceHeading + 360) % 360;
+      arrowRad = relative * Math.PI / 180;
+    } else {
+      arrowRad = latestBearing * Math.PI / 180;
+    }
+
+    // Triangle arrow
+    const tipDist = R * 0.58;
+    const baseDist = R * 0.30;
+    const halfWidth = R * 0.14;
+    const tipX = cx + tipDist * Math.sin(arrowRad);
+    const tipY = cy - tipDist * Math.cos(arrowRad);
+    const baseX = cx - baseDist * Math.sin(arrowRad);
+    const baseY = cy + baseDist * Math.cos(arrowRad);
+    const perpX = Math.cos(arrowRad) * halfWidth;
+    const perpY = Math.sin(arrowRad) * halfWidth;
+
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(baseX - perpX, baseY - perpY);
+    ctx.lineTo(baseX + perpX, baseY + perpY);
+    ctx.closePath();
+    ctx.fillStyle = arrowColor;
+    ctx.fill();
+
+    // Distance text in center
+    if (latestDist2d !== null) {
+      ctx.font = 'bold 17px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff';
+      const distStr = latestDist2d < 1
+        ? (latestDist2d * 100).toFixed(0) + ' cm'
+        : latestDist2d.toFixed(2) + ' m';
+      ctx.fillText(distStr, cx, cy);
+    }
+  } else {
+    // No fix yet
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#95a5a6';
+    ctx.fillText('Nessun fix', cx, cy);
+  }
+
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
+  ctx.fillStyle = '#ecf0f1';
+  ctx.fill();
+
+  animFrameId = requestAnimationFrame(drawCompass);
+}
+
+// ── Target / SSE controls ────────────────────────────────────────────────────
+$('target-select').addEventListener('change', (e) => {
+  $('manual-form').style.display = e.target.value === '_manual' ? 'block' : 'none';
 });
 
 $('start-btn').addEventListener('click', async () => {
   const sel = $('target-select').value;
   let target = null;
-  
-  if(sel === '_manual') {
+
+  if (sel === '_manual') {
     const lat = parseFloat($('manual-lat').value);
     const lon = parseFloat($('manual-lon').value);
     const alt = parseFloat($('manual-alt').value);
     const name = $('manual-name').value || 'Manual';
-    
-    if(isNaN(lat) || isNaN(lon) || isNaN(alt)) {
-      alert('Inserisci coordinate valide');
-      return;
-    }
-    
+    if (isNaN(lat) || isNaN(lon) || isNaN(alt)) { alert('Inserisci coordinate valide'); return; }
     target = {lat, lon, alt, name};
-  } else if(sel) {
+  } else if (sel) {
     const [sid, pid] = sel.split('|');
     target = {sid, pid};
   } else {
     alert('Seleziona un punto target');
     return;
   }
-  
+
   const threshold = parseFloat($('threshold').value) || 0.05;
-  
   const resp = await fetch('/stakeout/target', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({target, threshold})
   });
-  
-  if(resp.ok) {
+
+  if (resp.ok) {
     $('start-btn').style.display = 'none';
     $('stop-btn').style.display = 'inline-block';
     $('stakeout-data').style.display = 'block';
-    
+    initIMU();
+    if (!animFrameId) drawCompass();
+
     es = new EventSource('/stakeout/events');
     es.onmessage = (e) => {
       const data = JSON.parse(e.data);
@@ -137,21 +341,46 @@ $('start-btn').addEventListener('click', async () => {
 });
 
 $('stop-btn').addEventListener('click', () => {
-  if(es) { es.close(); es = null; }
+  if (es) { es.close(); es = null; }
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   $('start-btn').style.display = 'inline-block';
   $('stop-btn').style.display = 'none';
   $('stakeout-data').style.display = 'none';
+  latestBearing = null; latestDist2d = null; prevDist2d = null;
 });
 
+function cardinalArrow(deltaN, deltaE) {
+  const absN = Math.abs(deltaN || 0);
+  const absE = Math.abs(deltaE || 0);
+  let arrow = '⬆️ NORD';
+  if (absN > absE) {
+    arrow = (deltaN > 0) ? '⬆️ NORD' : '⬇️ SUD';
+  } else {
+    arrow = (deltaE > 0) ? '➡️ EST' : '⬅️ OVEST';
+  }
+  if (absN > 0.5 && absE > 0.5) {
+    if (deltaN > 0 && deltaE > 0) arrow = '↗️ NE';
+    else if (deltaN > 0 && deltaE < 0) arrow = '↖️ NO';
+    else if (deltaN < 0 && deltaE > 0) arrow = '↘️ SE';
+    else arrow = '↙️ SO';
+  }
+  return arrow;
+}
+
 function updateStakeout(data) {
-  if(!data || data.error) {
+  if (!data || data.error) {
     $('distance').textContent = data?.error || 'Errore';
     return;
   }
-  
+
   const threshold = parseFloat($('threshold').value) || 0.05;
   const reached = data.dist3d < threshold;
-  
+
+  prevDist2d = latestDist2d;
+  latestDist2d = data.dist2d ?? null;
+  latestBearing = data.bearing ?? null;
+  latestReached = reached;
+
   $('target-name').textContent = data.target_name || '-';
   $('deltaN').textContent = data.deltaN?.toFixed(3) + ' m' || '-';
   $('deltaE').textContent = data.deltaE?.toFixed(3) + ' m' || '-';
@@ -159,34 +388,37 @@ function updateStakeout(data) {
   $('dist2d').textContent = data.dist2d?.toFixed(3) + ' m' || '-';
   $('dist3d').textContent = data.dist3d?.toFixed(3) + ' m' || '-';
   $('distance').textContent = data.dist3d?.toFixed(3) + ' m';
-  
-  // Direzione
-  let arrow = '⬆️';
-  if(reached) {
-    arrow = '✅';
-    $('reached-msg').style.display = 'block';
-  } else {
-    $('reached-msg').style.display = 'none';
-    const absN = Math.abs(data.deltaN || 0);
-    const absE = Math.abs(data.deltaE || 0);
-    
-    if(absN > absE) {
-      arrow = (data.deltaN > 0) ? '⬆️ NORD' : '⬇️ SUD';
+
+  // Bearing / heading info
+  $('bearing-val').textContent = data.bearing !== undefined ? data.bearing.toFixed(0) + '°' : '-';
+  $('heading-val').textContent = (imuAvailable && deviceHeading !== null) ? deviceHeading.toFixed(0) + '°' : '-';
+
+  // RTK / accuracy
+  $('rtk-val').textContent = data.rtk || '-';
+  const hA = data.hAcc != null ? (data.hAcc * 1000).toFixed(0) + ' mm' : '-';
+  const vA = data.vAcc != null ? (data.vAcc * 1000).toFixed(0) + ' mm' : '-';
+  $('acc-val').textContent = hA + ' / ' + vA;
+  $('numSV-val').textContent = data.numSV != null ? data.numSV : '-';
+
+  // Fallback cardinal direction (visible only when IMU not available)
+  if (!imuAvailable) {
+    if (reached) {
+      $('direction').textContent = '✅';
     } else {
-      arrow = (data.deltaE > 0) ? '➡️ EST' : '⬅️ OVEST';
-    }
-    
-    if(absN > 0.5 && absE > 0.5) {
-      if(data.deltaN > 0 && data.deltaE > 0) arrow = '↗️ NE';
-      else if(data.deltaN > 0 && data.deltaE < 0) arrow = '↖️ NO';
-      else if(data.deltaN < 0 && data.deltaE > 0) arrow = '↘️ SE';
-      else arrow = '↙️ SO';
+      $('direction').textContent = cardinalArrow(data.deltaN, data.deltaE);
     }
   }
-  $('direction').textContent = arrow;
-  
-  // Progress bar (inversamente proporzionale alla distanza)
-  const maxDist = 10; // 10m come riferimento
+
+  if (reached) {
+    $('reached-msg').style.display = 'block';
+    // Haptic feedback on supported browsers
+    if (navigator.vibrate) { navigator.vibrate([200, 100, 200]); }
+  } else {
+    $('reached-msg').style.display = 'none';
+  }
+
+  // Progress bar
+  const maxDist = 10;
   const progress = Math.max(0, Math.min(100, 100 * (1 - data.dist3d / maxDist)));
   $('progress').style.width = progress + '%';
 }
