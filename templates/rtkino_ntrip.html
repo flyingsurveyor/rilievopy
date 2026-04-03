@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% set active = "rtkino" %}
+
+{% block title %}NTRIP BLE-only — Rilievo GNSS{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 720px; margin: 20px auto; padding: 0 16px; }
+.card {
+  background: #fff; border-radius: 10px; padding: 18px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08); margin-bottom: 16px;
+}
+.card h2 {
+  color: #2c3e50; margin: 0 0 14px; font-size: 16px;
+  border-bottom: 2px solid #3498db; padding-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card h2 .ico { font-size: 20px; }
+
+.field { margin-bottom: 12px; }
+.field label { display:block; font-weight:600; color:#555; margin-bottom:4px; font-size:13px; }
+.field input[type=text], .field input[type=number], .field input[type=password] {
+  width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:6px;
+  font-size:15px; box-sizing:border-box; background:#fafafa;
+}
+.field input:focus { border-color:#3498db; outline:none; background:#fff; }
+.field .hint { font-size:11px; color:#999; margin-top:2px; }
+.row { display:flex; gap:12px; }
+.row .field { flex:1; }
+
+.btn {
+  padding: 10px 20px; border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .2s, transform .1s; display: inline-block; text-decoration: none;
+}
+.btn:active { transform: scale(.96); }
+.btn-primary  { background: #3498db; color: #fff; }
+.btn-primary:hover { background: #2980b9; }
+.btn-success  { background: #2ecc71; color: #fff; }
+.btn-success:hover { background: #27ae60; }
+.btn-danger   { background: #e74c3c; color: #fff; }
+.btn-danger:hover { background: #c0392b; }
+.btn-outline  { background: transparent; border: 1px solid #ddd; color: #555; }
+.btn-outline:hover { background: #f8f8f8; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* Status card */
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); gap:10px; }
+.stat-cell .lbl { font-size:11px; color:#999; font-weight:600; text-transform:uppercase; }
+.stat-cell .val { font-size:16px; font-weight:700; color:#2c3e50; }
+
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; }
+.badge-ok   { background:#d5f5e3; color:#1a7a43; }
+.badge-off  { background:#f2f3f4; color:#888; }
+.badge-warn { background:#fff3cd; color:#856404; }
+.badge-ble  { background:#dbeafe; color:#1e40af; }
+
+/* Toast */
+.toast { position:fixed; bottom:24px; right:20px; padding:12px 20px; border-radius:8px;
+  color:#fff; font-weight:600; z-index:2000; transform:translateY(60px); opacity:0;
+  transition:transform .3s, opacity .3s; box-shadow:0 4px 12px rgba(0,0,0,.15); }
+.toast.show { transform:translateY(0); opacity:1; }
+.toast-ok  { background:#2ecc71; }
+.toast-err { background:#e74c3c; }
+
+/* Connection indicator */
+.conn-indicator { display:flex; align-items:center; gap:8px; padding:10px 14px;
+  border-radius:8px; margin-bottom:14px; font-size:13px; font-weight:600; }
+.conn-connected { background:#d5f5e3; color:#1a7a43; }
+.conn-disconnected { background:#f2f3f4; color:#666; }
+.conn-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.conn-connected .conn-dot { background:#2ecc71; animation: pulse 1.5s infinite; }
+.conn-disconnected .conn-dot { background:#bbb; }
+@keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- Header -->
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; padding-top:8px;">
+    <span style="font-size:28px;">📡</span>
+    <div>
+      <h1 style="margin:0; font-size:20px; color:#2c3e50;">NTRIP BLE-only</h1>
+      <p style="margin:0; font-size:12px; color:#999;">rilievo_gnss si connette al caster e inoltra RTCM via BLE a RTKino</p>
+    </div>
+    <div style="margin-left:auto;">
+      <a href="/rtkino" class="btn btn-outline btn-sm">← Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Status indicator -->
+  <div id="connIndicator" class="conn-indicator conn-disconnected">
+    <span class="conn-dot"></span>
+    <span id="connText">Non connesso</span>
+  </div>
+
+  <!-- Stato live -->
+  <div class="card">
+    <h2><span class="ico">📊</span> Stato connessione NTRIP</h2>
+    <div class="stat-grid" id="statGrid">
+      <div class="stat-cell"><div class="lbl">Host</div><div class="val" id="st_host">—</div></div>
+      <div class="stat-cell"><div class="lbl">Mountpoint</div><div class="val" id="st_mnt">—</div></div>
+      <div class="stat-cell"><div class="lbl">Dati ricevuti</div><div class="val" id="st_bytes">—</div></div>
+      <div class="stat-cell"><div class="lbl">Chunk RTCM</div><div class="val" id="st_msgs">—</div></div>
+      <div class="stat-cell"><div class="lbl">Uptime</div><div class="val" id="st_uptime">—</div></div>
+      <div class="stat-cell"><div class="lbl">BLE forward</div><div class="val" id="st_ble">—</div></div>
+    </div>
+    <div id="lastErr" style="margin-top:8px; font-size:12px; color:#e74c3c; display:none;"></div>
+  </div>
+
+  <!-- Configurazione caster -->
+  <div class="card">
+    <h2><span class="ico">⚙️</span> Configurazione caster NTRIP</h2>
+
+    <div class="row">
+      <div class="field">
+        <label>Host / IP caster</label>
+        <input type="text" id="ntrip_host" placeholder="rtk2go.com" value="{{ ntrip_host }}"/>
+        <div class="hint">Es. rtk2go.com oppure il tuo caster NTRIP privato</div>
+      </div>
+      <div class="field" style="max-width:110px;">
+        <label>Porta</label>
+        <input type="number" id="ntrip_port" min="1" max="65535" value="{{ ntrip_port }}"/>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Mountpoint</label>
+      <input type="text" id="ntrip_mountpoint" placeholder="NOME_MOUNTPOINT" value="{{ ntrip_mountpoint }}"/>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" id="ntrip_user" placeholder="(opzionale)" value="{{ ntrip_user }}"/>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="ntrip_password" placeholder="(opzionale)"/>
+        <div class="hint">La password è salvata in chiaro nel file di configurazione locale.</div>
+      </div>
+    </div>
+
+    <div class="field" style="max-width:220px;">
+      <label>Invio GGA ogni (secondi)</label>
+      <input type="number" id="ntrip_gga_interval" min="1" max="60" value="{{ ntrip_gga_interval }}"/>
+      <div class="hint">Necessario per VRS; 0 per disabilitare.</div>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+      <button class="btn btn-success" id="btnStart" onclick="startNtrip()">▶ Connetti NTRIP</button>
+      <button class="btn btn-danger"  id="btnStop"  onclick="stopNtrip()">■ Disconnetti</button>
+    </div>
+  </div>
+
+  <!-- Info BLE -->
+  <div class="card" style="background:#f0f7ff; border:1px solid #bcd;">
+    <h2><span class="ico">🔵</span> Modalità BLE-only</h2>
+    <p style="font-size:13px; color:#555; margin:0 0 8px;">
+      In questa modalità <strong>rilievo_gnss</strong> funge da bridge NTRIP → BLE:
+    </p>
+    <ol style="font-size:13px; color:#555; margin:0; padding-left:20px; line-height:1.7;">
+      <li>Connetti RTKino via BLE da <a href="/settings">Impostazioni</a></li>
+      <li>Inserisci le credenziali del caster NTRIP qui sopra</li>
+      <li>Premi <strong>Connetti NTRIP</strong></li>
+      <li>I dati RTCM vengono automaticamente inoltrati a RTKino via BLE</li>
+    </ol>
+    <div id="bleStatus" style="margin-top:10px; font-size:12px; color:#555;"></div>
+  </div>
+
+</div>
+<div id="toast" class="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var _pollTimer = null;
+
+function showToast(msg, ok) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err');
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 3500);
+}
+
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+function fmtUptime(s) {
+  if (s < 60) return s.toFixed(0) + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60).toFixed(0) + 's';
+  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+}
+
+function updateStatus() {
+  fetch('/api/rtkino/ntrip/status')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var ind = document.getElementById('connIndicator');
+      var ct  = document.getElementById('connText');
+      if (d.connected) {
+        ind.className = 'conn-indicator conn-connected';
+        ct.textContent = '● Connesso a ' + (d.host||'') + ':' + (d.port||'') + '/' + (d.mountpoint||'');
+      } else {
+        ind.className = 'conn-indicator conn-disconnected';
+        ct.textContent = 'Non connesso';
+      }
+      document.getElementById('st_host').textContent  = d.host || '—';
+      document.getElementById('st_mnt').textContent   = d.mountpoint || '—';
+      document.getElementById('st_bytes').textContent = d.bytes_received != null ? fmtBytes(d.bytes_received) : '—';
+      document.getElementById('st_msgs').textContent  = d.chunks != null ? d.chunks : '—';
+      document.getElementById('st_uptime').textContent = d.uptime != null ? fmtUptime(d.uptime) : '—';
+
+      var errEl = document.getElementById('lastErr');
+      if (d.last_error) { errEl.textContent = 'Ultimo errore: ' + d.last_error; errEl.style.display = ''; }
+      else               { errEl.style.display = 'none'; }
+    })
+    .catch(function(){});
+
+  // BLE status
+  fetch('/api/rtkino/status')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var bleEl = document.getElementById('st_ble');
+      var bleInfo = document.getElementById('bleStatus');
+      var mode = d.conn_mode || 'disconnected';
+      if (mode === 'ble' || mode === 'tcp') {
+        bleEl.innerHTML = '<span class="badge badge-ble">🔵 BLE attivo</span>';
+        bleInfo.textContent = '✅ BLE connesso — i dati RTCM verranno inoltrati automaticamente.';
+      } else {
+        bleEl.innerHTML = '<span class="badge badge-off">⚫ non connesso</span>';
+        bleInfo.textContent = '⚠️ BLE non connesso. Connetti prima RTKino via BLE nelle impostazioni.';
+      }
+    })
+    .catch(function(){});
+}
+
+function startNtrip() {
+  var host       = document.getElementById('ntrip_host').value.trim();
+  var port       = parseInt(document.getElementById('ntrip_port').value) || 2101;
+  var mountpoint = document.getElementById('ntrip_mountpoint').value.trim();
+  var user       = document.getElementById('ntrip_user').value.trim();
+  var password   = document.getElementById('ntrip_password').value;
+  var gga        = parseFloat(document.getElementById('ntrip_gga_interval').value) || 5;
+
+  if (!host || !mountpoint) {
+    showToast('Host e mountpoint obbligatori', false);
+    return;
+  }
+
+  fetch('/api/rtkino/ntrip/start', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({host:host, port:port, mountpoint:mountpoint,
+                          user:user, password:password, gga_interval:gga})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok) { showToast('NTRIP avviato ✓', true); setTimeout(updateStatus, 1000); }
+    else showToast('Errore: ' + (d.error||'?'), false);
+  })
+  .catch(function(){ showToast('Errore di rete', false); });
+}
+
+function stopNtrip() {
+  fetch('/api/rtkino/ntrip/stop', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      showToast(d.ok ? 'NTRIP fermato' : ('Errore: ' + (d.error||'?')), d.ok);
+      setTimeout(updateStatus, 500);
+    })
+    .catch(function(){ showToast('Errore di rete', false); });
+}
+
+updateStatus();
+_pollTimer = setInterval(updateStatus, 2000);
+</script>
+{% endblock %}

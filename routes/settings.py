@@ -54,7 +54,11 @@ def settings_page():
         sel_trim="selected" if s.get("robust_mode") == "trim" else "",
         sel_median="selected" if s.get("robust_mode") == "median" else "",
         workspace_dir=ws,
-        workspace_default=workspace.default_workspace())
+        workspace_default=workspace.default_workspace(),
+        rtkino_host=s.get("rtkino_host", ""),
+        rtkino_port=str(s.get("rtkino_port", 80)),
+        rtkino_polling_checked="checked" if s.get("rtkino_polling", False) else "",
+        rtkino_poll_interval=str(s.get("rtkino_poll_interval", 2.0)))
 
 
 @bp.route("/api/settings", methods=["POST"])

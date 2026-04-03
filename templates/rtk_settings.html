@@ -174,6 +174,33 @@
     </div>
   </div>
 
+  <!-- RTKino Integration -->
+  <div class="card">
+    <h2><span class="ico">🛰️</span> RTKino Integration</h2>
+    <div class="row">
+      <div class="field">
+        <label>Host / IP RTKino</label>
+        <input type="text" name="rtkino_host" id="rtkino_host" placeholder="es. 192.168.1.200" value="{{ rtkino_host }}"/>
+        <div class="hint">Indirizzo IP di RTKino sulla rete WiFi locale</div>
+      </div>
+      <div class="field" style="max-width:120px">
+        <label>Porta HTTP</label>
+        <input type="number" name="rtkino_port" id="rtkino_port" min="1" max="65535" value="{{ rtkino_port }}"/>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" name="rtkino_polling" id="rtkino_polling" {{ rtkino_polling_checked }} /><span class="slider"></span></label>
+      <label>Polling automatico stato e posizione</label>
+    </div>
+    <div class="field" style="max-width:200px">
+      <label>Intervallo polling (secondi)</label>
+      <input type="number" name="rtkino_poll_interval" id="rtkino_poll_interval" min="1" max="30" step="0.5" value="{{ rtkino_poll_interval }}"/>
+    </div>
+    <div style="margin-top:8px;">
+      <a href="/rtkino" class="btn btn-outline" style="font-size:13px;padding:8px 14px;">🛰️ Apri dashboard RTKino</a>
+    </div>
+  </div>
+
 
   </form>
 
