@@ -41,10 +41,12 @@ bp = Blueprint("rtkino", __name__)
 @bp.route("/rtkino")
 def rtkino_page():
     """Pagina unificata RTKino: IP, BLE, polling, NTRIP, status, comandi rapidi."""
+    from modules.settings import RTKINO_TCP_PORT
     s = cfg.load_settings()
     return render_template(
         "rtkino_dashboard.html",
         rtkino_host=s.get("rtkino_host", ""),
+        rtkino_tcp_port=RTKINO_TCP_PORT,
         rtkino_polling=s.get("rtkino_polling", False),
         rtkino_poll_interval=s.get("rtkino_poll_interval", 2.0),
         ble_enabled=s.get("ble_enabled", False),
@@ -98,10 +100,9 @@ def api_rtkino_settings():
 
     changes: dict = {}
 
-    # RTKino host (solo IP — le porte sono fisse: :80 WebUI, :7856 TCP Streamer)
+    # RTKino host (IP only — ports are fixed: :80 WebUI, :7856 TCP Streamer)
     rtkino_host = (s_in.get("rtkino_host") or "").strip()
     changes["rtkino_host"] = rtkino_host
-    changes["rtkino_port"] = 80  # WebUI sempre su porta 80
 
     # HTTP polling
     changes["rtkino_polling"] = bool(s_in.get("rtkino_polling", False))

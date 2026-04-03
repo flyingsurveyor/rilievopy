@@ -135,7 +135,7 @@
     </div>
     <div class="info-box">
       <strong>WebUI</strong> RTKino: <code>http://&lt;IP&gt;:80</code> &nbsp;|&nbsp;
-      <strong>TCP Streamer</strong> NMEA/UBX: <code>&lt;IP&gt;:7856</code>
+      <strong>TCP Streamer</strong> NMEA/UBX: <code>&lt;IP&gt;:{{ rtkino_tcp_port }}</code>
     </div>
   </div>
 
@@ -400,7 +400,7 @@ function saveAndConnect() {
     body: JSON.stringify({action: 'save_and_connect', settings: getRTKinoSettings()})
   }).then(function(r){ return r.json(); })
     .then(function(d){
-      if (d.ok) { showToast('Connessione TCP avviata → ' + host + ':7856 ✓', true); setTimeout(refreshStatus, 1000); }
+      if (d.ok) { showToast('Connessione TCP avviata → ' + host + ':' + RTKINO_TCP_PORT + ' ✓', true); setTimeout(refreshStatus, 1000); }
       else showToast('Errore: ' + (d.error || '?'), false);
     }).catch(function(){ showToast('Errore di rete', false); });
 }
@@ -418,7 +418,7 @@ function refreshStatus() {
       var cb  = document.getElementById('connBadge');
       if (conn === 'tcp') {
         ind.className = 'conn-indicator conn-tcp';
-        ct.textContent = '● TCP connesso — RTKino TCP Streamer :7856';
+        ct.textContent = '● TCP connesso — RTKino TCP Streamer :' + RTKINO_TCP_PORT;
         cb.className   = 'badge badge-tcp'; cb.textContent = '🟢 TCP';
       } else if (conn === 'ble') {
         ind.className = 'conn-indicator conn-connected';
@@ -431,7 +431,7 @@ function refreshStatus() {
       }
 
       // System status
-      badge(document.getElementById('st_conn'),    conn,                 conn === 'tcp' ? 'badge-tcp' : conn === 'ble' ? 'badge-ble' : 'badge-off');
+      badge(document.getElementById('st_conn'),    conn,                 connBadgeClass(conn));
       var rs = d.rtkino_status || {};
       badge(document.getElementById('st_wifi'),    rs.wifi  ? 'ON' : 'OFF',  rs.wifi  ? 'badge-ok' : 'badge-off');
       badge(document.getElementById('st_ntrip_rk'),rs.ntrip ? 'ON' : 'OFF',  rs.ntrip ? 'badge-ok' : 'badge-off');
@@ -544,6 +544,14 @@ function stopNtrip() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+var RTKINO_TCP_PORT = {{ rtkino_tcp_port }};
+
+function connBadgeClass(conn) {
+  if (conn === 'tcp') return 'badge-tcp';
+  if (conn === 'ble') return 'badge-ble';
+  return 'badge-off';
+}
+
 refreshStatus();
 _pollTimer = setInterval(refreshStatus, AUTO_REFRESH);
 </script>
