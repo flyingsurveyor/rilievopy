@@ -24,11 +24,11 @@
     }
 
     /* Reset: prevent page-level 'button' rules from leaking into topbar */
-    .topbar button, .topbar a.mode-switch {
+    .topbar button {
         margin: 0; min-height: 0; width: auto; font-size: inherit;
     }
 
-    /* Hamburger — immune to page-level button overrides */
+    /* Hamburger — always visible, immune to page-level button overrides */
     .topbar .nav-toggle {
         background: none; border: none; cursor: pointer;
         padding: 8px; margin: 0 10px 0 0;
@@ -40,30 +40,9 @@
         background: #fff; border-radius: 2px; transition: .3s;
     }
 
-    /* Mode switch button */
-    .mode-switch {
-        order: 1;
-        padding: 5px 14px;
-        border-radius: 6px;
-        border: none;
-        font-weight: 700;
-        font-size: 12px;
-        letter-spacing: 1px;
-        cursor: pointer;
-        text-transform: uppercase;
-        text-decoration: none;
-        color: #fff;
-        margin-right: 14px;
-        transition: background .2s, transform .15s;
-        line-height: 1.2;
-    }
-    .mode-switch:hover { transform: scale(1.05); }
-    .mode-switch.to-ppk { background: #2ecc71; }
-    .mode-switch.to-rtk { background: #e74c3c; }
-
     /* Brand */
     .topbar-brand {
-        order: 2;
+        order: 1;
         display: flex; align-items: center; gap: 6px;
         white-space: nowrap;
     }
@@ -82,33 +61,33 @@
 
     /* ── GNSS status indicator in topbar ── */
     .topbar-gnss {
-        order: 3;
+        order: 2;
         margin-left: auto;
         margin-right: 4px;
         display: flex; align-items: center; gap: 7px;
     }
     /* The dot/dash indicator */
     .gnss-dot {
-        width: 12px; height: 12px;
+        width: 16px; height: 16px;
         border-radius: 50%;
         background: #e74c3c;
         flex-shrink: 0;
         transition: background .3s, border-radius .3s, height .3s;
     }
-    /* no-data state: becomes a horizontal dash (same width, thin height) */
+    /* no-data state: becomes a horizontal dash */
     .gnss-dot.nodata {
         border-radius: 3px;
         height: 3px;
         background: #94a3b8;
     }
-    .gnss-dot.none  { background: #e74c3c; border-radius: 50%; height: 12px; }
-    .gnss-dot.float { background: #f39c12; border-radius: 50%; height: 12px; }
-    .gnss-dot.fixed { background: #2ecc71; border-radius: 50%; height: 12px; }
+    .gnss-dot.none  { background: #e74c3c; border-radius: 50%; height: 16px; }
+    .gnss-dot.float { background: #f39c12; border-radius: 50%; height: 16px; }
+    .gnss-dot.fixed { background: #2ecc71; border-radius: 50%; height: 16px; }
     /* subtle glow on fixed */
-    .gnss-dot.fixed { box-shadow: 0 0 6px rgba(46,204,113,.7); }
+    .gnss-dot.fixed { box-shadow: 0 0 8px rgba(46,204,113,.8); }
     /* label next to dot */
     .gnss-label {
-        font-size: 11px; font-weight: 600; color: #94a3b8;
+        font-size: 13px; font-weight: 700; color: #94a3b8;
         letter-spacing: .3px; white-space: nowrap;
     }
 
@@ -128,7 +107,7 @@
     }
     .sidebar-overlay.visible { display: block; }
 
-    .sidebar-nav { flex: 1; padding: 8px 0; }
+    .sidebar-nav { flex: 1; padding: 12px 0 8px; }
 
     .nav-item {
         display: flex; align-items: center; gap: 10px;
@@ -152,40 +131,24 @@
         padding: 16px 14px 6px;
     }
 
-    .sidebar-footer {
-        padding: 10px 14px;
+    /* Sezione comune in fondo alla sidebar */
+    .sidebar-common {
         border-top: 1px solid rgba(255,255,255,.06);
+        padding-bottom: 8px;
     }
-
-    /* RTK live status dot in sidebar footer */
-    .rtk-status-line {
-        display: flex; align-items: center; gap: 8px;
-        font-size: 11px; color: #94a3b8;
-    }
-    .rtk-status-dot {
-        width: 8px; height: 8px; border-radius: 50%;
-        display: inline-block;
-        background: #e74c3c;
-        transition: background .3s;
-        flex-shrink: 0;
-    }
-    .rtk-status-dot.fixed { background: #2ecc71; }
-    .rtk-status-dot.float { background: #f39c12; }
-    .rtk-status-dot.none  { background: #e74c3c; }
+    .nav-mode-switch { font-weight: 700; }
+    .nav-mode-ppk { color: #2ecc71 !important; }
+    .nav-mode-ppk svg { color: #2ecc71; }
+    .nav-mode-ppk:hover { background: rgba(46,204,113,.1) !important; }
+    .nav-mode-rtk { color: #e74c3c !important; }
+    .nav-mode-rtk svg { color: #e74c3c; }
+    .nav-mode-rtk:hover { background: rgba(231,76,60,.1) !important; }
 
     /* ═══ Main content ═══ */
     .content {
         margin-top: 44px;
         min-height: calc(100vh - 44px);
         padding: 0;
-    }
-
-    /* ═══ Desktop: sidebar always visible ═══ */
-    @media (min-width: 769px) {
-        .sidebar { left: 0; }
-        .content { margin-left: 195px; }
-        .nav-toggle { display: none; }
-        .sidebar-overlay { display: none !important; }
     }
     </style>
     {% block head %}{% endblock %}
@@ -196,12 +159,6 @@
         <button class="nav-toggle" id="navToggle" aria-label="Menu">
             <span></span><span></span><span></span>
         </button>
-
-        {% if mode == 'rtk' %}
-        <a href="/convbin" class="mode-switch to-ppk">PPK</a>
-        {% else %}
-        <a href="/" class="mode-switch to-rtk">RTK</a>
-        {% endif %}
 
         <div class="topbar-brand">
             <span class="brand-icon">◎</span>
@@ -272,23 +229,6 @@
                 <span>Poligonali</span>
             </a>
 
-            <a href="/rtkino" class="nav-item {% if active == 'rtkino' %}active{% endif %}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/>
-                    <circle cx="12" cy="9" r="2.5"/>
-                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
-                </svg>
-                <span>RTKino</span>
-            </a>
-
-            <a href="/settings" class="nav-item {% if active == 'settings' %}active{% endif %}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-                <span>Settings</span>
-            </a>
-
         {% else %}
             <div class="nav-section-label">Post-Processing</div>
             <a href="/convbin" class="nav-item {% if active == 'convbin' %}active{% endif %}">
@@ -325,22 +265,44 @@
                 </svg>
                 <span>Files</span>
             </a>
-            <a href="/settings" class="nav-item {% if active == 'settings' %}active{% endif %}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-                <span>Settings</span>
-            </a>
         {% endif %}
         </nav>
 
-        <!-- RTK status in sidebar footer (small, secondary) -->
-        <div class="sidebar-footer">
-            <div class="rtk-status-line">
-                <span class="rtk-status-dot none" id="rtkDot"></span>
-                <span id="rtkStatusText">RTK: —</span>
-            </div>
+        <!-- Sezione comune: Settings, RTKino e cambio modalità — sempre visibili -->
+        <div class="sidebar-common">
+            <div class="nav-section-label">Strumenti</div>
+            <a href="/rtkino" class="nav-item {% if active == 'rtkino' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/>
+                    <circle cx="12" cy="9" r="2.5"/>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+                </svg>
+                <span>RTKino</span>
+            </a>
+            <a href="/settings" class="nav-item {% if active == 'settings' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 12a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 6.04a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 1.72a1.65 1.65 0 0 0 1-1.51V0a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 6a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Settings</span>
+            </a>
+            <!-- Pulsante cambio modalità -->
+            <div class="nav-section-label">Modalità</div>
+            {% if mode == 'rtk' %}
+            <a href="/convbin" class="nav-item nav-mode-switch nav-mode-ppk">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+                <span>Passa a PPK</span>
+            </a>
+            {% else %}
+            <a href="/" class="nav-item nav-mode-switch nav-mode-rtk">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+                <span>Passa a RTK</span>
+            </a>
+            {% endif %}
         </div>
     </aside>
 
@@ -349,7 +311,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Overlay for mobile sidebar -->
+    <!-- Overlay -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <script src="/static/js/upload.js"></script>
@@ -368,44 +330,37 @@
             overlay.classList.remove('visible');
         });
 
-        /* ── GNSS status indicator — topbar dot + sidebar footer dot ── */
+        /* ── GNSS status indicator — topbar dot ── */
         (function() {
-            var gnssDot  = document.getElementById('gnssDot');
-            var gnssLbl  = document.getElementById('gnssLabel');
-            var sidebarDot = document.getElementById('rtkDot');
-            var sidebarTxt = document.getElementById('rtkStatusText');
+            var gnssDot = document.getElementById('gnssDot');
+            var gnssLbl = document.getElementById('gnssLabel');
 
             var es = null;
             var reconnectTimer = null;
             var reconnectDelay = 2000;
-            var dataTimeout = null;    // detect "no data arriving"
+            var dataTimeout = null;
 
             function setNoData() {
-                if (gnssDot)    { gnssDot.className = 'gnss-dot nodata'; }
-                if (gnssLbl)    { gnssLbl.textContent = '—'; }
-                if (sidebarDot) { sidebarDot.className = 'rtk-status-dot none'; }
-                if (sidebarTxt) { sidebarTxt.textContent = 'RTK: —'; }
+                if (gnssDot) { gnssDot.className = 'gnss-dot nodata'; }
+                if (gnssLbl) { gnssLbl.textContent = '—'; }
             }
 
             function applyStatus(rtk) {
                 var cls = rtk === 'RTK fixed' || rtk === 'likely fixed' ? 'fixed'
                         : rtk === 'RTK float' ? 'float'
                         : 'none';
-                var short = rtk === 'RTK fixed'    ? 'FIX'
-                          : rtk === 'RTK float'    ? 'FLT'
+                var label = rtk === 'RTK fixed'    ? 'FIX'
+                          : rtk === 'RTK float'    ? 'FLOAT'
                           : rtk === 'likely fixed' ? 'FIX'
                           : rtk === '-' || !rtk    ? '—'
-                          : 'SGL';
+                          : 'SINGLE';
 
-                if (gnssDot)    { gnssDot.className = 'gnss-dot ' + cls; }
-                if (gnssLbl)    { gnssLbl.textContent = short; }
-                if (sidebarDot) { sidebarDot.className = 'rtk-status-dot ' + cls; }
-                if (sidebarTxt) { sidebarTxt.textContent = 'RTK: ' + (rtk || '—'); }
+                if (gnssDot) { gnssDot.className = 'gnss-dot ' + cls; }
+                if (gnssLbl) { gnssLbl.textContent = label; }
             }
 
             function resetDataTimeout() {
                 clearTimeout(dataTimeout);
-                // If no message arrives within 3s, switch to nodata visual
                 dataTimeout = setTimeout(setNoData, 3000);
             }
 
