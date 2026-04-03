@@ -38,10 +38,6 @@ def settings_page():
     s = cfg.load_settings()
     ws = workspace.get_workspace()
     return render_template('rtk_settings.html',
-        gnss_host=s.get("gnss_host", ""),
-        gnss_port=str(s.get("gnss_port", 1234)),
-        gnss_autoconnect_checked="checked" if s.get("gnss_autoconnect", True) else "",
-        retry_interval=str(s.get("retry_interval", 3.0)),
         relay_enabled_checked="checked" if s.get("relay_enabled", True) else "",
         relay_bind=s.get("relay_bind", "127.0.0.1"),
         relay_port=str(s.get("relay_port", 21100)),
@@ -54,11 +50,7 @@ def settings_page():
         sel_trim="selected" if s.get("robust_mode") == "trim" else "",
         sel_median="selected" if s.get("robust_mode") == "median" else "",
         workspace_dir=ws,
-        workspace_default=workspace.default_workspace(),
-        rtkino_host=s.get("rtkino_host", ""),
-        rtkino_port=str(s.get("rtkino_port", 80)),
-        rtkino_polling_checked="checked" if s.get("rtkino_polling", False) else "",
-        rtkino_poll_interval=str(s.get("rtkino_poll_interval", 2.0)))
+        workspace_default=workspace.default_workspace())
 
 
 @bp.route("/api/settings", methods=["POST"])
@@ -103,14 +95,17 @@ def api_settings():
     utils.ROBUST_TRIM_Q = saved.get("robust_trim_q", 0.10)
 
     if action == "save_and_connect":
-        CONN.restart(
-            gnss_host=saved.get("gnss_host", ""),
-            gnss_port=saved.get("gnss_port", 1234),
-            relay_enabled=saved.get("relay_enabled", False),
-            relay_bind=saved.get("relay_bind", "127.0.0.1"),
-            relay_port=saved.get("relay_port", 21100),
-            retry=saved.get("retry_interval", 3.0),
-        )
+        from modules.settings import RTKINO_TCP_PORT
+        rtkino_host = saved.get("rtkino_host", "")
+        if rtkino_host:
+            CONN.restart(
+                gnss_host=rtkino_host,
+                gnss_port=RTKINO_TCP_PORT,
+                relay_enabled=saved.get("relay_enabled", False),
+                relay_bind=saved.get("relay_bind", "127.0.0.1"),
+                relay_port=saved.get("relay_port", 21100),
+                retry=saved.get("retry_interval", 3.0),
+            )
 
     return {"ok": True}
 
@@ -119,11 +114,15 @@ def api_settings():
 def api_settings_status():
     s = cfg.load_settings()
     conn_status = CONN.status()
+    from modules.settings import RTKINO_TCP_PORT
+    rtkino_host = s.get("rtkino_host", "")
     return {
-        "gnss_host": s.get("gnss_host", ""),
-        "gnss_port": s.get("gnss_port", 0),
+        "gnss_host": rtkino_host,
+        "gnss_port": RTKINO_TCP_PORT if rtkino_host else 0,
         "gnss_connected": conn_status["gnss_connected"],
         "relay_active": conn_status["relay_active"],
+        "rtkino_host": rtkino_host,
+        "rtkino_tcp_port": RTKINO_TCP_PORT,
     }
 
 

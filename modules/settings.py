@@ -1,7 +1,6 @@
 """
 Persistent settings manager.
-Loads/saves configuration from rilievo_settings.json.
-Lives alongside the surveys directory.
+Loads/saves configuration from rilievo_settings.json (project root).
 """
 
 import json
@@ -10,6 +9,9 @@ import threading
 from typing import Dict, Any, Optional
 
 from .utils import now_iso
+
+# RTKino TCP Streamer fixed port (hard-coded, not configurable by user)
+RTKINO_TCP_PORT: int = 7856
 
 # ---------- Defaults ----------
 DEFAULTS: Dict[str, Any] = {
