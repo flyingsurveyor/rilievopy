@@ -22,15 +22,16 @@ class _RTKinoManager:
     def get_api(self):
         """Restituisce un RTKinoAPI configurato con le impostazioni correnti."""
         from modules.rtkino_api import RTKinoAPI
+        from modules.settings import RTKINO_WEBUI_PORT
         s = cfg.load_settings()
         host = s.get("rtkino_host", "")
         if not host:
             return None
-        return RTKinoAPI(host=host, port=80, timeout=5.0)
+        return RTKinoAPI(host=host, port=RTKINO_WEBUI_PORT, timeout=5.0)
 
     def combined_status(self) -> dict:
         """Stato combinato per l'API /api/rtkino/status."""
-        from modules.settings import RTKINO_TCP_PORT
+        from modules.settings import RTKINO_TCP_PORT, RTKINO_WEBUI_PORT
         s = cfg.load_settings()
         host = s.get("rtkino_host", "")
         conn_mode = "connected" if host else "disconnected"
@@ -38,7 +39,7 @@ class _RTKinoManager:
             "conn_mode": conn_mode,
             "host": host,
             "tcp_port": RTKINO_TCP_PORT,
-            "api_port": 80,
+            "api_port": RTKINO_WEBUI_PORT,
         }
 
 

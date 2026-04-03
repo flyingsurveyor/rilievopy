@@ -10,8 +10,9 @@ from typing import Dict, Any, Optional
 
 from .utils import now_iso
 
-# RTKino TCP Streamer fixed port (hard-coded, not configurable by user)
-RTKINO_TCP_PORT: int = 7856
+# RTKino fixed ports (hard-coded, not configurable by user)
+RTKINO_TCP_PORT: int = 7856   # TCP Streamer (NMEA/UBX data)
+RTKINO_WEBUI_PORT: int = 80   # WebUI HTTP API
 
 # ---------- Defaults ----------
 DEFAULTS: Dict[str, Any] = {

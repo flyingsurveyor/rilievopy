@@ -48,13 +48,13 @@ def rtkino_page():
 
 @bp.route("/rtkino/surveys")
 def rtkino_surveys():
+    from modules.settings import RTKINO_WEBUI_PORT
     s = cfg.load_settings()
     return render_template(
         "rtkino_surveys.html",
         rtkino_host=s.get("rtkino_host", ""),
-        rtkino_port=80,
+        rtkino_port=RTKINO_WEBUI_PORT,
     )
-
 
 # ── API: stato combinato ──────────────────────────────────────────────────────
 
