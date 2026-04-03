@@ -53,7 +53,7 @@ class NtripClient:
 
         self._connected = False
         self._bytes_received: int = 0
-        self._messages: int = 0
+        self._chunks: int = 0
         self._start_time: Optional[float] = None
         self._last_error: str = ""
 
@@ -76,7 +76,7 @@ class NtripClient:
             self._gga_provider = gga_provider
             self._stop_event.clear()
             self._bytes_received = 0
-            self._messages = 0
+            self._chunks = 0
             self._start_time = time.time()
             self._connected = False
             self._thread = threading.Thread(
@@ -109,7 +109,7 @@ class NtripClient:
             "port": self.port,
             "mountpoint": self.mountpoint,
             "bytes_received": self._bytes_received,
-            "messages": self._messages,
+            "chunks": self._chunks,
             "uptime": round(uptime, 1),
             "last_error": self._last_error,
         }
@@ -142,7 +142,7 @@ class NtripClient:
 
         # Leggi risposta HTTP (fino a \r\n\r\n)
         response = self._read_http_response(sock)
-        if not response.startswith("ICY 200 OK") and "200 OK" not in response:
+        if "200 OK" not in response and not response.startswith("ICY 200 OK"):
             raise ConnectionError(f"NTRIP response: {response[:80]!r}")
 
         logger.info("[ntrip] NTRIP stream attivo (mountpoint=%s)", self.mountpoint)
@@ -171,7 +171,7 @@ class NtripClient:
                     raise ConnectionError("NTRIP server closed connection")
 
                 self._bytes_received += len(chunk)
-                self._messages += 1
+                self._chunks += 1
 
                 if self._rtcm_callback:
                     try:

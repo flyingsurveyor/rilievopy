@@ -176,9 +176,9 @@ def api_rtkino_survey_import():
             json.dump(geojson, fh, ensure_ascii=False, indent=2)
 
         return jsonify({"ok": True, "local_id": local_id, "title": original_title, "file": filename})
-    except Exception as exc:
+    except Exception:
         logger.exception("[rtkino] import survey error")
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        return jsonify({"ok": False, "error": "Errore interno durante l'importazione"}), 500
 
 
 @bp.route("/api/rtkino/survey/<sid>/points")
@@ -262,9 +262,9 @@ def api_ntrip_start():
             user=user, password=password, gga_interval=gga_interval,
         )
         return jsonify({"ok": True})
-    except Exception as exc:
+    except Exception:
         logger.exception("[rtkino] ntrip start error")
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        return jsonify({"ok": False, "error": "Errore durante l'avvio del client NTRIP"}), 500
 
 
 @bp.route("/api/rtkino/ntrip/stop", methods=["POST"])

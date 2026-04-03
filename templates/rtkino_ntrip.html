@@ -103,7 +103,7 @@
       <div class="stat-cell"><div class="lbl">Host</div><div class="val" id="st_host">—</div></div>
       <div class="stat-cell"><div class="lbl">Mountpoint</div><div class="val" id="st_mnt">—</div></div>
       <div class="stat-cell"><div class="lbl">Dati ricevuti</div><div class="val" id="st_bytes">—</div></div>
-      <div class="stat-cell"><div class="lbl">Messaggi RTCM</div><div class="val" id="st_msgs">—</div></div>
+      <div class="stat-cell"><div class="lbl">Chunk RTCM</div><div class="val" id="st_msgs">—</div></div>
       <div class="stat-cell"><div class="lbl">Uptime</div><div class="val" id="st_uptime">—</div></div>
       <div class="stat-cell"><div class="lbl">BLE forward</div><div class="val" id="st_ble">—</div></div>
     </div>
@@ -213,7 +213,7 @@ function updateStatus() {
       document.getElementById('st_host').textContent  = d.host || '—';
       document.getElementById('st_mnt').textContent   = d.mountpoint || '—';
       document.getElementById('st_bytes').textContent = d.bytes_received != null ? fmtBytes(d.bytes_received) : '—';
-      document.getElementById('st_msgs').textContent  = d.messages != null ? d.messages : '—';
+      document.getElementById('st_msgs').textContent  = d.chunks != null ? d.chunks : '—';
       document.getElementById('st_uptime').textContent = d.uptime != null ? fmtUptime(d.uptime) : '—';
 
       var errEl = document.getElementById('lastErr');

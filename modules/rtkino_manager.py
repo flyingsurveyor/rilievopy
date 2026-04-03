@@ -112,7 +112,10 @@ class _RTKinoManager:
             )
 
         def _rtcm_cb(data: bytes):
-            send_rtcm_via_ble(data)
+            try:
+                send_rtcm_via_ble(data)
+            except Exception as exc:
+                logger.debug("[rtkino_mgr] BLE forward error: %s", exc)
 
         def _gga_provider() -> str:
             return _get_current_gga()
@@ -239,15 +242,16 @@ def _build_gga(lat: float, lon: float, alt: float) -> str:
     now = datetime.datetime.utcnow()
     hhmmss = now.strftime("%H%M%S.00")
 
-    def dms(deg: float, pos_char: str, neg_char: str):
+    def dms(deg: float, pos_char: str, neg_char: str, deg_digits: int = 2):
         sign = pos_char if deg >= 0 else neg_char
         deg = abs(deg)
         d = int(deg)
         m = (deg - d) * 60.0
-        return f"{d:02d}{m:07.4f}", sign
+        fmt = f"{{:0{deg_digits}d}}{{:07.4f}}"
+        return fmt.format(d, m), sign
 
-    lat_str, lat_dir = dms(lat, "N", "S")
-    lon_str, lon_dir = dms(lon, "E", "W")
+    lat_str, lat_dir = dms(lat, "N", "S", deg_digits=2)
+    lon_str, lon_dir = dms(lon, "E", "W", deg_digits=3)
 
     body = f"GPGGA,{hhmmss},{lat_str},{lat_dir},{lon_str},{lon_dir},4,12,1.0,{alt:.1f},M,0.0,M,1.0,0000"
     checksum = 0
