@@ -53,8 +53,70 @@
 {% block scripts %}
 <script>
 async function openIndexedDB() {
+  // One-time migration: copy tiles from legacy 'RilievoGNSS' database if it exists
+  await (async () => {
+    try {
+      const legacyDb = await new Promise((resolve) => {
+        const req = indexedDB.open('RilievoGNSS', 1);
+        req.onerror = () => resolve(null);
+        req.onupgradeneeded = () => { req.transaction.abort(); resolve(null); };
+        req.onsuccess = () => resolve(req.result);
+      });
+      if (!legacyDb) return;
+      const stores = Array.from(legacyDb.objectStoreNames);
+      if (stores.length === 0) { legacyDb.close(); return; }
+
+      const newDb = await new Promise((resolve, reject) => {
+        const req = indexedDB.open('RilievoPY', 1);
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => resolve(req.result);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('tiles')) {
+            const s = db.createObjectStore('tiles', { keyPath: ['z', 'x', 'y', 'provider'] });
+            s.createIndex('provider', 'provider', { unique: false });
+            s.createIndex('surveyIds', 'surveyIds', { unique: false, multiEntry: true });
+          }
+          if (!db.objectStoreNames.contains('metadata')) {
+            db.createObjectStore('metadata', { keyPath: ['surveyId', 'provider'] });
+          }
+        };
+      });
+
+      for (const storeName of stores) {
+        try {
+          const items = await new Promise((res, rej) => {
+            const tx = legacyDb.transaction([storeName], 'readonly');
+            const req = tx.objectStore(storeName).getAll();
+            req.onsuccess = () => res(req.result || []);
+            req.onerror = () => rej(req.error);
+          });
+          if (items.length > 0) {
+            await new Promise((res, rej) => {
+              const tx = newDb.transaction([storeName], 'readwrite');
+              const store = tx.objectStore(storeName);
+              items.forEach(item => store.put(item));
+              tx.oncomplete = () => res();
+              tx.onerror = () => rej(tx.error);
+            });
+            console.log(`[IndexedDB] ✅ Migrated ${items.length} records from legacy '${storeName}'`);
+          }
+        } catch (e) {
+          console.warn(`[IndexedDB] ⚠️ Could not migrate store '${storeName}':`, e);
+        }
+      }
+
+      legacyDb.close();
+      newDb.close();
+      indexedDB.deleteDatabase('RilievoGNSS');
+      console.log('[IndexedDB] ✅ Legacy RilievoGNSS database migrated and removed');
+    } catch (e) {
+      console.warn('[IndexedDB] ⚠️ Legacy migration skipped:', e);
+    }
+  })();
+
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('RilievoGNSS', 1);
+    const request = indexedDB.open('RilievoPY', 1);
     
     request.onerror = () => {
       console.error('[IndexedDB] ❌ Failed to open:', request.error);

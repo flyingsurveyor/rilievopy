@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% set active = "settings" %}
 
-{% block title %}Impostazioni — Rilievo GNSS{% endblock %}
+{% block title %}Impostazioni — RilievoPY{% endblock %}
 
 {% block head %}
 <style>
@@ -215,7 +215,7 @@
         <button type="button" class="btn btn-outline" style="white-space:nowrap;padding:8px 12px;" onclick="wsInit()">&#128193; Inizializza</button>
       </div>
       <div class="hint">
-        On Android (Termux), use <code>~/storage/shared/RilievoGNSS</code> to make data visible in the File Manager.<br>
+        On Android (Termux), use <code>~/storage/shared/RilievoPY</code> to make data visible in the File Manager.<br>
         Default auto-detected: <code id="ws_default">{{ workspace_default }}</code>
       </div>
     </div>
@@ -229,7 +229,7 @@
       <div style="font-weight:600;margin-bottom:8px;font-size:14px;">&#128260; Copia dati in nuovo workspace</div>
       <div class="field">
         <label>Workspace di destinazione</label>
-        <input type="text" id="ws_dst" placeholder="es. ~/storage/shared/RilievoGNSS" style="font-family:monospace;font-size:13px;"/>
+        <input type="text" id="ws_dst" placeholder="es. ~/storage/shared/RilievoPY" style="font-family:monospace;font-size:13px;"/>
       </div>
       <div id="ws_dst_info" data-has-data="0" style="font-size:12px;color:#888;margin-bottom:8px;"></div>
       <div class="toggle-row" style="margin-bottom:8px;">

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Rilievo GNSS — Unified RTK/PPK Suite
-=====================================
+RilievoPY — Unified RTK/PPK Suite
+==================================
 RTK real-time surveying + PPK post-processing in one app.
 
 Starts immediately — configure via web UI at /settings.
@@ -93,7 +93,7 @@ def start_gnss_if_configured(s: dict):
 # ---------- Main ----------
 def main():
     ap = argparse.ArgumentParser(
-        description="Rilievo GNSS — RTK/PPK Suite"
+        description="RilievoPY — RTK/PPK Suite"
     )
     ap.add_argument("--port", type=int, help="Override porta HTTP")
     ap.add_argument("--bind", help="Override bind address")

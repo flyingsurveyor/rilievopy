@@ -1,8 +1,8 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════════
-# Rilievo GNSS — Installer
+# RilievoPY — Installer
 #
-# Unified installer for Rilievo (RTK surveying + PPK post-processing).
+# Unified installer for RilievoPY (RTK surveying + PPK post-processing).
 # Installs Python dependencies, optionally builds RTKLIB CLI tools
 # (convbin, rnx2rtkp) for PPK processing.
 #
@@ -43,7 +43,7 @@ for arg in "$@"; do
         --skip-build)    SKIP_BUILD=1 ;;
         --force-build)   FORCE_BUILD=1 ;;
         --help|-h)
-            echo "Rilievo GNSS — Installer"
+            echo "RilievoPY — Installer"
             echo ""
             echo "Usage: $0 [options]"
             echo ""
@@ -104,7 +104,7 @@ timer_show() {
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║       Rilievo GNSS — Installer           ║"
+echo "║       RilievoPY — Installer              ║"
 echo "║   RTK Surveying + PPK Post-processing    ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
@@ -673,7 +673,7 @@ if [ "${HAS_SUDO}" -eq 1 ] && command -v systemctl &>/dev/null; then
 
         sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null << EOF
 [Unit]
-Description=Rilievo GNSS — RTK/PPK Survey Suite
+Description=RilievoPY — RTK/PPK Survey Suite
 After=network.target
 
 [Service]

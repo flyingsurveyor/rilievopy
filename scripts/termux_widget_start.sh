@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Termux:Widget — avvia Rilievo GNSS
+# Termux:Widget — avvia RilievoPY
 # Posizionare in ~/.shortcuts/rilievo_avvia.sh
 
 PORT=8000
@@ -22,9 +22,9 @@ if [ -z "$PROJECT_DIR" ]; then
 fi
 
 if [ -z "$PROJECT_DIR" ]; then
-    termux-notification --id 9010 --title "Rilievo GNSS" \
+    termux-notification --id 9010 --title "RilievoPY" \
         --content "Progetto non trovato in $HOME" --priority high
-    termux-toast "Errore: progetto rilievo_gnss non trovato"
+    termux-toast "Errore: progetto RilievoPY non trovato"
     exit 1
 fi
 
@@ -32,7 +32,7 @@ URL="http://127.0.0.1:${PORT}"
 
 # Controlla se Flask è già in esecuzione
 if pgrep -f "python.*app\.py" > /dev/null 2>&1; then
-    termux-notification --id 9010 --title "🛰️ Rilievo GNSS" \
+    termux-notification --id 9010 --title "🛰️ RilievoPY" \
         --content "App già attiva — apertura browser" --priority default
     termux-open-url "$URL"
     exit 0
@@ -43,7 +43,7 @@ cd "$PROJECT_DIR" || exit 1
 nohup python app.py >> rilievo.log 2>&1 &
 APP_PID=$!
 
-termux-notification --id 9010 --title "🛰️ Rilievo GNSS" \
+termux-notification --id 9010 --title "🛰️ RilievoPY" \
     --content "Avvio in corso…" --priority high --ongoing
 
 # Attendi che Flask sia pronto (max 10s)
@@ -59,10 +59,10 @@ done
 termux-notification-remove 9010
 
 if [ "$READY" -eq 1 ]; then
-    termux-notification --id 9010 --title "✅ Rilievo GNSS" \
+    termux-notification --id 9010 --title "✅ RilievoPY" \
         --content "App avviata — tap per aprire" --priority default
     termux-open-url "$URL"
 else
-    termux-notification --id 9010 --title "⚠️ Rilievo GNSS" \
+    termux-notification --id 9010 --title "⚠️ RilievoPY" \
         --content "Avvio lento — riprova tra qualche secondo" --priority high
 fi

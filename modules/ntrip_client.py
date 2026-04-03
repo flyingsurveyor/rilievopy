@@ -3,7 +3,7 @@ modules/ntrip_client.py
 Client NTRIP puro Python (solo stdlib) per la modalità BLE-only.
 
 Quando RTKino è connesso via BLE ma non ha accesso WiFi/Internet,
-rilievo_gnss si connette a un caster NTRIP, riceve RTCM3 e lo
+RilievoPY si connette a un caster NTRIP, riceve RTCM3 e lo
 inoltra a RTKino via BLE usando send_rtcm_via_ble().
 
 Nessuna dipendenza esterna: solo socket, base64, threading, time.
@@ -208,7 +208,7 @@ class NtripClient:
             f"GET /{self.mountpoint} HTTP/1.1\r\n"
             f"Host: {self.host}:{self.port}\r\n"
             f"Ntrip-Version: Ntrip/2.0\r\n"
-            f"User-Agent: NTRIP rilievo_gnss/1.0\r\n"
+            f"User-Agent: NTRIP RilievoPY/1.0\r\n"
             f"{auth}"
             f"{gga}"
             f"Connection: keep-alive\r\n"

@@ -1,4 +1,4 @@
-# Rilievo GNSS — Unified RTK/PPK Suite
+# RilievoPY — Unified RTK/PPK Suite
 
 RTK real-time surveying + PPK post-processing in a single app.
 
