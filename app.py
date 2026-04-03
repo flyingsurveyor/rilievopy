@@ -4,8 +4,9 @@ RilievoPY — Unified RTK/PPK Suite
 ==================================
 RTK real-time surveying + PPK post-processing in one app.
 
-Starts immediately — configure via web UI at /settings.
-Settings are persisted in surveys/rilievo_settings.json.
+Starts immediately — configure via web UI at /rtkino (RTKino settings)
+and /settings (general settings).
+Settings are persisted in rilievo_settings.json (project root).
 """
 
 import argparse
@@ -72,22 +73,28 @@ def apply_settings(s: dict):
 
 
 def start_gnss_if_configured(s: dict):
-    """Start GNSS connection if host is configured and autoconnect is on."""
-    host = s.get("gnss_host", "")
-    if host and s.get("gnss_autoconnect", True):
+    """Start GNSS connection using RTKino host and fixed TCP port 7856.
+
+    RTKino-first: connection is always derived from rtkino_host + RTKINO_TCP_PORT.
+    The legacy gnss_host/gnss_port fields are ignored when rtkino_host is set.
+    """
+    from modules.settings import RTKINO_TCP_PORT
+    rtkino_host = s.get("rtkino_host", "")
+    if rtkino_host and s.get("gnss_autoconnect", True):
         CONN.start(
-            gnss_host=host,
-            gnss_port=s.get("gnss_port", 1234),
+            gnss_host=rtkino_host,
+            gnss_port=RTKINO_TCP_PORT,
             relay_enabled=s.get("relay_enabled", False),
             relay_bind=s.get("relay_bind", "127.0.0.1"),
             relay_port=s.get("relay_port", 21100),
             retry=s.get("retry_interval", 3.0),
         )
+        print(f"# {now_iso()} [app] RTKino TCP → {rtkino_host}:{RTKINO_TCP_PORT}")
     else:
-        if not host:
-            print(f"# {now_iso()} [app] GNSS non configurato — vai su /settings per configurare")
+        if not rtkino_host:
+            print(f"# {now_iso()} [app] RTKino non configurato — vai su /rtkino per configurare l'IP")
         else:
-            print(f"# {now_iso()} [app] autoconnect disabilitato — connetti manualmente da /settings")
+            print(f"# {now_iso()} [app] autoconnect disabilitato — connetti manualmente da /rtkino")
 
 
 # ---------- Main ----------

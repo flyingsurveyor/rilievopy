@@ -3,12 +3,14 @@ routes/rtkino.py
 Blueprint Flask per l'integrazione RTKino.
 
 Pagine:
-  /rtkino            — Dashboard controllo RTKino
+  /rtkino            — Pagina unificata RTKino (IP, BLE, polling, NTRIP, status, comandi)
   /rtkino/surveys    — Gestione e import rilievi
-  /rtkino/ntrip      — Client NTRIP per modalità BLE-only
+  /rtkino/ntrip      — Redirect a /rtkino#ntrip (mantenuto per compatibilità)
 
 API:
   GET  /api/rtkino/status
+  POST /api/rtkino/settings
+  POST /api/rtkino/connect
   POST /api/rtkino/command
   GET  /api/rtkino/surveys
   POST /api/rtkino/survey/import
@@ -24,7 +26,7 @@ import logging
 import uuid
 from datetime import datetime
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
 from modules import settings as cfg
 from modules.rtkino_manager import RTKINO
@@ -37,13 +39,27 @@ bp = Blueprint("rtkino", __name__)
 # ── Pagine HTML ───────────────────────────────────────────────────────────────
 
 @bp.route("/rtkino")
-def rtkino_dashboard():
+def rtkino_page():
+    """Pagina unificata RTKino: IP, BLE, polling, NTRIP, status, comandi rapidi."""
+    from modules.settings import RTKINO_TCP_PORT
     s = cfg.load_settings()
     return render_template(
         "rtkino_dashboard.html",
         rtkino_host=s.get("rtkino_host", ""),
-        rtkino_port=s.get("rtkino_port", 80),
+        rtkino_tcp_port=RTKINO_TCP_PORT,
         rtkino_polling=s.get("rtkino_polling", False),
+        rtkino_poll_interval=s.get("rtkino_poll_interval", 2.0),
+        ble_enabled=s.get("ble_enabled", False),
+        ble_device_name=s.get("ble_device_name", "RTKino"),
+        ble_passkey=s.get("ble_passkey", 123456),
+        ble_autoconnect=s.get("ble_autoconnect", False),
+        ble_tts=s.get("ble_tts", True),
+        ble_tts_lang=s.get("ble_tts_lang", "it"),
+        ntrip_host=s.get("rtkino_ntrip_host", ""),
+        ntrip_port=s.get("rtkino_ntrip_port", 2101),
+        ntrip_mountpoint=s.get("rtkino_ntrip_mountpoint", ""),
+        ntrip_user=s.get("rtkino_ntrip_user", ""),
+        ntrip_gga_interval=s.get("rtkino_ntrip_gga_interval", 5),
     )
 
 
@@ -59,15 +75,8 @@ def rtkino_surveys():
 
 @bp.route("/rtkino/ntrip")
 def rtkino_ntrip():
-    s = cfg.load_settings()
-    return render_template(
-        "rtkino_ntrip.html",
-        ntrip_host=s.get("rtkino_ntrip_host", ""),
-        ntrip_port=s.get("rtkino_ntrip_port", 2101),
-        ntrip_mountpoint=s.get("rtkino_ntrip_mountpoint", ""),
-        ntrip_user=s.get("rtkino_ntrip_user", ""),
-        ntrip_gga_interval=s.get("rtkino_ntrip_gga_interval", 5),
-    )
+    """Redirect alla pagina unificata RTKino (sezione NTRIP)."""
+    return redirect(url_for("rtkino.rtkino_page") + "#ntrip")
 
 
 # ── API: stato combinato ──────────────────────────────────────────────────────
@@ -76,6 +85,63 @@ def rtkino_ntrip():
 def api_rtkino_status():
     """Stato combinato: connessione, status RTKino, posizione, NTRIP."""
     return jsonify(RTKINO.combined_status())
+
+
+# ── API: salva impostazioni RTKino ────────────────────────────────────────────
+
+@bp.route("/api/rtkino/settings", methods=["POST"])
+def api_rtkino_settings():
+    """Salva le impostazioni RTKino (host, BLE, polling).
+
+    Body JSON: {"action": "save" | "save_and_connect", "settings": {...}}
+    """
+    data = request.get_json() or {}
+    s_in = data.get("settings", {})
+
+    changes: dict = {}
+
+    # RTKino host (IP only — ports are fixed: :80 WebUI, :7856 TCP Streamer)
+    rtkino_host = (s_in.get("rtkino_host") or "").strip()
+    changes["rtkino_host"] = rtkino_host
+
+    # HTTP polling
+    changes["rtkino_polling"] = bool(s_in.get("rtkino_polling", False))
+    try:
+        interval = float(s_in.get("rtkino_poll_interval") or 2.0)
+        changes["rtkino_poll_interval"] = max(1.0, min(30.0, interval))
+    except (ValueError, TypeError):
+        changes["rtkino_poll_interval"] = 2.0
+
+    # BLE settings
+    changes["ble_enabled"] = bool(s_in.get("ble_enabled", False))
+    changes["ble_device_name"] = (s_in.get("ble_device_name") or "RTKino").strip()
+    try:
+        changes["ble_passkey"] = int(s_in.get("ble_passkey", 123456))
+    except (ValueError, TypeError):
+        changes["ble_passkey"] = 123456
+    changes["ble_autoconnect"] = bool(s_in.get("ble_autoconnect", False))
+    changes["ble_tts"] = bool(s_in.get("ble_tts", True))
+    changes["ble_tts_lang"] = (s_in.get("ble_tts_lang") or "it").strip()
+
+    saved = cfg.update(changes)
+
+    action = data.get("action", "save")
+    if action == "save_and_connect" and rtkino_host:
+        from modules.connection import CONN
+        from modules.settings import RTKINO_TCP_PORT
+        CONN.restart(
+            gnss_host=rtkino_host,
+            gnss_port=RTKINO_TCP_PORT,
+            relay_enabled=saved.get("relay_enabled", False),
+            relay_bind=saved.get("relay_bind", "127.0.0.1"),
+            relay_port=saved.get("relay_port", 21100),
+            retry=saved.get("retry_interval", 3.0),
+        )
+        if changes.get("rtkino_polling"):
+            RTKINO.stop_polling()
+            RTKINO.start_polling()
+
+    return jsonify({"ok": True})
 
 
 # ── API: comandi rapidi ───────────────────────────────────────────────────────

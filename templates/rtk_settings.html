@@ -74,30 +74,6 @@
 
   <form id="settingsForm">
 
-  <!-- GNSS Connection -->
-  <div class="card">
-    <h2><span class="ico">📡</span> Connessione GNSS</h2>
-    <div class="row">
-      <div class="field">
-        <label>Host / IP del ricevitore GNSS</label>
-        <input type="text" name="gnss_host" id="gnss_host" placeholder="es. 192.168.1.100" value="{{ gnss_host }}"/>
-        <div class="hint">Indirizzo IP o hostname del ricevitore GNSS (RTK)</div>
-      </div>
-      <div class="field" style="max-width:140px">
-        <label>Porta TCP</label>
-        <input type="number" name="gnss_port" id="gnss_port" min="1" max="65535" value="{{ gnss_port }}"/>
-      </div>
-    </div>
-    <div class="toggle-row">
-      <label class="switch"><input type="checkbox" name="gnss_autoconnect" id="gnss_autoconnect" {{ gnss_autoconnect_checked }} /><span class="slider"></span></label>
-      <label>Connessione automatica all'avvio</label>
-    </div>
-    <div class="field">
-      <label>Intervallo di riconnessione (secondi)</label>
-      <input type="number" name="retry_interval" id="retry_interval" min="1" max="60" step="0.5" value="{{ retry_interval }}"/>
-    </div>
-  </div>
-
   <!-- TCP Relay -->
   <div class="card">
     <h2><span class="ico">🔁</span> TCP Relay</h2>
@@ -168,39 +144,11 @@
   <div class="card">
     <div class="actions">
       <button type="submit" class="btn btn-primary">💾 Salva impostazioni</button>
-      <button type="button" class="btn btn-success" onclick="saveAndConnect()">💾 Salva e (ri)connetti</button>
       <button type="button" class="btn btn-danger" onclick="resetDefaults()">🔄 Reset default</button>
       <a href="/" class="btn btn-outline">← Dashboard</a>
+      <a href="/rtkino" class="btn btn-outline">🛰️ RTKino</a>
     </div>
   </div>
-
-  <!-- RTKino Integration -->
-  <div class="card">
-    <h2><span class="ico">🛰️</span> RTKino Integration</h2>
-    <div class="row">
-      <div class="field">
-        <label>Host / IP RTKino</label>
-        <input type="text" name="rtkino_host" id="rtkino_host" placeholder="es. 192.168.1.200" value="{{ rtkino_host }}"/>
-        <div class="hint">Indirizzo IP di RTKino sulla rete WiFi locale</div>
-      </div>
-      <div class="field" style="max-width:120px">
-        <label>Porta HTTP</label>
-        <input type="number" name="rtkino_port" id="rtkino_port" min="1" max="65535" value="{{ rtkino_port }}"/>
-      </div>
-    </div>
-    <div class="toggle-row">
-      <label class="switch"><input type="checkbox" name="rtkino_polling" id="rtkino_polling" {{ rtkino_polling_checked }} /><span class="slider"></span></label>
-      <label>Polling automatico stato e posizione</label>
-    </div>
-    <div class="field" style="max-width:200px">
-      <label>Intervallo polling (secondi)</label>
-      <input type="number" name="rtkino_poll_interval" id="rtkino_poll_interval" min="1" max="30" step="0.5" value="{{ rtkino_poll_interval }}"/>
-    </div>
-    <div style="margin-top:8px;">
-      <a href="/rtkino" class="btn btn-outline" style="font-size:13px;padding:8px 14px;">🛰️ Apri dashboard RTKino</a>
-    </div>
-  </div>
-
 
   </form>
 
@@ -269,10 +217,6 @@ function showToast(msg, ok) {
 function getFormData() {
   var f = document.getElementById('settingsForm');
   return {
-    gnss_host: f.gnss_host.value.trim(),
-    gnss_port: parseInt(f.gnss_port.value) || 1234,
-    gnss_autoconnect: f.gnss_autoconnect.checked,
-    retry_interval: parseFloat(f.retry_interval.value) || 3.0,
     relay_enabled: f.relay_enabled.checked,
     relay_bind: f.relay_bind.value.trim() || '127.0.0.1',
     relay_port: parseInt(f.relay_port.value) || 21100,
@@ -298,19 +242,6 @@ document.getElementById('settingsForm').addEventListener('submit', function(e) {
     }).catch(function(e){ showToast('Errore di rete', false); });
 });
 
-function saveAndConnect() {
-  fetch('/api/settings', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({action: 'save_and_connect', settings: getFormData()})
-  }).then(function(r){ return r.json(); })
-    .then(function(d){
-      if(d.ok) showToast('Salvato e connessione avviata ✓', true);
-      else showToast('Errore: ' + (d.error||'?'), false);
-      updateStatus();
-    }).catch(function(e){ showToast('Errore di rete', false); });
-}
-
 function resetDefaults() {
   if(!confirm('Ripristinare tutte le impostazioni ai valori predefiniti?')) return;
   fetch('/api/settings', {
@@ -330,16 +261,16 @@ function updateStatus() {
     .then(function(d){
       var el = document.getElementById('connStatus');
       var txt = document.getElementById('connText');
-      if(!d.gnss_host) {
+      if(!d.rtkino_host) {
         el.className = 'status-bar status-nocfg';
-        txt.textContent = 'GNSS non configurato — inserisci host e porta';
+        txt.textContent = 'RTKino non configurato — vai su /rtkino per configurare l\'IP';
       } else if(d.gnss_connected) {
         el.className = 'status-bar status-connected';
-        txt.textContent = 'Connesso a ' + d.gnss_host + ':' + d.gnss_port +
+        txt.textContent = 'TCP connesso a ' + d.rtkino_host + ':' + d.rtkino_tcp_port +
           (d.relay_active ? '  •  Relay attivo' : '');
       } else {
         el.className = 'status-bar status-disconnected';
-        txt.textContent = 'Connessione a ' + d.gnss_host + ':' + d.gnss_port + ' in corso...';
+        txt.textContent = 'Connessione TCP a ' + d.rtkino_host + ':' + d.rtkino_tcp_port + ' in corso...';
       }
     }).catch(function(){});
 }
