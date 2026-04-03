@@ -42,6 +42,14 @@ _BLE_CHUNK = 200
 # Reconnect interval (seconds)
 _RECONNECT_INTERVAL = 5.0
 
+# Binary buffer limits
+_MAX_RAW_BUFFER = 8192   # bytes before hard reset of the raw buffer
+_MAX_NMEA_LINE = 1024    # bytes before discarding an unterminated NMEA line
+
+# UBX packet framing constants
+_UBX_HEADER_SIZE = 6     # sync1 + sync2 + class + id + length(2 bytes)
+_UBX_CHECKSUM_SIZE = 2   # CK_A + CK_B
+
 
 def _popen_silent(cmd: list):
     """Run a command non-blocking, silently ignoring FileNotFoundError."""
@@ -124,8 +132,12 @@ class BleGnss:
         # RTCM queue — thread-safe send from outside the event loop
         self._rtcm_queue: Optional[asyncio.Queue] = None
 
-        # NMEA reassembly buffer
-        self._nmea_buf = ""
+        # Binary reassembly buffer (handles both NMEA and UBX)
+        self._raw_buf = bytearray()
+
+        # UBX parser pipe and thread
+        self._ubx_pipe = None
+        self._ubx_thread: Optional[threading.Thread] = None
 
         # RTK fix state tracking
         self._fix_quality: Optional[int] = None
@@ -144,6 +156,21 @@ class BleGnss:
         if self._thread and self._thread.is_alive():
             return
         self._stop_flag.clear()
+
+        # Start UBX parser thread if not already running
+        if self._ubx_pipe is None:
+            try:
+                from .state import BytePipe
+                self._ubx_pipe = BytePipe()
+                self._ubx_thread = threading.Thread(
+                    target=self._run_ubx_parser, name="ble-ubx-parser", daemon=True
+                )
+                self._ubx_thread.start()
+                logger.info("[ble_gnss] UBX parser thread started")
+            except Exception as exc:
+                logger.warning("[ble_gnss] Could not start UBX parser: %s", exc)
+                self._ubx_pipe = None
+
         self._thread = threading.Thread(
             target=self._run_loop, name="ble-gnss", daemon=True
         )
@@ -158,6 +185,12 @@ class BleGnss:
         if self._thread:
             self._thread.join(timeout=5)
         self._thread = None
+        if self._ubx_pipe is not None:
+            self._ubx_pipe.close()
+            self._ubx_pipe = None
+        if self._ubx_thread is not None:
+            self._ubx_thread.join(timeout=5)
+            self._ubx_thread = None
         logger.info("[ble_gnss] BLE stopped")
 
     def send_rtcm(self, data: bytes):
@@ -247,13 +280,67 @@ class BleGnss:
     # ── Private: BLE callbacks ───────────────────────────────────────
 
     def _on_ble_data(self, _sender, data: bytearray):
-        """Notification callback — reassemble NMEA sentences from BLE chunks."""
-        self._nmea_buf += data.decode("ascii", errors="replace")
-        while "\n" in self._nmea_buf:
-            line, self._nmea_buf = self._nmea_buf.split("\n", 1)
-            line = line.strip()
-            if line.startswith("$"):
-                self._process_nmea(line)
+        """Notification callback — parse BLE chunks containing NMEA and/or UBX."""
+        self._raw_buf.extend(data)
+        # Overflow protection
+        if len(self._raw_buf) > _MAX_RAW_BUFFER:
+            logger.warning("[ble_gnss] _raw_buf overflow — clearing buffer")
+            self._raw_buf.clear()
+            return
+        while len(self._raw_buf) > 0:
+            first = self._raw_buf[0]
+            if first == 0xB5:
+                # Potential UBX packet: sync1=0xB5, sync2=0x62
+                if len(self._raw_buf) < 2:
+                    break  # need more data
+                if self._raw_buf[1] != 0x62:
+                    # False sync byte — skip it
+                    self._raw_buf.pop(0)
+                    continue
+                if len(self._raw_buf) < _UBX_HEADER_SIZE:
+                    break  # need full header
+                # Bytes 4-5 carry little-endian payload length
+                payload_len = self._raw_buf[4] | (self._raw_buf[5] << 8)
+                total_len = _UBX_HEADER_SIZE + payload_len + _UBX_CHECKSUM_SIZE
+                if len(self._raw_buf) < total_len:
+                    break  # need more data
+                packet = bytes(self._raw_buf[:total_len])
+                del self._raw_buf[:total_len]
+                self._feed_ubx(packet)
+            elif first == 0x24:
+                # NMEA sentence starting with '$'
+                nl = self._raw_buf.find(0x0A)  # '\n'
+                if nl < 0:
+                    if len(self._raw_buf) > _MAX_NMEA_LINE:
+                        logger.warning("[ble_gnss] NMEA buffer overflow — clearing")
+                        self._raw_buf.clear()
+                    break  # need more data
+                line_bytes = bytes(self._raw_buf[:nl + 1])
+                del self._raw_buf[:nl + 1]
+                line = line_bytes.decode("ascii", errors="replace").strip()
+                if line.startswith("$"):
+                    self._process_nmea(line)
+            else:
+                # Unknown byte — skip
+                self._raw_buf.pop(0)
+
+    def _feed_ubx(self, packet: bytes):
+        """Feed a complete UBX packet to the UBX parser pipe."""
+        if self._ubx_pipe is not None:
+            try:
+                self._ubx_pipe.feed(packet)
+            except Exception as exc:
+                logger.debug("[ble_gnss] UBX pipe feed error: %s", exc)
+
+    def _run_ubx_parser(self):
+        """Thread target: run the UBX parse loop on the BLE pipe."""
+        try:
+            from .ubx_parser import ubx_parse_loop
+            ubx_parse_loop(self._ubx_pipe)
+        except ImportError:
+            logger.warning("[ble_gnss] pyubx2 not installed — UBX parsing disabled")
+        except Exception as exc:
+            logger.error("[ble_gnss] UBX parser error: %s", exc)
 
     def _process_nmea(self, sentence: str):
         """Handle a complete NMEA sentence."""
