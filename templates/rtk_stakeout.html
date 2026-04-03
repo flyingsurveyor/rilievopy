@@ -97,22 +97,53 @@ const $=id=>document.getElementById(id);
 let es = null;
 
 // ── IMU / compass state ──────────────────────────────────────────────────────
-let deviceHeading = null;   // degrees, 0=North clockwise
+let deviceHeading = null;   // degrees, 0=North clockwise (raw)
+let smoothedHeading = null; // low-pass filtered heading
 let imuAvailable = false;
 let imuChecked = false;
+const HEADING_ALPHA = 0.2;  // smoothing factor (0=no update, 1=no smoothing)
+
+function smoothHeading(newHeading) {
+  if (smoothedHeading === null) {
+    smoothedHeading = newHeading;
+    return smoothedHeading;
+  }
+  // Handle wrap-around 359° → 0°
+  let diff = newHeading - smoothedHeading;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  smoothedHeading = (smoothedHeading + HEADING_ALPHA * diff + 360) % 360;
+  return smoothedHeading;
+}
+
+function onOrientationAbsolute(event) {
+  // deviceorientationabsolute: alpha is CCW from magnetic North (absolute)
+  // Convert to CW heading (0=N, 90=E, 180=S, 270=W)
+  if (event.alpha !== null && event.alpha !== undefined) {
+    deviceHeading = (360 - event.alpha % 360 + 360) % 360;
+    smoothHeading(deviceHeading);
+    imuAvailable = true;
+    $('imu-status').textContent = '🧭 Bussola attiva (assoluta)';
+    $('heading-val').textContent = smoothedHeading.toFixed(0) + '°';
+  }
+}
 
 function onOrientation(event) {
   if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
-    // iOS: already magnetic-north-relative heading
+    // iOS: webkitCompassHeading is already CW from magnetic North
     deviceHeading = event.webkitCompassHeading;
-  } else if (event.alpha !== null) {
-    // Android: alpha is CCW from North in screen-relative frame, convert to CW
-    deviceHeading = (360 - event.alpha) % 360;
-  }
-  if (deviceHeading !== null) {
+    smoothHeading(deviceHeading);
     imuAvailable = true;
     $('imu-status').textContent = '🧭 Bussola attiva';
-    $('heading-val').textContent = deviceHeading.toFixed(0) + '°';
+    $('heading-val').textContent = smoothedHeading.toFixed(0) + '°';
+  } else if (event.alpha !== null && event.alpha !== undefined) {
+    // Android fallback: convert CCW alpha to CW heading
+    deviceHeading = (360 - event.alpha % 360 + 360) % 360;
+    smoothHeading(deviceHeading);
+    imuAvailable = true;
+    const absStr = event.absolute ? ' (assoluta)' : ' (relativa)';
+    $('imu-status').textContent = '🧭 Bussola attiva' + absStr;
+    $('heading-val').textContent = smoothedHeading.toFixed(0) + '°';
   }
 }
 
@@ -134,8 +165,26 @@ function requestIMU() {
       showCardinalFallback();
     });
   } else {
-    // Android / non-iOS: attach directly
-    window.addEventListener('deviceorientation', onOrientation, true);
+    // Android / non-iOS: try deviceorientationabsolute first, fallback to deviceorientation
+    let absoluteRegistered = false;
+
+    // Try deviceorientationabsolute (Android Chrome) — alpha is absolute from magnetic North
+    window.addEventListener('deviceorientationabsolute', function(e) {
+      if (e.alpha != null) {
+        absoluteRegistered = true;
+        window.addEventListener('deviceorientationabsolute', onOrientationAbsolute, true);
+        onOrientationAbsolute(e);
+      }
+    }, { capture: true, once: true });
+
+    // Fallback to standard deviceorientation
+    function fallbackHandler(e) {
+      if (!absoluteRegistered) {
+        onOrientation(e);
+      }
+    }
+    window.addEventListener('deviceorientation', fallbackHandler, true);
+
     setTimeout(() => {
       if (!imuChecked) {
         imuChecked = true;
@@ -197,8 +246,8 @@ function drawCompass() {
   ctx.stroke();
 
   // Tick marks (rotate ring with heading so N always points to geographic North on screen)
-  const headingRad = imuAvailable && deviceHeading !== null
-    ? deviceHeading * Math.PI / 180
+  const headingRad = imuAvailable && smoothedHeading !== null
+    ? smoothedHeading * Math.PI / 180
     : 0;
 
   for (let i = 0; i < 36; i++) {
@@ -237,8 +286,8 @@ function drawCompass() {
 
     // Arrow direction: heading-relative if IMU available, else North-up
     let arrowRad;
-    if (imuAvailable && deviceHeading !== null) {
-      const relative = (latestBearing - deviceHeading + 360) % 360;
+    if (imuAvailable && smoothedHeading !== null) {
+      const relative = (latestBearing - smoothedHeading + 360) % 360;
       arrowRad = relative * Math.PI / 180;
     } else {
       arrowRad = latestBearing * Math.PI / 180;
@@ -391,7 +440,7 @@ function updateStakeout(data) {
 
   // Bearing / heading info
   $('bearing-val').textContent = data.bearing !== undefined ? data.bearing.toFixed(0) + '°' : '-';
-  $('heading-val').textContent = (imuAvailable && deviceHeading !== null) ? deviceHeading.toFixed(0) + '°' : '-';
+  $('heading-val').textContent = (imuAvailable && smoothedHeading !== null) ? smoothedHeading.toFixed(0) + '°' : '-';
 
   // RTK / accuracy
   $('rtk-val').textContent = data.rtk || '-';
