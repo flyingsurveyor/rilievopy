@@ -3,9 +3,8 @@ routes/rtkino.py
 Blueprint Flask per l'integrazione RTKino.
 
 Pagine:
-  /rtkino            — Pagina unificata RTKino (IP, BLE, polling, NTRIP, status, comandi)
+  /rtkino            — Pagina RTKino (IP, stato, comandi rapidi)
   /rtkino/surveys    — Gestione e import rilievi
-  /rtkino/ntrip      — Redirect a /rtkino#ntrip (mantenuto per compatibilità)
 
 API:
   GET  /api/rtkino/status
@@ -17,16 +16,13 @@ API:
   GET  /api/rtkino/survey/<sid>/points
   POST /api/rtkino/measure
   GET  /api/rtkino/measure/status
-  POST /api/rtkino/ntrip/start
-  POST /api/rtkino/ntrip/stop
-  GET  /api/rtkino/ntrip/status
 """
 
 import logging
 import uuid
 from datetime import datetime
 
-from flask import Blueprint, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, jsonify, render_template, request
 
 from modules import settings as cfg
 from modules.rtkino_manager import RTKINO
@@ -40,26 +36,13 @@ bp = Blueprint("rtkino", __name__)
 
 @bp.route("/rtkino")
 def rtkino_page():
-    """Pagina unificata RTKino: IP, BLE, polling, NTRIP, status, comandi rapidi."""
+    """Pagina RTKino: IP, stato connessione, comandi rapidi."""
     from modules.settings import RTKINO_TCP_PORT
     s = cfg.load_settings()
     return render_template(
         "rtkino_dashboard.html",
         rtkino_host=s.get("rtkino_host", ""),
         rtkino_tcp_port=RTKINO_TCP_PORT,
-        rtkino_polling=s.get("rtkino_polling", False),
-        rtkino_poll_interval=s.get("rtkino_poll_interval", 2.0),
-        ble_enabled=s.get("ble_enabled", False),
-        ble_device_name=s.get("ble_device_name", "RTKino"),
-        ble_passkey=s.get("ble_passkey", 123456),
-        ble_autoconnect=s.get("ble_autoconnect", False),
-        ble_tts=s.get("ble_tts", True),
-        ble_tts_lang=s.get("ble_tts_lang", "it"),
-        ntrip_host=s.get("rtkino_ntrip_host", ""),
-        ntrip_port=s.get("rtkino_ntrip_port", 2101),
-        ntrip_mountpoint=s.get("rtkino_ntrip_mountpoint", ""),
-        ntrip_user=s.get("rtkino_ntrip_user", ""),
-        ntrip_gga_interval=s.get("rtkino_ntrip_gga_interval", 5),
     )
 
 
@@ -69,21 +52,15 @@ def rtkino_surveys():
     return render_template(
         "rtkino_surveys.html",
         rtkino_host=s.get("rtkino_host", ""),
-        rtkino_port=s.get("rtkino_port", 80),
+        rtkino_port=80,
     )
-
-
-@bp.route("/rtkino/ntrip")
-def rtkino_ntrip():
-    """Redirect alla pagina unificata RTKino (sezione NTRIP)."""
-    return redirect(url_for("rtkino.rtkino_page") + "#ntrip")
 
 
 # ── API: stato combinato ──────────────────────────────────────────────────────
 
 @bp.route("/api/rtkino/status")
 def api_rtkino_status():
-    """Stato combinato: connessione, status RTKino, posizione, NTRIP."""
+    """Stato combinato: connessione e configurazione RTKino."""
     return jsonify(RTKINO.combined_status())
 
 
@@ -91,39 +68,16 @@ def api_rtkino_status():
 
 @bp.route("/api/rtkino/settings", methods=["POST"])
 def api_rtkino_settings():
-    """Salva le impostazioni RTKino (host, BLE, polling).
+    """Salva le impostazioni RTKino (solo host IP).
 
-    Body JSON: {"action": "save" | "save_and_connect", "settings": {...}}
+    Body JSON: {"action": "save" | "save_and_connect", "settings": {"rtkino_host": ...}}
     """
     data = request.get_json() or {}
     s_in = data.get("settings", {})
 
-    changes: dict = {}
-
     # RTKino host (IP only — ports are fixed: :80 WebUI, :7856 TCP Streamer)
     rtkino_host = (s_in.get("rtkino_host") or "").strip()
-    changes["rtkino_host"] = rtkino_host
-
-    # HTTP polling
-    changes["rtkino_polling"] = bool(s_in.get("rtkino_polling", False))
-    try:
-        interval = float(s_in.get("rtkino_poll_interval") or 2.0)
-        changes["rtkino_poll_interval"] = max(1.0, min(30.0, interval))
-    except (ValueError, TypeError):
-        changes["rtkino_poll_interval"] = 2.0
-
-    # BLE settings
-    changes["ble_enabled"] = bool(s_in.get("ble_enabled", False))
-    changes["ble_device_name"] = (s_in.get("ble_device_name") or "RTKino").strip()
-    try:
-        changes["ble_passkey"] = int(s_in.get("ble_passkey", 123456))
-    except (ValueError, TypeError):
-        changes["ble_passkey"] = 123456
-    changes["ble_autoconnect"] = bool(s_in.get("ble_autoconnect", False))
-    changes["ble_tts"] = bool(s_in.get("ble_tts", True))
-    changes["ble_tts_lang"] = (s_in.get("ble_tts_lang") or "it").strip()
-
-    saved = cfg.update(changes)
+    saved = cfg.update({"rtkino_host": rtkino_host})
 
     action = data.get("action", "save")
     if action == "save_and_connect" and rtkino_host:
@@ -137,9 +91,6 @@ def api_rtkino_settings():
             relay_port=saved.get("relay_port", 21100),
             retry=saved.get("retry_interval", 3.0),
         )
-        if changes.get("rtkino_polling"):
-            RTKINO.stop_polling()
-            RTKINO.start_polling()
 
     return jsonify({"ok": True})
 
@@ -293,54 +244,3 @@ def api_rtkino_measure_status():
     if data is None:
         return jsonify({"ok": False, "error": "Impossibile contattare RTKino"}), 502
     return jsonify({"ok": True, "status": data})
-
-
-# ── API: NTRIP client locale (per BLE-only) ───────────────────────────────────
-
-@bp.route("/api/rtkino/ntrip/start", methods=["POST"])
-def api_ntrip_start():
-    """Avvia il client NTRIP locale e salva le impostazioni."""
-    data = request.get_json() or {}
-    host = (data.get("host") or "").strip()
-    mountpoint = (data.get("mountpoint") or "").strip()
-
-    if not host or not mountpoint:
-        return jsonify({"ok": False, "error": "host e mountpoint obbligatori"}), 400
-
-    port = int(data.get("port") or 2101)
-    user = data.get("user", "")
-    password = data.get("password", "")
-    gga_interval = float(data.get("gga_interval") or 5.0)
-
-    # Salva nelle settings (senza password in chiaro se vuoi, ma qui la salviamo)
-    cfg.update({
-        "rtkino_ntrip_host": host,
-        "rtkino_ntrip_port": port,
-        "rtkino_ntrip_mountpoint": mountpoint,
-        "rtkino_ntrip_user": user,
-        "rtkino_ntrip_password": password,
-        "rtkino_ntrip_gga_interval": gga_interval,
-    })
-
-    try:
-        RTKINO.start_ntrip(
-            host=host, port=port, mountpoint=mountpoint,
-            user=user, password=password, gga_interval=gga_interval,
-        )
-        return jsonify({"ok": True})
-    except Exception:
-        logger.exception("[rtkino] ntrip start error")
-        return jsonify({"ok": False, "error": "Errore durante l'avvio del client NTRIP"}), 500
-
-
-@bp.route("/api/rtkino/ntrip/stop", methods=["POST"])
-def api_ntrip_stop():
-    """Ferma il client NTRIP locale."""
-    RTKINO.stop_ntrip()
-    return jsonify({"ok": True})
-
-
-@bp.route("/api/rtkino/ntrip/status")
-def api_ntrip_status():
-    """Stato del client NTRIP locale."""
-    return jsonify(RTKINO.ntrip_status())
