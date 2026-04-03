@@ -10,8 +10,9 @@ from typing import Dict, Any, Optional
 
 from .utils import now_iso
 
-# RTKino TCP Streamer fixed port (hard-coded, not configurable by user)
-RTKINO_TCP_PORT: int = 7856
+# RTKino fixed ports (hard-coded, not configurable by user)
+RTKINO_TCP_PORT: int = 7856   # TCP Streamer (NMEA/UBX data)
+RTKINO_WEBUI_PORT: int = 80   # WebUI HTTP API
 
 # ---------- Defaults ----------
 DEFAULTS: Dict[str, Any] = {
@@ -53,27 +54,8 @@ DEFAULTS: Dict[str, Any] = {
     "min_sv": 8,
     "rtk_quality_gate": True,  # se False, disabilita tutti i check
 
-    # BLE (RTKINO)
-    "ble_enabled": False,
-    "ble_device_name": "RTKino",
-    "ble_passkey": 123456,
-    "ble_autoconnect": False,
-    "ble_tts": True,
-    "ble_tts_lang": "it",
-
     # RTKino HTTP integration
     "rtkino_host": "",
-    "rtkino_port": 80,
-    "rtkino_polling": False,
-    "rtkino_poll_interval": 2.0,
-
-    # NTRIP client per BLE-only
-    "rtkino_ntrip_host": "",
-    "rtkino_ntrip_port": 2101,
-    "rtkino_ntrip_mountpoint": "",
-    "rtkino_ntrip_user": "",
-    "rtkino_ntrip_password": "",
-    "rtkino_ntrip_gga_interval": 5.0,
 }
 
 # ---------- File path ----------

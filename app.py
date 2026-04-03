@@ -131,12 +131,6 @@ def main():
     # Start GNSS connection in background
     start_gnss_if_configured(s)
 
-    # Start RTKino polling if configured
-    if s.get("rtkino_host") and s.get("rtkino_polling", False):
-        from modules.rtkino_manager import RTKINO
-        RTKINO.start_polling()
-        print(f"# {now_iso()} [rtkino] polling avviato → {s.get('rtkino_host')}:{s.get('rtkino_port', 80)}")
-
     # Create Flask app
     app = create_app()
     print(f"# {now_iso()} [web] http://{http_bind}:{http_port}")

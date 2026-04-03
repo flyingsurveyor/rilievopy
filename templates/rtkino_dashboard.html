@@ -19,23 +19,12 @@
 
 .field { margin-bottom: 12px; }
 .field label { display:block; font-weight:600; color:#555; margin-bottom:4px; font-size:13px; }
-.field input[type=text], .field input[type=number], .field input[type=password], .field select {
+.field input[type=text], .field input[type=number], .field select {
   width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:6px;
   font-size:15px; box-sizing:border-box; background:#fafafa; font-family:inherit;
 }
 .field input:focus, .field select:focus { border-color:#3498db; outline:none; background:#fff; }
 .field .hint { font-size:11px; color:#999; margin-top:2px; }
-.row { display:flex; gap:12px; }
-.row .field { flex:1; }
-
-.toggle-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
-.toggle-row label { font-weight:600; color:#555; font-size:13px; margin:0; }
-.switch { position:relative; width:44px; height:24px; flex-shrink:0; }
-.switch input { opacity:0; width:0; height:0; }
-.slider { position:absolute; cursor:pointer; inset:0; background:#ccc; border-radius:24px; transition:.3s; }
-.slider::before { content:""; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s; }
-.switch input:checked + .slider { background:#2ecc71; }
-.switch input:checked + .slider::before { transform:translateX(20px); }
 
 /* Badges */
 .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; }
@@ -43,7 +32,6 @@
 .badge-warn  { background:#fff3cd; color:#856404; }
 .badge-off   { background:#f2f3f4; color:#888; }
 .badge-tcp   { background:#d1ecf1; color:#0c5460; }
-.badge-ble   { background:#dbeafe; color:#1e40af; }
 .badge-fixed { background:#d5f5e3; color:#1a7a43; }
 .badge-float { background:#fff3cd; color:#856404; }
 .badge-nofix { background:#fde8e8; color:#a93226; }
@@ -137,76 +125,8 @@
       <strong>WebUI</strong> RTKino: <code>http://&lt;IP&gt;:80</code> &nbsp;|&nbsp;
       <strong>TCP Streamer</strong> NMEA/UBX: <code>&lt;IP&gt;:{{ rtkino_tcp_port }}</code>
     </div>
-  </div>
-
-  <!-- ═══ BLE ═══════════════════════════════════════════════════════════════ -->
-  <div class="card anchor-target" id="ble">
-    <h2><span class="ico">🔵</span> BLE (Bluetooth Low Energy)</h2>
-    <div class="toggle-row">
-      <label class="switch">
-        <input type="checkbox" id="ble_enabled" {% if ble_enabled %}checked{% endif %}/>
-        <span class="slider"></span>
-      </label>
-      <label>Abilita connessione BLE a RTKino</label>
-    </div>
-    <div class="row" style="margin-top:8px;">
-      <div class="field">
-        <label>Nome dispositivo BLE</label>
-        <input type="text" id="ble_device_name" value="{{ ble_device_name }}" placeholder="RTKino"/>
-      </div>
-      <div class="field" style="max-width:140px">
-        <label>Passkey / PIN</label>
-        <input type="number" id="ble_passkey" value="{{ ble_passkey }}" min="0" max="999999"/>
-        <div class="hint">Gestito a livello OS/Bluetooth</div>
-      </div>
-    </div>
-    <div class="toggle-row">
-      <label class="switch">
-        <input type="checkbox" id="ble_autoconnect" {% if ble_autoconnect %}checked{% endif %}/>
-        <span class="slider"></span>
-      </label>
-      <label>Riconnessione automatica BLE all'avvio</label>
-    </div>
-    <div class="toggle-row">
-      <label class="switch">
-        <input type="checkbox" id="ble_tts" {% if ble_tts %}checked{% endif %}/>
-        <span class="slider"></span>
-      </label>
-      <label>Sintesi vocale (TTS) su eventi BLE</label>
-    </div>
-    <div class="field" style="max-width:200px; margin-top:4px;">
-      <label>Lingua TTS</label>
-      <select id="ble_tts_lang">
-        <option value="it" {% if ble_tts_lang == 'it' %}selected{% endif %}>Italiano</option>
-        <option value="en" {% if ble_tts_lang == 'en' %}selected{% endif %}>English</option>
-        <option value="fr" {% if ble_tts_lang == 'fr' %}selected{% endif %}>Français</option>
-        <option value="de" {% if ble_tts_lang == 'de' %}selected{% endif %}>Deutsch</option>
-        <option value="es" {% if ble_tts_lang == 'es' %}selected{% endif %}>Español</option>
-      </select>
-    </div>
-  </div>
-
-  <!-- ═══ HTTP POLLING ══════════════════════════════════════════════════════ -->
-  <div class="card anchor-target" id="polling">
-    <h2><span class="ico">🔄</span> Polling HTTP</h2>
-    <div class="toggle-row">
-      <label class="switch">
-        <input type="checkbox" id="rtkino_polling" {% if rtkino_polling %}checked{% endif %}/>
-        <span class="slider"></span>
-      </label>
-      <label>Abilita polling periodico stato/posizione RTKino via HTTP</label>
-    </div>
-    <div class="field" style="max-width:220px; margin-top:8px;">
-      <label>Intervallo polling (secondi)</label>
-      <input type="number" id="rtkino_poll_interval" min="1" max="30" step="0.5" value="{{ rtkino_poll_interval }}"/>
-    </div>
-  </div>
-
-  <!-- ═══ AZIONI ════════════════════════════════════════════════════════════ -->
-  <div class="card">
-    <div class="actions">
-      <button class="btn btn-primary" onclick="saveSettings()">💾 Salva impostazioni</button>
-      <button class="btn btn-success" onclick="saveAndConnect()">🔌 Salva e connetti TCP</button>
+    <div class="actions" style="margin-top:14px;">
+      <button class="btn btn-success" onclick="saveAndConnect()">🔌 Salva e Connetti</button>
       <a href="/settings" class="btn btn-outline">⚙ Impostazioni generali</a>
     </div>
   </div>
@@ -215,27 +135,11 @@
   <div class="card anchor-target" id="status">
     <h2><span class="ico">📊</span> Stato RTKino</h2>
     <div class="stat-grid" id="sysStatGrid">
-      <div class="stat-cell"><div class="lbl">Connessione</div><div class="val" id="st_conn">—</div></div>
+      <div class="stat-cell"><div class="lbl">Connessione TCP</div><div class="val" id="st_conn">—</div></div>
       <div class="stat-cell"><div class="lbl">WiFi</div><div class="val" id="st_wifi">—</div></div>
       <div class="stat-cell"><div class="lbl">NTRIP RTKino</div><div class="val" id="st_ntrip_rk">—</div></div>
       <div class="stat-cell"><div class="lbl">Mode</div><div class="val" id="st_mode">—</div></div>
       <div class="stat-cell"><div class="lbl">Logging</div><div class="val" id="st_log">—</div></div>
-      <div class="stat-cell"><div class="lbl">BLE RTKino</div><div class="val" id="st_ble_rk">—</div></div>
-    </div>
-  </div>
-
-  <!-- ═══ POSIZIONE ═════════════════════════════════════════════════════════ -->
-  <div class="card">
-    <h2><span class="ico">📍</span> Posizione live</h2>
-    <div class="stat-grid">
-      <div class="stat-cell"><div class="lbl">Fix</div><div class="val" id="p_fix">—</div></div>
-      <div class="stat-cell"><div class="lbl">Lat</div><div class="val" id="p_lat">—</div></div>
-      <div class="stat-cell"><div class="lbl">Lon</div><div class="val" id="p_lon">—</div></div>
-      <div class="stat-cell"><div class="lbl">Alt</div><div class="val" id="p_alt">—</div></div>
-      <div class="stat-cell"><div class="lbl">SV</div><div class="val" id="p_sv">—</div></div>
-      <div class="stat-cell"><div class="lbl">hAcc</div><div class="val" id="p_hacc">—</div></div>
-      <div class="stat-cell"><div class="lbl">PDOP</div><div class="val" id="p_pdop">—</div></div>
-      <div class="stat-cell"><div class="lbl">Age</div><div class="val" id="p_age">—</div></div>
     </div>
   </div>
 
@@ -247,80 +151,9 @@
       <button class="btn btn-warning" onclick="sendCmd('ntrip_off')">■ NTRIP Off</button>
       <button class="btn btn-primary" onclick="sendCmd('log_start')">● Log Start</button>
       <button class="btn btn-outline" onclick="sendCmd('log_stop')">■ Log Stop</button>
-      <button class="btn btn-outline" onclick="confirmCmd('switch_rover','Passare a modalità Rover?')">🔄 → Rover</button>
+      <button class="btn btn-outline" onclick="confirmCmd('switch_rover','Passare a modalità Rover?')">�� → Rover</button>
       <button class="btn btn-danger btn-sm" onclick="confirmCmd('zed_reset_hot','Reset HOT del ZED-F9P?')">♻ ZED Hot Reset</button>
       <button class="btn btn-danger btn-sm" onclick="confirmCmd('zed_reset_cold','Reset COLD del ZED-F9P? (perde ephemeris)')">♻ ZED Cold Reset</button>
-    </div>
-  </div>
-
-  <!-- ═══ NTRIP BLE-only ════════════════════════════════════════════════════ -->
-  <div class="card anchor-target" id="ntrip">
-    <h2><span class="ico">📡</span> NTRIP BLE-only</h2>
-    <p style="font-size:12px; color:#666; margin:0 0 12px;">
-      RilievoPY si connette al caster NTRIP e inoltra i dati RTCM a RTKino via BLE.
-    </p>
-
-    <!-- NTRIP status -->
-    <div id="ntripIndicator" class="conn-indicator conn-disconnected" style="margin-bottom:12px;">
-      <span class="conn-dot"></span>
-      <span id="ntripConnText">Non connesso</span>
-    </div>
-
-    <div class="stat-grid" style="margin-bottom:12px;">
-      <div class="stat-cell"><div class="lbl">Dati ricevuti</div><div class="val" id="nt_bytes">—</div></div>
-      <div class="stat-cell"><div class="lbl">Chunk RTCM</div><div class="val" id="nt_msgs">—</div></div>
-      <div class="stat-cell"><div class="lbl">Uptime</div><div class="val" id="nt_uptime">—</div></div>
-      <div class="stat-cell"><div class="lbl">BLE forward</div><div class="val" id="nt_ble">—</div></div>
-    </div>
-    <div id="nt_lasterr" style="font-size:12px; color:#e74c3c; display:none; margin-bottom:10px;"></div>
-
-    <!-- Caster config -->
-    <div class="row">
-      <div class="field">
-        <label>Host / IP caster NTRIP</label>
-        <input type="text" id="ntrip_host" placeholder="rtk2go.com" value="{{ ntrip_host }}"/>
-        <div class="hint">Es. rtk2go.com oppure caster privato</div>
-      </div>
-      <div class="field" style="max-width:110px;">
-        <label>Porta</label>
-        <input type="number" id="ntrip_port" min="1" max="65535" value="{{ ntrip_port }}"/>
-      </div>
-    </div>
-    <div class="field">
-      <label>Mountpoint</label>
-      <input type="text" id="ntrip_mountpoint" placeholder="NOME_MOUNTPOINT" value="{{ ntrip_mountpoint }}"/>
-    </div>
-    <div class="row">
-      <div class="field">
-        <label>Username</label>
-        <input type="text" id="ntrip_user" placeholder="(opzionale)" value="{{ ntrip_user }}"/>
-      </div>
-      <div class="field">
-        <label>Password</label>
-        <input type="password" id="ntrip_password" placeholder="(opzionale)"/>
-        <div class="hint">Salvata in chiaro nel file di configurazione locale.</div>
-      </div>
-    </div>
-    <div class="field" style="max-width:220px;">
-      <label>Invio GGA ogni (secondi)</label>
-      <input type="number" id="ntrip_gga_interval" min="0" max="60" value="{{ ntrip_gga_interval }}"/>
-      <div class="hint">Necessario per VRS; 0 per disabilitare.</div>
-    </div>
-
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
-      <button class="btn btn-success" onclick="startNtrip()">▶ Connetti NTRIP</button>
-      <button class="btn btn-danger"  onclick="stopNtrip()">■ Disconnetti</button>
-    </div>
-
-    <div class="info-box" style="margin-top:12px;">
-      <strong>Come funziona:</strong>
-      <ol style="margin:4px 0 0; padding-left:18px; line-height:1.7;">
-        <li>Abilita BLE sopra e collega RTKino via BLE</li>
-        <li>Inserisci le credenziali del caster NTRIP</li>
-        <li>Premi <strong>Connetti NTRIP</strong></li>
-        <li>I dati RTCM vengono inoltrati automaticamente a RTKino via BLE</li>
-      </ol>
-      <div id="bleStatusNote" style="margin-top:6px; font-size:12px; color:#555;"></div>
     </div>
   </div>
 
@@ -338,6 +171,7 @@
 <script>
 var _pollTimer = null;
 var AUTO_REFRESH = 3000;
+var RTKINO_TCP_PORT = {{ rtkino_tcp_port }};
 
 function showToast(msg, ok) {
   var t = document.getElementById('toast');
@@ -351,45 +185,6 @@ function badge(el, text, cls) {
   el.innerHTML = '<span class="badge ' + cls + '">' + text + '</span>';
 }
 
-function fmtBytes(b) {
-  if (b < 1024) return b + ' B';
-  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
-  return (b/1048576).toFixed(1) + ' MB';
-}
-function fmtUptime(s) {
-  if (s < 60) return s.toFixed(0) + 's';
-  if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60).toFixed(0) + 's';
-  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
-}
-
-// ── Collect form data ─────────────────────────────────────────────────────────
-function getRTKinoSettings() {
-  return {
-    rtkino_host:       document.getElementById('rtkino_host').value.trim(),
-    rtkino_polling:    document.getElementById('rtkino_polling').checked,
-    rtkino_poll_interval: parseFloat(document.getElementById('rtkino_poll_interval').value) || 2.0,
-    ble_enabled:       document.getElementById('ble_enabled').checked,
-    ble_device_name:   document.getElementById('ble_device_name').value.trim() || 'RTKino',
-    ble_passkey:       parseInt(document.getElementById('ble_passkey').value) || 123456,
-    ble_autoconnect:   document.getElementById('ble_autoconnect').checked,
-    ble_tts:           document.getElementById('ble_tts').checked,
-    ble_tts_lang:      document.getElementById('ble_tts_lang').value
-  };
-}
-
-// ── Save settings ─────────────────────────────────────────────────────────────
-function saveSettings() {
-  fetch('/api/rtkino/settings', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({action: 'save', settings: getRTKinoSettings()})
-  }).then(function(r){ return r.json(); })
-    .then(function(d){
-      if (d.ok) showToast('Impostazioni RTKino salvate ✓', true);
-      else showToast('Errore: ' + (d.error || '?'), false);
-    }).catch(function(){ showToast('Errore di rete', false); });
-}
-
 // ── Save & connect TCP ────────────────────────────────────────────────────────
 function saveAndConnect() {
   var host = document.getElementById('rtkino_host').value.trim();
@@ -397,7 +192,7 @@ function saveAndConnect() {
   fetch('/api/rtkino/settings', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({action: 'save_and_connect', settings: getRTKinoSettings()})
+    body: JSON.stringify({action: 'save_and_connect', settings: {rtkino_host: host}})
   }).then(function(r){ return r.json(); })
     .then(function(d){
       if (d.ok) { showToast('Connessione TCP avviata → ' + host + ':' + RTKINO_TCP_PORT + ' ✓', true); setTimeout(refreshStatus, 1000); }
@@ -416,80 +211,23 @@ function refreshStatus() {
       var ind = document.getElementById('connIndicator');
       var ct  = document.getElementById('connText');
       var cb  = document.getElementById('connBadge');
-      if (conn === 'tcp') {
+      if (conn === 'connected') {
         ind.className = 'conn-indicator conn-tcp';
-        ct.textContent = '● TCP connesso — RTKino TCP Streamer :' + RTKINO_TCP_PORT;
-        cb.className   = 'badge badge-tcp'; cb.textContent = '🟢 TCP';
-      } else if (conn === 'ble') {
-        ind.className = 'conn-indicator conn-connected';
-        ct.textContent = '● BLE connesso';
-        cb.className   = 'badge badge-ble'; cb.textContent = '🔵 BLE';
+        ct.textContent = '● Configurato — TCP Streamer :' + RTKINO_TCP_PORT + ' | WebUI :80';
+        cb.className   = 'badge badge-tcp'; cb.textContent = '🟢 configurato';
       } else {
         ind.className = 'conn-indicator conn-disconnected';
-        ct.textContent = 'Non connesso';
+        ct.textContent = 'Non configurato — inserisci l\'IP di RTKino';
         cb.className   = 'badge badge-off'; cb.textContent = '⚫ offline';
       }
 
       // System status
-      badge(document.getElementById('st_conn'),    conn,                 connBadgeClass(conn));
+      badge(document.getElementById('st_conn'), conn === 'connected' ? 'TCP :' + RTKINO_TCP_PORT : 'N/D', conn === 'connected' ? 'badge-tcp' : 'badge-off');
       var rs = d.rtkino_status || {};
-      badge(document.getElementById('st_wifi'),    rs.wifi  ? 'ON' : 'OFF',  rs.wifi  ? 'badge-ok' : 'badge-off');
-      badge(document.getElementById('st_ntrip_rk'),rs.ntrip ? 'ON' : 'OFF',  rs.ntrip ? 'badge-ok' : 'badge-off');
-      badge(document.getElementById('st_mode'),    rs.mode  || '—',           'badge-off');
-      badge(document.getElementById('st_log'),     rs.log   ? 'ON' : 'OFF',  rs.log   ? 'badge-ok' : 'badge-off');
-      badge(document.getElementById('st_ble_rk'),  rs.ble   ? 'ON' : 'OFF',  rs.ble   ? 'badge-ble' : 'badge-off');
-
-      // Position
-      var rp = d.rtkino_position || {};
-      var fixCls = rp.carrSoln === 2 ? 'badge-fixed' : rp.carrSoln === 1 ? 'badge-float' : 'badge-nofix';
-      document.getElementById('p_fix').innerHTML  = '<span class="badge ' + fixCls + '">' + (rp.fixStr || '—') + '</span>';
-      document.getElementById('p_lat').textContent = rp.lat   != null ? rp.lat.toFixed(8)  : '—';
-      document.getElementById('p_lon').textContent = rp.lon   != null ? rp.lon.toFixed(8)  : '—';
-      document.getElementById('p_alt').textContent = rp.alt   != null ? rp.alt.toFixed(3) + ' m' : '—';
-      document.getElementById('p_sv').textContent  = rp.numSV != null ? rp.numSV           : '—';
-      document.getElementById('p_hacc').textContent= rp.hAcc  != null ? (rp.hAcc*100).toFixed(1) + ' cm' : '—';
-      document.getElementById('p_pdop').textContent= rp.pdop  != null ? rp.pdop.toFixed(2) : '—';
-      document.getElementById('p_age').textContent = rp.age   != null ? rp.age.toFixed(1) + ' s' : '—';
-    })
-    .catch(function(){});
-
-  // NTRIP status
-  fetch('/api/rtkino/ntrip/status')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var ind = document.getElementById('ntripIndicator');
-      var ct  = document.getElementById('ntripConnText');
-      if (d.connected) {
-        ind.className = 'conn-indicator conn-connected';
-        ct.textContent = '● Connesso a ' + (d.host||'') + ':' + (d.port||'') + '/' + (d.mountpoint||'');
-      } else {
-        ind.className = 'conn-indicator conn-disconnected';
-        ct.textContent = 'Non connesso';
-      }
-      document.getElementById('nt_bytes').textContent = d.bytes_received != null ? fmtBytes(d.bytes_received) : '—';
-      document.getElementById('nt_msgs').textContent  = d.chunks != null ? d.chunks : '—';
-      document.getElementById('nt_uptime').textContent= d.uptime != null ? fmtUptime(d.uptime) : '—';
-
-      var errEl = document.getElementById('nt_lasterr');
-      if (d.last_error) { errEl.textContent = 'Ultimo errore: ' + d.last_error; errEl.style.display = ''; }
-      else               { errEl.style.display = 'none'; }
-    })
-    .catch(function(){});
-
-  // BLE note for NTRIP section
-  fetch('/api/rtkino/status')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var bleEl = document.getElementById('nt_ble');
-      var noteEl = document.getElementById('bleStatusNote');
-      var mode = d.conn_mode || 'disconnected';
-      if (mode === 'ble' || mode === 'tcp') {
-        bleEl.innerHTML = '<span class="badge badge-ble">🔵 BLE attivo</span>';
-        noteEl.textContent = '✅ BLE connesso — i dati RTCM verranno inoltrati automaticamente.';
-      } else {
-        bleEl.innerHTML = '<span class="badge badge-off">⚫ non connesso</span>';
-        noteEl.textContent = '⚠️ BLE non connesso. Abilita BLE qui sopra e connetti RTKino.';
-      }
+      badge(document.getElementById('st_wifi'),     rs.wifi  ? 'ON' : '—',  rs.wifi  ? 'badge-ok' : 'badge-off');
+      badge(document.getElementById('st_ntrip_rk'), rs.ntrip ? 'ON' : '—',  rs.ntrip ? 'badge-ok' : 'badge-off');
+      badge(document.getElementById('st_mode'),     rs.mode  || '—',         'badge-off');
+      badge(document.getElementById('st_log'),      rs.log   ? 'ON' : '—',  rs.log   ? 'badge-ok' : 'badge-off');
     })
     .catch(function(){});
 }
@@ -511,47 +249,7 @@ function confirmCmd(cmd, msg) {
   if (confirm(msg)) sendCmd(cmd);
 }
 
-// ── NTRIP ─────────────────────────────────────────────────────────────────────
-function startNtrip() {
-  var host       = document.getElementById('ntrip_host').value.trim();
-  var port       = parseInt(document.getElementById('ntrip_port').value) || 2101;
-  var mountpoint = document.getElementById('ntrip_mountpoint').value.trim();
-  var user       = document.getElementById('ntrip_user').value.trim();
-  var password   = document.getElementById('ntrip_password').value;
-  var gga        = parseFloat(document.getElementById('ntrip_gga_interval').value) || 5;
-
-  if (!host || !mountpoint) { showToast('Host e mountpoint obbligatori', false); return; }
-
-  fetch('/api/rtkino/ntrip/start', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({host:host, port:port, mountpoint:mountpoint,
-                          user:user, password:password, gga_interval:gga})
-  }).then(function(r){ return r.json(); })
-    .then(function(d){
-      if (d.ok) { showToast('NTRIP avviato ✓', true); setTimeout(refreshStatus, 1000); }
-      else showToast('Errore: ' + (d.error||'?'), false);
-    }).catch(function(){ showToast('Errore di rete', false); });
-}
-
-function stopNtrip() {
-  fetch('/api/rtkino/ntrip/stop', { method: 'POST' })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      showToast(d.ok ? 'NTRIP fermato' : ('Errore: ' + (d.error||'?')), d.ok);
-      setTimeout(refreshStatus, 500);
-    }).catch(function(){ showToast('Errore di rete', false); });
-}
-
 // ── Init ──────────────────────────────────────────────────────────────────────
-var RTKINO_TCP_PORT = {{ rtkino_tcp_port }};
-
-function connBadgeClass(conn) {
-  if (conn === 'tcp') return 'badge-tcp';
-  if (conn === 'ble') return 'badge-ble';
-  return 'badge-off';
-}
-
 refreshStatus();
 _pollTimer = setInterval(refreshStatus, AUTO_REFRESH);
 </script>
