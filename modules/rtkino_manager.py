@@ -35,12 +35,23 @@ class _RTKinoManager:
         s = cfg.load_settings()
         host = s.get("rtkino_host", "")
         conn_mode = "connected" if host else "disconnected"
-        return {
+        result = {
             "conn_mode": conn_mode,
             "host": host,
             "tcp_port": RTKINO_TCP_PORT,
             "api_port": RTKINO_WEBUI_PORT,
         }
+        # Prova a leggere lo stato live da RTKino via HTTP
+        if host:
+            try:
+                from modules.rtkino_api import RTKinoAPI
+                api = RTKinoAPI(host=host, port=RTKINO_WEBUI_PORT, timeout=3.0)
+                live = api.get_status()
+                if live and isinstance(live, dict):
+                    result["rtkino_live"] = live
+            except Exception:
+                pass
+        return result
 
 
 # ── Singleton globale ─────────────────────────────────────────────────────────

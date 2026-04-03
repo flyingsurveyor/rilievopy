@@ -223,11 +223,14 @@ function refreshStatus() {
 
       // System status
       badge(document.getElementById('st_conn'), conn === 'connected' ? 'TCP :' + RTKINO_TCP_PORT : 'N/D', conn === 'connected' ? 'badge-tcp' : 'badge-off');
-      var rs = d.rtkino_status || {};
-      badge(document.getElementById('st_wifi'),     rs.wifi  ? 'ON' : '—',  rs.wifi  ? 'badge-ok' : 'badge-off');
-      badge(document.getElementById('st_ntrip_rk'), rs.ntrip ? 'ON' : '—',  rs.ntrip ? 'badge-ok' : 'badge-off');
-      badge(document.getElementById('st_mode'),     rs.mode  || '—',         'badge-off');
-      badge(document.getElementById('st_log'),      rs.log   ? 'ON' : '—',  rs.log   ? 'badge-ok' : 'badge-off');
+      var rl = d.rtkino_live || {};
+      badge(document.getElementById('st_wifi'),     rl.wifi  ? '✅ OK'      : '⚠️ Off', rl.wifi  ? 'badge-ok'   : 'badge-off');
+      var ntripTxt = rl.ntrip ? '▶ Attivo' : '■ Off';
+      if (rl.ntrip && rl.ntripProfile) ntripTxt += ' (' + rl.ntripProfile + ')';
+      badge(document.getElementById('st_ntrip_rk'), ntripTxt, rl.ntrip ? 'badge-ok' : 'badge-off');
+      var modeTxt = rl.tcpIn ? 'TCP In' : (('rtkino_live' in d) ? '—' : 'N/D');
+      badge(document.getElementById('st_mode'), modeTxt, rl.tcpIn ? 'badge-tcp' : 'badge-off');
+      badge(document.getElementById('st_log'), rl.log ? '● Attivo' : '■ Off', rl.log ? 'badge-ok' : 'badge-off');
     })
     .catch(function(){});
 }

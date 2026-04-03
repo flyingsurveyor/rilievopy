@@ -109,12 +109,12 @@ class RTKinoAPI:
         return self._get("/ntrip/toggle", {"enable": 1 if enable else 0})
 
     def logging_start(self) -> Optional[Any]:
-        """GET /logging/start"""
-        return self._get("/logging/start")
+        """GET /log/start — avvia logging raw UBX."""
+        return self._get("/log/start")
 
     def logging_stop(self) -> Optional[Any]:
-        """GET /logging/stop"""
-        return self._get("/logging/stop")
+        """GET /log/stop — ferma logging raw UBX."""
+        return self._get("/log/stop")
 
     def switch_to_rover(self) -> Optional[Any]:
         """GET /api/switchToRover"""

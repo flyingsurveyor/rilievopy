@@ -144,19 +144,17 @@ function loadSurveys() {
         return;
       }
       var html = '<table class="survey-table"><thead><tr>'
-        + '<th>Titolo</th><th>ID</th><th>Punti</th><th>Creato</th><th>Azioni</th>'
+        + '<th>Titolo</th><th>ID</th><th>Punti</th><th>Azioni</th>'
         + '</tr></thead><tbody>';
       list.forEach(function(s) {
         var title = s.title || s.name || s.id || '—';
         var sid   = s.id || s.sid || '';
-        var pts   = s.points_count || s.count || '—';
-        var date  = s.created || s.date || '—';
-        if (date && date.length > 10) date = date.substring(0,10);
+        var pts   = s.pts != null ? s.pts : (s.points_count || s.count || '—');
+        var activeBadge = s.active ? ' <span class="badge badge-ok">● attivo</span>' : '';
         html += '<tr>'
-          + '<td><strong>' + esc(title) + '</strong></td>'
+          + '<td><strong>' + esc(title) + '</strong>' + activeBadge + '</td>'
           + '<td><code style="font-size:11px">' + esc(sid) + '</code></td>'
           + '<td>' + pts + '</td>'
-          + '<td>' + esc(date) + '</td>'
           + '<td>'
           + '  <button class="btn btn-outline btn-sm" onclick="showPoints(\'' + esc(sid) + '\',\'' + esc(title) + '\')">👁 Punti</button> '
           + '  <button class="btn btn-success btn-sm" onclick="importSurvey(\'' + esc(sid) + '\',\'' + esc(title) + '\')">⬇ Importa</button>'
