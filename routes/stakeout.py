@@ -99,10 +99,20 @@ def stakeout_events():
                 e, n, u = ecef_delta_to_enu(dX, dY, dZ, lat, lon)
                 dist2d = math.hypot(e, n)
                 dist3d = math.sqrt(dist2d * dist2d + u * u)
+                bearing = math.degrees(math.atan2(e, n)) % 360  # geographic azimuth: 0°=Nord, 90°=Est, clockwise
+                rtk = tpv.get("rtk", "")
+                hAcc = hp.get("hAcc") or tpv.get("hAcc")
+                vAcc = hp.get("vAcc") or tpv.get("vAcc")
+                numSV = tpv.get("numSV")
                 yield "data: " + json.dumps({
                     "target_name": target.get("name", ""),
                     "deltaN": n, "deltaE": e, "deltaU": u,
-                    "dist2d": dist2d, "dist3d": dist3d
+                    "dist2d": dist2d, "dist3d": dist3d,
+                    "bearing": bearing,
+                    "rtk": rtk,
+                    "hAcc": hAcc,
+                    "vAcc": vAcc,
+                    "numSV": numSV
                 }) + "\n\n"
             except Exception as exc:
                 yield "data: " + json.dumps({"error": str(exc)}) + "\n\n"
