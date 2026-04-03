@@ -1,6 +1,6 @@
 """
 modules/ble_integration.py
-Ponte BLE ↔ rilievo_gnss.
+Ponte BLE ↔ RilievoPY.
 - Avvia BleGnss in background
 - Inietta NMEA ricevuto nel BytePipe di CONN
 - Espone send_rtcm_via_ble() per il modulo NTRIP futuro

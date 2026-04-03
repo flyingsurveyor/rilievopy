@@ -250,7 +250,7 @@ def export_geopackage_sqlite(svy: Dict[str, Any], filepath: str) -> bool:
         CONSTRAINT fk_gc_r_srs_id FOREIGN KEY (srs_id) REFERENCES gpkg_spatial_ref_sys(srs_id))""")
 
     c.execute("INSERT INTO gpkg_contents (table_name,data_type,identifier,description,min_x,min_y,max_x,max_y,srs_id) VALUES (?,?,?,?,?,?,?,?,?)",
-              ("punti", "features", "punti", "Punti rilievo GNSS", min_x, min_y, max_x, max_y, GPKG_WGS84_SRS_ID))
+              ("punti", "features", "punti", "Punti rilievo RilievoPY", min_x, min_y, max_x, max_y, GPKG_WGS84_SRS_ID))
 
     c.execute("""CREATE TABLE gpkg_geometry_columns (
         table_name TEXT NOT NULL, column_name TEXT NOT NULL,

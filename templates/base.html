@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a2e">
-    <title>{% block title %}Rilievo GNSS{% endblock %}</title>
+    <title>{% block title %}RilievoPY{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
 
     {# ── Determine mode from active page ── #}
@@ -205,7 +205,7 @@
 
         <div class="topbar-brand">
             <span class="brand-icon">◎</span>
-            <span class="brand-text">Rilievo<span class="brand-accent">GNSS</span></span>
+            <span class="brand-text">Rilievo<span class="brand-accent">PY</span></span>
             <span class="brand-mode {{ mode }}">
                 {% if mode == 'rtk' %}— RTK{% else %}— PPK{% endif %}
             </span>

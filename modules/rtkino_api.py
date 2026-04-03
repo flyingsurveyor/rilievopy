@@ -38,7 +38,7 @@ class RTKinoAPI:
         try:
             req = urllib.request.Request(
                 url,
-                headers={"Accept": "application/json", "User-Agent": "rilievo_gnss/1.0"},
+                headers={"Accept": "application/json", "User-Agent": "RilievoPY/1.0"},
             )
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
@@ -64,7 +64,7 @@ class RTKinoAPI:
                 headers={
                     "Content-Type": "application/json",
                     "Accept": "application/json",
-                    "User-Agent": "rilievo_gnss/1.0",
+                    "User-Agent": "RilievoPY/1.0",
                 },
                 method="POST",
             )

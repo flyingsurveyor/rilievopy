@@ -8,9 +8,13 @@ The workspace is a directory that contains:
   ...
 
 Default path logic:
-  - Termux (Android): ~/storage/shared/RilievoGNSS  if ~/storage/shared exists,
-                      else ~/RilievoGNSS
-  - Other (RPi/Linux): ~/RilievoGNSS
+  - Termux (Android): ~/storage/shared/RilievoPY  if ~/storage/shared exists,
+                      else ~/RilievoPY
+  - Other (RPi/Linux): ~/RilievoPY
+
+Backward compatibility: if the legacy ~/RilievoGNSS directory exists and
+the new ~/RilievoPY does not, the legacy path is returned so existing
+installations keep working without any manual migration.
 """
 
 import os
@@ -31,15 +35,27 @@ def _is_termux() -> bool:
 def default_workspace() -> str:
     """
     Compute the default workspace path:
-    - Termux + shared storage available → ~/storage/shared/RilievoGNSS
-    - Termux (no shared storage) or other → ~/RilievoGNSS
+    - Termux + shared storage available → ~/storage/shared/RilievoPY
+    - Termux (no shared storage) or other → ~/RilievoPY
+
+    Backward compatibility: if the legacy RilievoGNSS directory already exists
+    and the new RilievoPY directory does not, the legacy path is returned so
+    existing installations continue working without a manual migration.
     """
     home = os.path.expanduser("~")
     if _is_termux():
         shared = os.path.join(home, "storage", "shared")
         if os.path.isdir(shared):
-            return os.path.join(shared, "RilievoGNSS")
-    return os.path.join(home, "RilievoGNSS")
+            new_path = os.path.join(shared, "RilievoPY")
+            legacy_path = os.path.join(shared, "RilievoGNSS")
+            if not os.path.isdir(new_path) and os.path.isdir(legacy_path):
+                return legacy_path
+            return new_path
+    new_path = os.path.join(home, "RilievoPY")
+    legacy_path = os.path.join(home, "RilievoGNSS")
+    if not os.path.isdir(new_path) and os.path.isdir(legacy_path):
+        return legacy_path
+    return new_path
 
 
 # ─── Path helpers ─────────────────────────────────────────────────────────────
