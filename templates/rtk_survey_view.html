@@ -8,7 +8,7 @@
 :root{--bg:#f3f6f9;--card:#fff;--line:#d7e0e7;--text:#20303c;--muted:#62727e;--accent:#1d5f8f;--soft:#eef5fb;--danger:#c0392b;--ok:#27ae60}
 body{background:var(--bg)}
 .container{max-width:1180px;margin:12px auto;padding:0 10px 24px}.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
-.hero{display:grid;grid-template-columns:1.2fr .9fr;gap:12px;align-items:stretch}.hero-main{display:flex;flex-direction:column;justify-content:space-between}.hero-title{font-size:24px;font-weight:900;color:var(--text);margin:0}.muted{color:var(--muted);font-size:13px}.toolbar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:12px}.btn{background:#3498db;color:#fff;border:none;padding:12px 14px;border-radius:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:800;gap:8px}.btn:hover{background:#2980b9}.btn-danger{background:var(--danger)}.btn-soft{background:var(--soft);color:var(--accent)}
+.hero{display:grid;grid-template-columns:1.2fr .9fr;gap:12px;align-items:stretch}.hero-main{display:flex;flex-direction:column;justify-content:space-between}.hero-title{font-size:24px;font-weight:900;color:var(--text);margin:0}.muted{color:var(--muted);font-size:13px}.toolbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.btn{background:#3498db;color:#fff;border:none;padding:12px 14px;border-radius:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:800;gap:8px}.btn:hover{background:#2980b9}.btn-danger{background:var(--danger)}.btn-soft{background:var(--soft);color:var(--accent)}
 textarea,input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:15px;box-sizing:border-box}
 .gnss-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.gnss-box{border:1px solid #e3eaf0;border-radius:14px;padding:12px;background:#f7fafc}.gnss-box .k{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase}.gnss-box .v{font-size:24px;font-weight:900;color:var(--text);margin-top:6px}
 .table-wrap{overflow:auto}.points-table{border-collapse:collapse;width:100%;margin-top:10px}th,td{border:1px solid #dde5ea;padding:8px}th{background:#eef3f6;text-align:left}tr:nth-child(even){background:#fafcfd}
@@ -39,6 +39,8 @@ textarea,input,select{width:100%;padding:12px;border:1px solid var(--line);borde
           <a class="btn btn-soft" href="/survey/{{ sid }}/cad">📐 CAD</a>
           <a class="btn btn-soft" href="/surveys">← Rilievi</a>
           <a class="btn btn-soft" href="/survey/{{ sid }}.geojson">GeoJSON</a>
+          <a class="btn btn-soft" href="/survey/{{ sid }}.csv">📊 CSV</a>
+          <a class="btn btn-soft" href="/survey/{{ sid }}.gpkg">📦 GPKG</a>
         </div>
       </form>
       <div class="voice-rec-box">

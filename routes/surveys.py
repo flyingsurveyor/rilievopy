@@ -193,9 +193,6 @@ def survey_view(sid):
     point_cards = []
     for idx, f in enumerate(svy.get("features", [])):
         p = f.get("properties", {})
-        hp = p.get("HPPOSLLH", {})
-        dop = p.get("DOP", {})
-        rp = p.get("RELPOSNED", {})
 
         def fnum(x, fmt):
             return "-" if x is None else fmt.format(x)
@@ -205,10 +202,9 @@ def survey_view(sid):
         codice = p.get('codice', '')
         points_for_json.append({"id": point_id, "name": point_name})
 
-        samp = p.get("sampling", {})
-        sigma_N = samp.get("sigma_N")
-        sigma_E = samp.get("sigma_E")
-        sigma_U = samp.get("sigma_U")
+        sigma_N = p.get("sigma_n")
+        sigma_E = p.get("sigma_e")
+        sigma_U = p.get("sigma_u")
 
         def fsig(x):
             return f"±{x:.3f} m" if x is not None else "-"
@@ -219,16 +215,16 @@ def survey_view(sid):
             f"<td>{point_id}</td>"
             f"<td>{point_name}</td>"
             f"<td>{codice}</td>"
-            f"<td>{fnum(hp.get('lat'), '{:.9f}')}</td>"
-            f"<td>{fnum(hp.get('lon'), '{:.9f}')}</td>"
-            f"<td>{fnum(hp.get('altHAE'), '{:.3f}')}</td>"
-            f"<td>{fnum(dop.get('pdop'), '{:.2f}')}</td>"
-            f"<td>{fnum(dop.get('hdop'), '{:.2f}')}</td>"
-            f"<td>{fnum(dop.get('vdop'), '{:.2f}')}</td>"
-            f"<td>{fnum(rp.get('N'), '{:.4f}')}</td>"
-            f"<td>{fnum(rp.get('E'), '{:.4f}')}</td>"
-            f"<td>{fnum(rp.get('D'), '{:.4f}')}</td>"
-            f"<td>{fnum(rp.get('baseline'), '{:.4f}')}</td>"
+            f"<td>{fnum(p.get('lat'), '{:.9f}')}</td>"
+            f"<td>{fnum(p.get('lon'), '{:.9f}')}</td>"
+            f"<td>{fnum(p.get('alt_hae'), '{:.3f}')}</td>"
+            f"<td>{fnum(p.get('pdop'), '{:.2f}')}</td>"
+            f"<td>{fnum(p.get('hdop'), '{:.2f}')}</td>"
+            f"<td>{fnum(p.get('vdop'), '{:.2f}')}</td>"
+            f"<td>{fnum(p.get('rel_n'), '{:.4f}')}</td>"
+            f"<td>{fnum(p.get('rel_e'), '{:.4f}')}</td>"
+            f"<td>{fnum(p.get('rel_d'), '{:.4f}')}</td>"
+            f"<td>{fnum(p.get('baseline'), '{:.4f}')}</td>"
             f"<td>{fsig(sigma_N)}</td>"
             f"<td>{fsig(sigma_E)}</td>"
             f"<td>{fsig(sigma_U)}</td>"
@@ -241,12 +237,12 @@ def survey_view(sid):
             "id": point_id,
             "name": point_name,
             "codice": codice,
-            "lat": fnum(hp.get('lat'), '{:.9f}'),
-            "lon": fnum(hp.get('lon'), '{:.9f}'),
-            "hae": fnum(hp.get('altHAE'), '{:.3f}'),
-            "pdop": fnum(dop.get('pdop'), '{:.2f}'),
-            "hdop": fnum(dop.get('hdop'), '{:.2f}'),
-            "vdop": fnum(dop.get('vdop'), '{:.2f}'),
+            "lat": fnum(p.get('lat'), '{:.9f}'),
+            "lon": fnum(p.get('lon'), '{:.9f}'),
+            "hae": fnum(p.get('alt_hae'), '{:.3f}'),
+            "pdop": fnum(p.get('pdop'), '{:.2f}'),
+            "hdop": fnum(p.get('hdop'), '{:.2f}'),
+            "vdop": fnum(p.get('vdop'), '{:.2f}'),
             "sigma_n": fsig(sigma_N),
             "sigma_e": fsig(sigma_E),
             "sigma_u": fsig(sigma_U),
@@ -780,20 +776,20 @@ def survey_calc_area(sid):
         return make_response({"error": "Punti insufficienti con coordinate valide"}, 400)
 
     # Get reference point
-    first_p = ordered_feats[0].get("properties", {}).get("HPPOSLLH", {})
+    first_p = ordered_feats[0].get("properties", {})
     lat0, lon0 = first_p.get("lat"), first_p.get("lon")
     if lat0 is None or lon0 is None:
         return make_response({"error": "Coordinate primo punto non valide"}, 400)
-    alt0 = first_p.get("altMSL") or first_p.get("altHAE", 0.0)
+    alt0 = first_p.get("alt_msl") or first_p.get("alt_hae", 0.0)
     X0, Y0, Z0 = geodetic_to_ecef(lat0, lon0, alt0)
 
     enu_points = []
     for f in ordered_feats:
-        hp = f.get("properties", {}).get("HPPOSLLH", {})
-        lat, lon = hp.get("lat"), hp.get("lon")
+        p = f.get("properties", {})
+        lat, lon = p.get("lat"), p.get("lon")
         if lat is None or lon is None:
             continue
-        alt = hp.get("altMSL") or hp.get("altHAE", 0.0)
+        alt = p.get("alt_msl") or p.get("alt_hae", 0.0)
         X, Y, Z = geodetic_to_ecef(lat, lon, alt)
         e, n, u = ecef_delta_to_enu(X - X0, Y - Y0, Z - Z0, lat0, lon0)
         enu_points.append((e, n))

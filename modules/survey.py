@@ -70,11 +70,102 @@ def list_survey_ids() -> List[str]:
     return ids
 
 
+def _normalize_feature(feat: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert a feature with legacy nested properties (HPPOSLLH, TPV, DOP, etc.)
+    to the new flat structure. Returns the feature unchanged if already flat.
+    """
+    p = feat.get("properties", {})
+    # Detect legacy structure: presence of nested sub-dicts
+    if "HPPOSLLH" not in p and "TPV" not in p:
+        return feat  # already flat or empty
+
+    hp = p.get("HPPOSLLH", {})
+    ecef = p.get("HPPOSECEF", {})
+    tpv = p.get("TPV", {})
+    dop = p.get("DOP", {})
+    cov = p.get("COV", {})
+    rp = p.get("RELPOSNED", {})
+    samp = p.get("sampling", {})
+
+    flat = {
+        # identification
+        "name":        p.get("name", ""),
+        "codice":      p.get("codice", ""),
+        "desc":        p.get("desc", ""),
+        "timestamp":   p.get("timestamp", ""),
+        # coordinates
+        "lat":         hp.get("lat"),
+        "lon":         hp.get("lon"),
+        "alt_hae":     hp.get("altHAE"),
+        "alt_msl":     hp.get("altMSL"),
+        "h_acc":       hp.get("hAcc"),
+        "v_acc":       hp.get("vAcc"),
+        # ECEF
+        "ecef_x":      ecef.get("X"),
+        "ecef_y":      ecef.get("Y"),
+        "ecef_z":      ecef.get("Z"),
+        "p_acc":       ecef.get("pAcc"),
+        # GNSS quality
+        "rtk":         tpv.get("rtk"),
+        "gnss_mode":   tpv.get("mode"),
+        "num_sv":      tpv.get("numSV"),
+        # DOP
+        "pdop":        dop.get("pdop"),
+        "hdop":        dop.get("hdop"),
+        "vdop":        dop.get("vdop"),
+        "gdop":        dop.get("gdop"),
+        "ndop":        dop.get("ndop"),
+        "edop":        dop.get("edop"),
+        "tdop":        dop.get("tdop"),
+        # covariance
+        "cov_nn":      cov.get("NN"),
+        "cov_ee":      cov.get("EE"),
+        "cov_dd":      cov.get("DD"),
+        "cov_ne":      cov.get("NE"),
+        "cov_nd":      cov.get("ND"),
+        "cov_ed":      cov.get("ED"),
+        # relative position (baseline)
+        "rel_n":       rp.get("N"),
+        "rel_e":       rp.get("E"),
+        "rel_d":       rp.get("D"),
+        "rel_sn":      rp.get("sN"),
+        "rel_se":      rp.get("sE"),
+        "rel_sd":      rp.get("sD"),
+        "baseline":    rp.get("baseline"),
+        "horiz":       rp.get("horiz"),
+        "bearing_deg": rp.get("bearingDeg"),
+        "slope_deg":   rp.get("slopeDeg"),
+        # sampling statistics
+        "sigma_n":     samp.get("sigma_N"),
+        "sigma_e":     samp.get("sigma_E"),
+        "sigma_u":     samp.get("sigma_U"),
+        "n_samples":   samp.get("n_samples", 0),
+        "n_kept":      samp.get("n_kept"),
+        "duration_s":  samp.get("duration_s", 10.0),
+        "interval_s":  samp.get("interval_s", 0.5),
+        "start_time":  samp.get("start_iso"),
+        "end_time":    samp.get("end_iso"),
+    }
+    # Preserve any extra keys not in the legacy sub-dicts (e.g. voice_notes)
+    for k, v in p.items():
+        if k not in ("HPPOSLLH", "HPPOSECEF", "TPV", "DOP", "COV", "RELPOSNED", "sampling"):
+            if k not in flat:
+                flat[k] = v
+    feat = dict(feat)
+    feat["properties"] = flat
+    return feat
+
+
 def load_survey(sid: str) -> Dict[str, Any]:
     path = survey_path(sid)
     with SURVEY_LOCK:
         with open(path, "r", encoding="utf-8") as fh:
-            return json.load(fh)
+            svy = json.load(fh)
+    # Normalize legacy nested features to flat structure on load
+    if "features" in svy:
+        svy["features"] = [_normalize_feature(f) for f in svy["features"]]
+    return svy
 
 
 def save_survey(sid: str, obj: Dict[str, Any]):
@@ -150,35 +241,63 @@ def point_feature(pid: str,
         "id": pid,
         "geometry": geom,
         "properties": {
-            "name": meta.get("name") or pid,
-            "codice": meta.get("codice", ""),
-            "desc": meta.get("desc") or "",
-            "timestamp": now_iso(),
-            "TPV": {"mode": stats.get("mode"), "rtk": stats.get("rtk"), "numSV": stats.get("numSV")},
-            "HPPOSLLH": {"lat": lat, "lon": lon, "altHAE": altHAE, "altMSL": altMSL,
-                         "hAcc": stats.get("hAcc"), "vAcc": stats.get("vAcc")},
-            "HPPOSECEF": {"X": X, "Y": Y, "Z": Z, "pAcc": stats.get("pAcc")},
-            "DOP": {"gdop": stats.get("gdop"), "pdop": stats.get("pdop"),
-                    "hdop": stats.get("hdop"), "vdop": stats.get("vdop"),
-                    "ndop": stats.get("ndop"), "edop": stats.get("edop"),
-                    "tdop": stats.get("tdop")},
-            "COV": {"NN": stats.get("covNN"), "EE": stats.get("covEE"), "DD": stats.get("covDD"),
-                    "NE": stats.get("covNE"), "ND": stats.get("covND"), "ED": stats.get("covED")},
-            "RELPOSNED": {"N": stats.get("relN"), "E": stats.get("relE"), "D": stats.get("relD"),
-                          "sN": stats.get("relsN"), "sE": stats.get("relsE"), "sD": stats.get("relsD"),
-                          "baseline": stats.get("baseline"), "horiz": stats.get("horiz"),
-                          "bearingDeg": stats.get("bearing"), "slopeDeg": stats.get("slope")},
-            "sampling": {
-                "start_iso": meta.get("start"),
-                "end_iso": meta.get("end"),
-                "duration_s": meta.get("duration", 10.0),
-                "interval_s": meta.get("interval", 0.5),
-                "n_samples": meta.get("n_samples", 0),
-                "sigma_N": stats.get("sigma_N"),
-                "sigma_E": stats.get("sigma_E"),
-                "sigma_U": stats.get("sigma_U"),
-                "n_kept": stats.get("n_kept"),
-            }
+            # identification
+            "name":        meta.get("name") or pid,
+            "codice":      meta.get("codice", ""),
+            "desc":        meta.get("desc") or "",
+            "timestamp":   now_iso(),
+            # coordinates (float, full precision)
+            "lat":         lat,
+            "lon":         lon,
+            "alt_hae":     altHAE,
+            "alt_msl":     altMSL,
+            "h_acc":       stats.get("hAcc"),
+            "v_acc":       stats.get("vAcc"),
+            # ECEF
+            "ecef_x":      X,
+            "ecef_y":      Y,
+            "ecef_z":      Z,
+            "p_acc":       stats.get("pAcc"),
+            # GNSS quality
+            "rtk":         stats.get("rtk"),
+            "gnss_mode":   stats.get("mode"),
+            "num_sv":      stats.get("numSV"),
+            # DOP
+            "pdop":        stats.get("pdop"),
+            "hdop":        stats.get("hdop"),
+            "vdop":        stats.get("vdop"),
+            "gdop":        stats.get("gdop"),
+            "ndop":        stats.get("ndop"),
+            "edop":        stats.get("edop"),
+            "tdop":        stats.get("tdop"),
+            # covariance
+            "cov_nn":      stats.get("covNN"),
+            "cov_ee":      stats.get("covEE"),
+            "cov_dd":      stats.get("covDD"),
+            "cov_ne":      stats.get("covNE"),
+            "cov_nd":      stats.get("covND"),
+            "cov_ed":      stats.get("covED"),
+            # relative position (baseline)
+            "rel_n":       stats.get("relN"),
+            "rel_e":       stats.get("relE"),
+            "rel_d":       stats.get("relD"),
+            "rel_sn":      stats.get("relsN"),
+            "rel_se":      stats.get("relsE"),
+            "rel_sd":      stats.get("relsD"),
+            "baseline":    stats.get("baseline"),
+            "horiz":       stats.get("horiz"),
+            "bearing_deg": stats.get("bearing"),
+            "slope_deg":   stats.get("slope"),
+            # sampling statistics
+            "sigma_n":     stats.get("sigma_N"),
+            "sigma_e":     stats.get("sigma_E"),
+            "sigma_u":     stats.get("sigma_U"),
+            "n_samples":   meta.get("n_samples", 0),
+            "n_kept":      stats.get("n_kept"),
+            "duration_s":  meta.get("duration", 10.0),
+            "interval_s":  meta.get("interval", 0.5),
+            "start_time":  meta.get("start"),
+            "end_time":    meta.get("end"),
         }
     }
 
@@ -282,25 +401,22 @@ def build_voice_notes_index(sid: str, svy: Dict[str, Any]) -> Dict[str, Any]:
 
 # ---------- CSV flatten ----------
 CSV_HEADER = [
-    "name", "codice", "lat", "lon", "altHAE", "altMSL",
-    "X", "Y", "Z", "mode", "rtk", "numSV",
+    "name", "codice", "desc", "timestamp",
+    "lat", "lon", "alt_hae", "alt_msl",
+    "ecef_x", "ecef_y", "ecef_z",
+    "gnss_mode", "rtk", "num_sv",
     "gdop", "pdop", "hdop", "vdop", "ndop", "edop", "tdop",
-    "hAcc", "vAcc", "pAcc",
-    "covNN", "covEE", "covDD", "covNE", "covND", "covED",
-    "relN", "relE", "relD", "relsN", "relsE", "relsD",
-    "baseline", "bearing", "slope",
-    "sigma_N", "sigma_E", "sigma_U", "n_kept"
+    "h_acc", "v_acc", "p_acc",
+    "cov_nn", "cov_ee", "cov_dd", "cov_ne", "cov_nd", "cov_ed",
+    "rel_n", "rel_e", "rel_d", "rel_sn", "rel_se", "rel_sd",
+    "baseline", "horiz", "bearing_deg", "slope_deg",
+    "sigma_n", "sigma_e", "sigma_u", "n_kept", "n_samples",
+    "duration_s", "interval_s", "start_time", "end_time",
 ]
 
 
 def flatten_point_for_csv(feat: Dict[str, Any]) -> List[str]:
     p = feat["properties"]
-    hp = p.get("HPPOSLLH", {})
-    ecef = p.get("HPPOSECEF", {})
-    dop = p.get("DOP", {})
-    cov = p.get("COV", {})
-    rp = p.get("RELPOSNED", {})
-    samp = p.get("sampling", {})
 
     def f(x, fmt):
         try:
@@ -311,45 +427,53 @@ def flatten_point_for_csv(feat: Dict[str, Any]) -> List[str]:
     return [
         p.get("name", ""),
         p.get("codice", ""),
-        f(hp.get("lat"), "{:.9f}"),
-        f(hp.get("lon"), "{:.9f}"),
-        f(hp.get("altHAE"), "{:.3f}"),
-        f(hp.get("altMSL"), "{:.3f}"),
-        f(ecef.get("X"), "{:.4f}"),
-        f(ecef.get("Y"), "{:.4f}"),
-        f(ecef.get("Z"), "{:.4f}"),
-        str(p.get("TPV", {}).get("mode", "")),
-        p.get("TPV", {}).get("rtk", ""),
-        f(p.get("TPV", {}).get("numSV", 0), "{}"),
-        f(dop.get("gdop"), "{:.2f}"),
-        f(dop.get("pdop"), "{:.2f}"),
-        f(dop.get("hdop"), "{:.2f}"),
-        f(dop.get("vdop"), "{:.2f}"),
-        f(dop.get("ndop"), "{:.2f}"),
-        f(dop.get("edop"), "{:.2f}"),
-        f(dop.get("tdop"), "{:.2f}"),
-        f(hp.get("hAcc"), "{:.3f}"),
-        f(hp.get("vAcc"), "{:.3f}"),
-        f(ecef.get("pAcc"), "{:.3f}"),
-        f(cov.get("NN"), "{:.4e}"),
-        f(cov.get("EE"), "{:.4e}"),
-        f(cov.get("DD"), "{:.4e}"),
-        f(cov.get("NE"), "{:.4e}"),
-        f(cov.get("ND"), "{:.4e}"),
-        f(cov.get("ED"), "{:.4e}"),
-        f(rp.get("N"), "{:.4f}"),
-        f(rp.get("E"), "{:.4f}"),
-        f(rp.get("D"), "{:.4f}"),
-        f(rp.get("sN"), "{:.3f}"),
-        f(rp.get("sE"), "{:.3f}"),
-        f(rp.get("sD"), "{:.3f}"),
-        f(rp.get("baseline"), "{:.4f}"),
-        f(rp.get("bearingDeg"), "{:.2f}"),
-        f(rp.get("slopeDeg"), "{:.2f}"),
-        f(samp.get("sigma_N"), "{:.4f}"),
-        f(samp.get("sigma_E"), "{:.4f}"),
-        f(samp.get("sigma_U"), "{:.4f}"),
-        f(samp.get("n_kept"), "{}"),
+        p.get("desc", ""),
+        p.get("timestamp", ""),
+        f(p.get("lat"), "{:.9f}"),
+        f(p.get("lon"), "{:.9f}"),
+        f(p.get("alt_hae"), "{:.3f}"),
+        f(p.get("alt_msl"), "{:.3f}"),
+        f(p.get("ecef_x"), "{:.4f}"),
+        f(p.get("ecef_y"), "{:.4f}"),
+        f(p.get("ecef_z"), "{:.4f}"),
+        str(p.get("gnss_mode", "")),
+        p.get("rtk", "") or "",
+        f(p.get("num_sv", 0), "{}"),
+        f(p.get("gdop"), "{:.2f}"),
+        f(p.get("pdop"), "{:.2f}"),
+        f(p.get("hdop"), "{:.2f}"),
+        f(p.get("vdop"), "{:.2f}"),
+        f(p.get("ndop"), "{:.2f}"),
+        f(p.get("edop"), "{:.2f}"),
+        f(p.get("tdop"), "{:.2f}"),
+        f(p.get("h_acc"), "{:.3f}"),
+        f(p.get("v_acc"), "{:.3f}"),
+        f(p.get("p_acc"), "{:.3f}"),
+        f(p.get("cov_nn"), "{:.4e}"),
+        f(p.get("cov_ee"), "{:.4e}"),
+        f(p.get("cov_dd"), "{:.4e}"),
+        f(p.get("cov_ne"), "{:.4e}"),
+        f(p.get("cov_nd"), "{:.4e}"),
+        f(p.get("cov_ed"), "{:.4e}"),
+        f(p.get("rel_n"), "{:.4f}"),
+        f(p.get("rel_e"), "{:.4f}"),
+        f(p.get("rel_d"), "{:.4f}"),
+        f(p.get("rel_sn"), "{:.3f}"),
+        f(p.get("rel_se"), "{:.3f}"),
+        f(p.get("rel_sd"), "{:.3f}"),
+        f(p.get("baseline"), "{:.4f}"),
+        f(p.get("horiz"), "{:.4f}"),
+        f(p.get("bearing_deg"), "{:.2f}"),
+        f(p.get("slope_deg"), "{:.2f}"),
+        f(p.get("sigma_n"), "{:.4f}"),
+        f(p.get("sigma_e"), "{:.4f}"),
+        f(p.get("sigma_u"), "{:.4f}"),
+        f(p.get("n_kept"), "{}"),
+        f(p.get("n_samples", 0), "{}"),
+        f(p.get("duration_s"), "{:.1f}"),
+        f(p.get("interval_s"), "{:.2f}"),
+        p.get("start_time", "") or "",
+        p.get("end_time", "") or "",
     ]
 
 
@@ -357,13 +481,11 @@ def flatten_point_for_csv(feat: Dict[str, Any]) -> List[str]:
 def point_from_feature(f: Dict[str, Any]) -> Dict[str, Any]:
     """Extract point info from a GeoJSON feature."""
     p = f.get("properties", {})
-    hp = p.get("HPPOSLLH", {})
-    ecef = p.get("HPPOSECEF", {})
     return {
         "name": p.get("name", f.get("id")),
-        "lat": hp.get("lat"), "lon": hp.get("lon"),
-        "altHAE": hp.get("altHAE"), "altMSL": hp.get("altMSL"),
-        "X": ecef.get("X"), "Y": ecef.get("Y"), "Z": ecef.get("Z"),
+        "lat": p.get("lat"), "lon": p.get("lon"),
+        "altHAE": p.get("alt_hae"), "altMSL": p.get("alt_msl"),
+        "X": p.get("ecef_x"), "Y": p.get("ecef_y"), "Z": p.get("ecef_z"),
         "start": None, "end": None
     }
 

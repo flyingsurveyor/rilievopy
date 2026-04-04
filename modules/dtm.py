@@ -94,10 +94,9 @@ class TIN:
         """
         for feat in features:
             props = feat.get("properties", {})
-            hp = props.get("HPPOSLLH", {})
-            lat = hp.get("lat")
-            lon = hp.get("lon")
-            alt = hp.get("altMSL") or hp.get("altHAE", 0.0) or 0.0
+            lat = props.get("lat")
+            lon = props.get("lon")
+            alt = props.get("alt_msl") or props.get("alt_hae", 0.0) or 0.0
             if lat is None or lon is None:
                 continue
 
