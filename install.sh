@@ -1,16 +1,22 @@
-#!/bin/bash
-# ... [Other script content] ...
+# Updated install.sh
 
-# Termux installation
+# Script to install required python packages
+
+# ... [other script content above]
+
+info "Installing: flask, pyubx2, waitress, openpyxl..."
 pip install ${PIP_EXTRA_FLAGS} flask pyubx2 waitress openpyxl 2>&1 | tail -5
 
-# Info message
-info "Installing: flask, pyubx2, openpyxl..."
+# ... [other script content in between]
 
-# Linux/venv installation
+info "Installing: flask, pyubx2, waitress, openpyxl..."
 pip install flask pyubx2 waitress openpyxl 2>&1 | tail -5
 
-# Final summary section
-# ... [Some lines above] ...
+# Check for necessary libraries
+python3 -c "import openpyxl" 2>/dev/null || { err "openpyxl not installed!"; DEPS_OK=0; }
+
+# ... [other script content in between]
+
+# Final summary
 python3 -c "import openpyxl; print('  ✓ openpyxl', openpyxl.__version__)" 2>/dev/null || echo "  ✗ openpyxl — NOT INSTALLED"
-# ... [Other script content] ...
+# ... [rest of script]
