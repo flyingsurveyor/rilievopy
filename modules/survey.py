@@ -420,7 +420,9 @@ def flatten_point_for_csv(feat: Dict[str, Any]) -> List[str]:
 
     def f(x, fmt):
         try:
-            return fmt.format(x if x is not None else float("nan"))
+            if x is None:
+                return ""
+            return fmt.format(float(x))
         except Exception:
             return ""
 
