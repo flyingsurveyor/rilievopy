@@ -58,15 +58,14 @@ def _all_survey_points():
             title = svy.get("properties", {}).get("title", sid)
             for feat in svy.get("features", []):
                 props = feat.get("properties", {})
-                hp = props.get("HPPOSLLH", {})
-                lat, lon = hp.get("lat"), hp.get("lon")
+                lat, lon = props.get("lat"), props.get("lon")
                 if lat is None or lon is None:
                     continue
                 all_pts.append({
                     "sid": sid, "survey": title, "pid": feat.get("id", ""),
                     "name": props.get("name", ""),
                     "lat": lat, "lon": lon,
-                    "alt": hp.get("altMSL") or hp.get("altHAE", 0) or 0,
+                    "alt": props.get("alt_msl") or props.get("alt_hae", 0) or 0,
                     "label": f"{title} / {props.get('name', feat.get('id', ''))}",
                 })
         except Exception:
@@ -79,14 +78,13 @@ def _survey_to_local(sid):
     features = svy.get("features", [])
     if not features:
         return [], None
-    first_hp = features[0].get("properties", {}).get("HPPOSLLH", {})
-    olat, olon = first_hp.get("lat", 0), first_hp.get("lon", 0)
+    first_props = features[0].get("properties", {})
+    olat, olon = first_props.get("lat", 0), first_props.get("lon", 0)
     points = []
     for feat in features:
         props = feat.get("properties", {})
-        hp = props.get("HPPOSLLH", {})
-        lat, lon = hp.get("lat"), hp.get("lon")
-        alt = hp.get("altMSL") or hp.get("altHAE", 0) or 0
+        lat, lon = props.get("lat"), props.get("lon")
+        alt = props.get("alt_msl") or props.get("alt_hae", 0) or 0
         if lat is None or lon is None:
             continue
         x = (lon - olon) * 111320 * math.cos(math.radians(olat))
@@ -110,8 +108,8 @@ def _build_tin(sid):
     features = svy.get("features", [])
     if len(features) < 3:
         raise ValueError("Servono almeno 3 punti per un DTM")
-    first_hp = features[0].get("properties", {}).get("HPPOSLLH", {})
-    origin = (first_hp.get("lat", 0), first_hp.get("lon", 0))
+    first_props = features[0].get("properties", {})
+    origin = (first_props.get("lat", 0), first_props.get("lon", 0))
     tin = TIN()
     tin.add_points_from_features(features, use_local=True, origin=origin)
     tin.build()

@@ -24,10 +24,9 @@ def _dxf_escape_text(s: str) -> str:
 def _feature_to_llh(feat: Dict[str, Any]) -> Optional[Tuple[float, float, float]]:
     """Extract lat, lon, altMSL from feature."""
     p = feat.get("properties", {})
-    hp = p.get("HPPOSLLH", {})
-    lat = hp.get("lat")
-    lon = hp.get("lon")
-    alt = hp.get("altMSL") or hp.get("altHAE", 0.0)
+    lat = p.get("lat")
+    lon = p.get("lon")
+    alt = p.get("alt_msl") or p.get("alt_hae", 0.0)
     if lat is None or lon is None:
         return None
     return float(lat), float(lon), float(alt)
@@ -107,7 +106,6 @@ def build_dxf_advanced(svy: Dict[str, Any], mode: str = "3d",
 
     for f in feats:
         p = f.get("properties", {})
-        hp = p.get("HPPOSLLH", {})
         llh = _feature_to_llh(f)
         if not llh:
             continue
@@ -147,7 +145,7 @@ def build_dxf_advanced(svy: Dict[str, Any], mode: str = "3d",
 
         # Precision circle
         if show_precision:
-            hAcc = hp.get("hAcc")
+            hAcc = p.get("h_acc")
             if hAcc and hAcc > 0:
                 w(0, "CIRCLE"); w(8, "PRECISIONE"); w(62, "1")
                 w(10, f"{x_local:.4f}"); w(20, f"{y_local:.4f}"); w(30, f"{z_local:.4f}")
@@ -197,27 +195,44 @@ def export_geopackage_sqlite(svy: Dict[str, Any], filepath: str) -> bool:
 
     for f in features:
         p = f.get("properties", {})
-        hp = p.get("HPPOSLLH", {})
-        tpv = p.get("TPV", {})
-        dop = p.get("DOP", {})
-        lat = hp.get("lat")
-        lon = hp.get("lon")
+        lat = p.get("lat")
+        lon = p.get("lon")
         if lat is None or lon is None:
             continue
         lons.append(lon)
         lats.append(lat)
-        altHAE = hp.get("altHAE")
-        altMSL = hp.get("altMSL")
-        alt = altMSL if altMSL is not None else (altHAE if altHAE is not None else 0.0)
+        alt_hae = p.get("alt_hae")
+        alt_msl = p.get("alt_msl")
+        alt = alt_msl if alt_msl is not None else (alt_hae if alt_hae is not None else 0.0)
         points.append({
-            "name": p.get("name", ""), "lat": lat, "lon": lon,
-            "altHAE": altHAE, "altMSL": altMSL,
-            "hAcc": hp.get("hAcc"), "vAcc": hp.get("vAcc"),
-            "pAcc": p.get("HPPOSECEF", {}).get("pAcc"),
-            "pdop": dop.get("pdop"), "hdop": dop.get("hdop"),
-            "vdop": dop.get("vdop"), "gdop": dop.get("gdop"),
-            "rtk": tpv.get("rtk"), "numSV": tpv.get("numSV"),
+            "name": p.get("name", ""),
+            "codice": p.get("codice", ""),
+            "desc": p.get("desc", ""),
             "timestamp": p.get("timestamp", ""),
+            "lat": lat, "lon": lon,
+            "alt_hae": alt_hae, "alt_msl": alt_msl,
+            "h_acc": p.get("h_acc"), "v_acc": p.get("v_acc"),
+            "ecef_x": p.get("ecef_x"), "ecef_y": p.get("ecef_y"),
+            "ecef_z": p.get("ecef_z"), "p_acc": p.get("p_acc"),
+            "rtk": p.get("rtk"), "gnss_mode": p.get("gnss_mode"),
+            "num_sv": p.get("num_sv"),
+            "pdop": p.get("pdop"), "hdop": p.get("hdop"),
+            "vdop": p.get("vdop"), "gdop": p.get("gdop"),
+            "ndop": p.get("ndop"), "edop": p.get("edop"),
+            "tdop": p.get("tdop"),
+            "cov_nn": p.get("cov_nn"), "cov_ee": p.get("cov_ee"),
+            "cov_dd": p.get("cov_dd"), "cov_ne": p.get("cov_ne"),
+            "cov_nd": p.get("cov_nd"), "cov_ed": p.get("cov_ed"),
+            "rel_n": p.get("rel_n"), "rel_e": p.get("rel_e"),
+            "rel_d": p.get("rel_d"), "rel_sn": p.get("rel_sn"),
+            "rel_se": p.get("rel_se"), "rel_sd": p.get("rel_sd"),
+            "baseline": p.get("baseline"), "horiz": p.get("horiz"),
+            "bearing_deg": p.get("bearing_deg"), "slope_deg": p.get("slope_deg"),
+            "sigma_n": p.get("sigma_n"), "sigma_e": p.get("sigma_e"),
+            "sigma_u": p.get("sigma_u"),
+            "n_samples": p.get("n_samples", 0), "n_kept": p.get("n_kept"),
+            "duration_s": p.get("duration_s"), "interval_s": p.get("interval_s"),
+            "start_time": p.get("start_time"), "end_time": p.get("end_time"),
             "geom": create_gpkg_geometry(lon, lat, alt, GPKG_WGS84_SRS_ID)
         })
 
@@ -265,15 +280,51 @@ def export_geopackage_sqlite(svy: Dict[str, Any], filepath: str) -> bool:
 
     c.execute("""CREATE TABLE punti (
         fid INTEGER PRIMARY KEY AUTOINCREMENT, geom BLOB,
-        name TEXT, lat REAL, lon REAL, altHAE REAL, altMSL REAL,
-        hAcc REAL, vAcc REAL, pAcc REAL, pdop REAL, hdop REAL,
-        vdop REAL, gdop REAL, rtk TEXT, numSV INTEGER, timestamp TEXT)""")
+        name TEXT, codice TEXT, desc TEXT, timestamp TEXT,
+        lat REAL, lon REAL, alt_hae REAL, alt_msl REAL,
+        h_acc REAL, v_acc REAL, p_acc REAL,
+        ecef_x REAL, ecef_y REAL, ecef_z REAL,
+        rtk TEXT, gnss_mode INTEGER, num_sv INTEGER,
+        pdop REAL, hdop REAL, vdop REAL, gdop REAL,
+        ndop REAL, edop REAL, tdop REAL,
+        cov_nn REAL, cov_ee REAL, cov_dd REAL,
+        cov_ne REAL, cov_nd REAL, cov_ed REAL,
+        rel_n REAL, rel_e REAL, rel_d REAL,
+        rel_sn REAL, rel_se REAL, rel_sd REAL,
+        baseline REAL, horiz REAL, bearing_deg REAL, slope_deg REAL,
+        sigma_n REAL, sigma_e REAL, sigma_u REAL,
+        n_samples INTEGER, n_kept INTEGER,
+        duration_s REAL, interval_s REAL,
+        start_time TEXT, end_time TEXT)""")
 
-    c.executemany("""INSERT INTO punti (geom,name,lat,lon,altHAE,altMSL,hAcc,vAcc,pAcc,pdop,hdop,vdop,gdop,rtk,numSV,timestamp)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                  [(pt["geom"], pt["name"], pt["lat"], pt["lon"], pt["altHAE"], pt["altMSL"],
-                    pt["hAcc"], pt["vAcc"], pt["pAcc"], pt["pdop"], pt["hdop"], pt["vdop"],
-                    pt["gdop"], pt["rtk"], pt["numSV"], pt["timestamp"]) for pt in points])
+    c.executemany(
+        """INSERT INTO punti (geom,name,codice,desc,timestamp,
+            lat,lon,alt_hae,alt_msl,h_acc,v_acc,p_acc,
+            ecef_x,ecef_y,ecef_z,rtk,gnss_mode,num_sv,
+            pdop,hdop,vdop,gdop,ndop,edop,tdop,
+            cov_nn,cov_ee,cov_dd,cov_ne,cov_nd,cov_ed,
+            rel_n,rel_e,rel_d,rel_sn,rel_se,rel_sd,
+            baseline,horiz,bearing_deg,slope_deg,
+            sigma_n,sigma_e,sigma_u,n_samples,n_kept,
+            duration_s,interval_s,start_time,end_time)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,
+                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        [(pt["geom"], pt["name"], pt["codice"], pt["desc"], pt["timestamp"],
+          pt["lat"], pt["lon"], pt["alt_hae"], pt["alt_msl"],
+          pt["h_acc"], pt["v_acc"], pt["p_acc"],
+          pt["ecef_x"], pt["ecef_y"], pt["ecef_z"],
+          pt["rtk"], pt["gnss_mode"], pt["num_sv"],
+          pt["pdop"], pt["hdop"], pt["vdop"], pt["gdop"],
+          pt["ndop"], pt["edop"], pt["tdop"],
+          pt["cov_nn"], pt["cov_ee"], pt["cov_dd"],
+          pt["cov_ne"], pt["cov_nd"], pt["cov_ed"],
+          pt["rel_n"], pt["rel_e"], pt["rel_d"],
+          pt["rel_sn"], pt["rel_se"], pt["rel_sd"],
+          pt["baseline"], pt["horiz"], pt["bearing_deg"], pt["slope_deg"],
+          pt["sigma_n"], pt["sigma_e"], pt["sigma_u"],
+          pt["n_samples"], pt["n_kept"],
+          pt["duration_s"], pt["interval_s"],
+          pt["start_time"], pt["end_time"]) for pt in points])
 
     conn.commit()
     conn.close()
@@ -295,22 +346,40 @@ def export_geopackage(svy: Dict[str, Any], sid: str) -> Optional[str]:
         geometries = []
         for f in svy.get("features", []):
             p = f.get("properties", {})
-            hp = p.get("HPPOSLLH", {})
-            tpv = p.get("TPV", {})
-            dop = p.get("DOP", {})
-            lat, lon = hp.get("lat"), hp.get("lon")
+            lat, lon = p.get("lat"), p.get("lon")
             if lat is None or lon is None:
                 continue
             geometries.append(Point(lon, lat))
             data.append({
-                "name": p.get("name", ""), "lat": lat, "lon": lon,
-                "altHAE": hp.get("altHAE"), "altMSL": hp.get("altMSL"),
-                "hAcc": hp.get("hAcc"), "vAcc": hp.get("vAcc"),
-                "pAcc": p.get("HPPOSECEF", {}).get("pAcc"),
-                "pdop": dop.get("pdop"), "hdop": dop.get("hdop"),
-                "vdop": dop.get("vdop"), "gdop": dop.get("gdop"),
-                "rtk": tpv.get("rtk"), "numSV": tpv.get("numSV"),
-                "timestamp": p.get("timestamp", "")
+                "name": p.get("name", ""),
+                "codice": p.get("codice", ""),
+                "desc": p.get("desc", ""),
+                "timestamp": p.get("timestamp", ""),
+                "lat": lat, "lon": lon,
+                "alt_hae": p.get("alt_hae"), "alt_msl": p.get("alt_msl"),
+                "h_acc": p.get("h_acc"), "v_acc": p.get("v_acc"),
+                "p_acc": p.get("p_acc"),
+                "ecef_x": p.get("ecef_x"), "ecef_y": p.get("ecef_y"),
+                "ecef_z": p.get("ecef_z"),
+                "rtk": p.get("rtk"), "gnss_mode": p.get("gnss_mode"),
+                "num_sv": p.get("num_sv"),
+                "pdop": p.get("pdop"), "hdop": p.get("hdop"),
+                "vdop": p.get("vdop"), "gdop": p.get("gdop"),
+                "ndop": p.get("ndop"), "edop": p.get("edop"),
+                "tdop": p.get("tdop"),
+                "cov_nn": p.get("cov_nn"), "cov_ee": p.get("cov_ee"),
+                "cov_dd": p.get("cov_dd"), "cov_ne": p.get("cov_ne"),
+                "cov_nd": p.get("cov_nd"), "cov_ed": p.get("cov_ed"),
+                "rel_n": p.get("rel_n"), "rel_e": p.get("rel_e"),
+                "rel_d": p.get("rel_d"), "rel_sn": p.get("rel_sn"),
+                "rel_se": p.get("rel_se"), "rel_sd": p.get("rel_sd"),
+                "baseline": p.get("baseline"), "horiz": p.get("horiz"),
+                "bearing_deg": p.get("bearing_deg"), "slope_deg": p.get("slope_deg"),
+                "sigma_n": p.get("sigma_n"), "sigma_e": p.get("sigma_e"),
+                "sigma_u": p.get("sigma_u"),
+                "n_samples": p.get("n_samples", 0), "n_kept": p.get("n_kept"),
+                "duration_s": p.get("duration_s"), "interval_s": p.get("interval_s"),
+                "start_time": p.get("start_time"), "end_time": p.get("end_time"),
             })
 
         gdf = gpd.GeoDataFrame(data, geometry=geometries, crs="EPSG:4326")
@@ -338,18 +407,10 @@ def format_point_txt(feat: Dict[str, Any], sid: str) -> str:
     pid = feat.get("id", "?")
     name = p.get("name", pid)
     desc = p.get("desc", "") or "-"
-    samp = p.get("sampling", {})
-    start_iso = samp.get("start_iso") or "-"
-    end_iso = samp.get("end_iso") or "-"
-    duration = samp.get("duration_s", 10.0)
-    n_samples = samp.get("n_samples", 0)
-
-    tpv = p.get("TPV", {})
-    hp = p.get("HPPOSLLH", {})
-    ecef = p.get("HPPOSECEF", {})
-    dop = p.get("DOP", {})
-    cov = p.get("COV", {})
-    rp = p.get("RELPOSNED", {})
+    start_iso = p.get("start_time") or "-"
+    end_iso = p.get("end_time") or "-"
+    duration = p.get("duration_s", 10.0)
+    n_samples = p.get("n_samples", 0)
 
     def _fmt(x, fmt):
         try:
@@ -357,44 +418,46 @@ def format_point_txt(feat: Dict[str, Any], sid: str) -> str:
         except Exception:
             return str(x)
 
-    NN, EE, DD = cov.get("NN"), cov.get("EE"), cov.get("DD")
-    _sigN = None if NN is None or NN < 0 else math.sqrt(NN)
-    _sigE = None if EE is None or EE < 0 else math.sqrt(EE)
-    _sigD = None if DD is None or DD < 0 else math.sqrt(DD)
-    _rSigN = rp.get("sN") if rp.get("sN") is not None else _sigN
-    _rSigE = rp.get("sE") if rp.get("sE") is not None else _sigE
-    _rSigD = rp.get("sD") if rp.get("sD") is not None else _sigD
+    cov_nn = p.get("cov_nn")
+    cov_ee = p.get("cov_ee")
+    cov_dd = p.get("cov_dd")
+    _sigN = None if cov_nn is None or cov_nn < 0 else math.sqrt(cov_nn)
+    _sigE = None if cov_ee is None or cov_ee < 0 else math.sqrt(cov_ee)
+    _sigD = None if cov_dd is None or cov_dd < 0 else math.sqrt(cov_dd)
+    _rSigN = p.get("rel_sn") if p.get("rel_sn") is not None else _sigN
+    _rSigE = p.get("rel_se") if p.get("rel_se") is not None else _sigE
+    _rSigD = p.get("rel_sd") if p.get("rel_sd") is not None else _sigD
 
     lines = [
         f"Punto: {name}",
         f"Descrizione: {desc}",
         f"Rilievo: {start_iso} → {end_iso}  (durata {duration:.0f}s, campioni {n_samples})",
         "",
-        f"TPV: mode={tpv.get('mode', '')}  RTK={tpv.get('rtk', '')}  SV={tpv.get('numSV', '')}",
+        f"TPV: mode={p.get('gnss_mode', '')}  RTK={p.get('rtk', '')}  SV={p.get('num_sv', '')}",
         "",
         "HPPOSLLH (media):",
-        f"  lat = {_fmt(hp.get('lat'), '{:.9f}')}  lon = {_fmt(hp.get('lon'), '{:.9f}')}",
-        f"  altHAE = {_fmt(hp.get('altHAE'), '{:.3f}')} m   altMSL = {_fmt(hp.get('altMSL'), '{:.3f}')} m",
-        f"  hAcc = {_fmt(hp.get('hAcc'), '{:.3f}')} m   vAcc = {_fmt(hp.get('vAcc'), '{:.3f}')} m",
+        f"  lat = {_fmt(p.get('lat'), '{:.9f}')}  lon = {_fmt(p.get('lon'), '{:.9f}')}",
+        f"  altHAE = {_fmt(p.get('alt_hae'), '{:.3f}')} m   altMSL = {_fmt(p.get('alt_msl'), '{:.3f}')} m",
+        f"  hAcc = {_fmt(p.get('h_acc'), '{:.3f}')} m   vAcc = {_fmt(p.get('v_acc'), '{:.3f}')} m",
         "",
         "HPPOSECEF (media):",
-        f"  X = {_fmt(ecef.get('X'), '{:.4f}')} m",
-        f"  Y = {_fmt(ecef.get('Y'), '{:.4f}')} m",
-        f"  Z = {_fmt(ecef.get('Z'), '{:.4f}')} m",
-        f"  pAcc = {_fmt(ecef.get('pAcc'), '{:.4f}')} m",
+        f"  X = {_fmt(p.get('ecef_x'), '{:.4f}')} m",
+        f"  Y = {_fmt(p.get('ecef_y'), '{:.4f}')} m",
+        f"  Z = {_fmt(p.get('ecef_z'), '{:.4f}')} m",
+        f"  pAcc = {_fmt(p.get('p_acc'), '{:.4f}')} m",
         "",
         "DOP (media):",
-        f"  GDOP={_fmt(dop.get('gdop'), '{:.2f}')}  PDOP={_fmt(dop.get('pdop'), '{:.2f}')}  HDOP={_fmt(dop.get('hdop'), '{:.2f}')}  VDOP={_fmt(dop.get('vdop'), '{:.2f}')}",
-        f"  NDOP={_fmt(dop.get('ndop'), '{:.2f}')}  EDOP={_fmt(dop.get('edop'), '{:.2f}')}  TDOP={_fmt(dop.get('tdop'), '{:.2f}')}",
+        f"  GDOP={_fmt(p.get('gdop'), '{:.2f}')}  PDOP={_fmt(p.get('pdop'), '{:.2f}')}  HDOP={_fmt(p.get('hdop'), '{:.2f}')}  VDOP={_fmt(p.get('vdop'), '{:.2f}')}",
+        f"  NDOP={_fmt(p.get('ndop'), '{:.2f}')}  EDOP={_fmt(p.get('edop'), '{:.2f}')}  TDOP={_fmt(p.get('tdop'), '{:.2f}')}",
         "",
         "COV Pos (media):",
         f"  σN={_fmt(_sigN, '{:.3f}')} m  σE={_fmt(_sigE, '{:.3f}')} m  σD={_fmt(_sigD, '{:.3f}')} m",
-        f"  NN={_fmt(NN, '{:.4e}')}  EE={_fmt(EE, '{:.4e}')}  DD={_fmt(DD, '{:.4e}')} (m²)",
-        f"  NE={_fmt(cov.get('NE'), '{:.4e}')}  ND={_fmt(cov.get('ND'), '{:.4e}')}  ED={_fmt(cov.get('ED'), '{:.4e}')} (m²)",
+        f"  NN={_fmt(cov_nn, '{:.4e}')}  EE={_fmt(cov_ee, '{:.4e}')}  DD={_fmt(cov_dd, '{:.4e}')} (m²)",
+        f"  NE={_fmt(p.get('cov_ne'), '{:.4e}')}  ND={_fmt(p.get('cov_nd'), '{:.4e}')}  ED={_fmt(p.get('cov_ed'), '{:.4e}')} (m²)",
         "",
         "RELPOSNED (media):",
-        f"  N={_fmt(rp.get('N'), '{:.4f}')} m  E={_fmt(rp.get('E'), '{:.4f}')} m  D={_fmt(rp.get('D'), '{:.4f}')} m",
+        f"  N={_fmt(p.get('rel_n'), '{:.4f}')} m  E={_fmt(p.get('rel_e'), '{:.4f}')} m  D={_fmt(p.get('rel_d'), '{:.4f}')} m",
         f"  σN={_fmt(_rSigN, '{:.3f}')} m  σE={_fmt(_rSigE, '{:.3f}')} m  σD={_fmt(_rSigD, '{:.3f}')} m",
-        f"  |baseline|={_fmt(rp.get('baseline'), '{:.4f}')} m  horiz={_fmt(rp.get('horiz'), '{:.4f}')} m  bearing={_fmt(rp.get('bearingDeg'), '{:.1f}')}°  slope={_fmt(rp.get('slopeDeg'), '{:.1f}')}°",
+        f"  |baseline|={_fmt(p.get('baseline'), '{:.4f}')} m  horiz={_fmt(p.get('horiz'), '{:.4f}')} m  bearing={_fmt(p.get('bearing_deg'), '{:.1f}')}°  slope={_fmt(p.get('slope_deg'), '{:.1f}')}°",
     ]
     return "\n".join(lines) + "\n"

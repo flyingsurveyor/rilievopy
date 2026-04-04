@@ -51,7 +51,7 @@ details.advanced summary::-webkit-details-marker{display:none}
 details.advanced .advanced-body{padding:0 16px 16px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:var(--soft);color:var(--accent);padding:8px 10px;border-radius:999px;font-size:13px;font-weight:800}
 .flash-ok,.flash-error{padding:12px 14px;border-radius:14px;margin-bottom:10px;font-weight:800}.flash-ok{background:#dff6e8;color:#17643b}.flash-error{background:#fde8e8;color:#8e2727}
-.progress-wrap{display:none;margin-top:14px}.progress-bar{height:20px;background:#e8edf1;border-radius:999px;overflow:hidden}.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#27ae60,#2ecc71);transition:width .2s ease}.progress-text{font-size:13px;font-weight:800;color:#355;display:flex;justify-content:space-between;margin-top:6px}
+.progress-bar{height:16px;background:#e8edf1;border-radius:999px;overflow:hidden}.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#27ae60,#2ecc71);transition:width .2s ease}.progress-text{font-size:12px;font-weight:800;color:#355;display:flex;justify-content:space-between;margin-top:4px}
 .voice-buttons{display:grid;grid-template-columns:1fr;gap:10px}
 .btn{border:none;border-radius:14px;padding:13px 16px;font-size:15px;font-weight:900;cursor:pointer}
 .btn-soft{background:var(--soft);color:var(--accent)}
@@ -60,8 +60,12 @@ details.advanced .advanced-body{padding:0 16px 16px}
 .btn-main[disabled]{opacity:.6;cursor:not-allowed}
 .rec-status{display:none;margin-top:10px;padding:12px;border-radius:12px;background:#fff4df;color:#7a4d00;font-weight:800}
 .note-list{display:grid;gap:10px;margin-top:12px}.note-item{border:1px solid #dbe4ea;border-radius:12px;padding:10px;background:#fafcfd}.note-meta{font-size:12px;color:#60707d;margin-bottom:6px}.note-item audio{width:100%}
-.action-bar{position:fixed;left:10px;right:10px;bottom:10px;padding:10px;display:grid;grid-template-columns:72px 1fr 72px;gap:10px;z-index:80}
+.action-bar{position:fixed;left:10px;right:10px;bottom:10px;padding:10px;display:flex;flex-direction:column;gap:8px;z-index:80}
+.action-bar-status{display:none;padding:6px 4px 0}
+.action-bar-status.visible{display:block}
+.action-bar-btns{display:grid;grid-template-columns:72px 1fr 72px;gap:10px}
 .action-icon,.action-link{display:flex;align-items:center;justify-content:center;font-size:24px;padding:12px;background:var(--soft);color:var(--accent);border:none;border-radius:14px;font-weight:900;text-decoration:none}
+.saved-msg{font-size:14px;font-weight:900;color:var(--ok);padding:4px 0 2px}
 .note-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.note-actions .btn{padding:10px 12px;font-size:13px;border-radius:10px}
 .confirm-title{margin:0 0 6px;color:var(--text)}
 .confirm-text{color:var(--muted);font-size:14px}
@@ -72,7 +76,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
   .status-grid,.quick-strip,.field-grid,.voice-buttons,.active-strip-meta{grid-template-columns:1fr}
   .survey-title{font-size:18px}
   .status-big{font-size:34px}
-  .action-bar{grid-template-columns:64px 1fr 64px}
+  .action-bar-btns{grid-template-columns:64px 1fr 64px}
   .desktop-only{display:none !important}
 }
 @media (min-width:769px){.mobile-only{display:none !important}.action-bar{max-width:960px;margin:0 auto}}
@@ -181,10 +185,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
       </details>
 
       <input type="hidden" name="force" id="force-field" value="0">
-      <div class="progress-wrap" id="progress-wrap">
-        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-        <div class="progress-text"><span id="progress-label">Misura in corso…</span><span id="progress-seconds">0%</span></div>
-      </div>
     </div>
 
     <div class="card">
@@ -202,9 +202,20 @@ details.advanced .advanced-body{padding:0 16px 16px}
   </form>
 
   <div class="action-bar">
-    <button class="action-icon" id="btn-record-point-mobile" type="button" title="Nota punto">🎙</button>
-    <button class="btn btn-main" type="submit" form="point-form" id="btn-measure">MISURA PUNTO</button>
-    <a class="action-link" href="/survey/{{ sid }}" title="Rilievo">↩</a>
+    <div class="action-bar-status" id="action-bar-status">
+      <div class="progress-bar" id="action-progress-bar" style="display:none">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-text" id="action-progress-text" style="display:none">
+        <span id="progress-label">Misura in corso…</span><span id="progress-seconds">0%</span>
+      </div>
+      <div class="saved-msg" id="saved-msg" style="display:none"></div>
+    </div>
+    <div class="action-bar-btns">
+      <button class="action-icon" id="btn-record-point-mobile" type="button" title="Nota punto">🎙</button>
+      <button class="btn btn-main" type="submit" form="point-form" id="btn-measure">MISURA PUNTO</button>
+      <a class="action-link" href="/survey/{{ sid }}" title="Rilievo">↩</a>
+    </div>
   </div>
 
   <div id="confirm-delete-modal" class="modal-overlay">
@@ -247,10 +258,13 @@ details.advanced .advanced-body{padding:0 16px 16px}
   const flashError = document.getElementById('flash-error');
   const qualityModal = document.getElementById('quality-modal');
   const warningsList = document.getElementById('quality-warnings-list');
-  const progressWrap = document.getElementById('progress-wrap');
+  const actionBarStatus = document.getElementById('action-bar-status');
+  const actionProgressBar = document.getElementById('action-progress-bar');
+  const actionProgressText = document.getElementById('action-progress-text');
   const progressFill = document.getElementById('progress-fill');
   const progressLabel = document.getElementById('progress-label');
   const progressSeconds = document.getElementById('progress-seconds');
+  const savedMsg = document.getElementById('saved-msg');
   const btnMeasure = document.getElementById('btn-measure');
   const pillCat = document.getElementById('pill-cat');
   const pillCod = document.getElementById('pill-cod');
@@ -265,6 +279,11 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
   const flash = document.getElementById('flash-ok');
   if (flash) setTimeout(() => flash.style.display = 'none', 3500);
+
+  // Show last saved point in action-bar on page load (after redirect)
+  {% if saved %}
+  showSavedMsg({{ saved|tojson }}, {{ savedname|tojson }}, {{ savedcodice|tojson }});
+  {% endif %}
 
   function showError(msg) {
     flashError.textContent = msg;
@@ -317,10 +336,25 @@ details.advanced .advanced-body{padding:0 16px 16px}
     ['btn-record-point','btn-record-point-mobile'].forEach(id => {
       const el = document.getElementById(id); if (el) el.disabled = busy;
     });
+    if (busy) {
+      btnMeasure.textContent = 'Misurazione…';
+      btnMeasure.disabled = true;
+    } else {
+      btnMeasure.textContent = 'MISURA PUNTO';
+      btnMeasure.disabled = false;
+    }
+  }
+  function showProgress() {
+    savedMsg.style.display = 'none';
+    actionProgressBar.style.display = 'block';
+    actionProgressText.style.display = 'flex';
+    actionBarStatus.classList.add('visible');
   }
   function startProgress(seconds) {
-    progressWrap.style.display = 'block';
+    showProgress();
     progressLabel.textContent = 'Misura in corso…';
+    progressFill.style.width = '0%';
+    progressSeconds.textContent = '0%';
     const started = Date.now();
     if (progressTimer) clearInterval(progressTimer);
     progressTimer = setInterval(() => {
@@ -336,14 +370,22 @@ details.advanced .advanced-body{padding:0 16px 16px}
   }
   function stopProgress() {
     if (progressTimer) clearInterval(progressTimer);
-    progressWrap.style.display = 'none';
+    actionProgressBar.style.display = 'none';
+    actionProgressText.style.display = 'none';
     progressFill.style.width = '0%';
     progressLabel.textContent = 'Misura in corso…';
     progressSeconds.textContent = '0%';
   }
+  function showSavedMsg(pid, name, codice) {
+    stopProgress();
+    savedMsg.textContent = '✅ ' + pid + (name ? ' (' + name + ')' : '') + (codice ? ' — ' + codice : '');
+    savedMsg.style.display = 'block';
+    actionBarStatus.classList.add('visible');
+  }
 
   async function submitPoint() {
     clearError();
+    codHidden.value = codSel.value;
     setFormBusy(true);
     startProgress(Number(durSel.value || 10));
     const fd = new FormData(form);
@@ -364,6 +406,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
       }
       if (!data.ok) { setFormBusy(false); stopProgress(); showError('❌ Errore'); return; }
     }
+    // Redirect to the saved page URL which contains saved point info
     window.location.href = resp.redirected ? resp.url : (resp.url || form.action);
   }
 
