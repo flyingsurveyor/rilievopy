@@ -17,6 +17,7 @@ textarea,input,select{width:100%;padding:12px;border:1px solid var(--line);borde
 .voice-rec-box{border:1px solid #dbe4ea;border-radius:14px;background:#f8fbfd;padding:12px;margin-top:12px}.voice-rec-actions{display:flex;gap:8px;flex-wrap:wrap}.voice-rec-status{display:none;margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff4df;color:#7a4d00;font-weight:800}.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:10000}.confirm-box{background:#fff;border-radius:16px;padding:18px;max-width:420px;width:92%;box-shadow:0 8px 24px rgba(0,0,0,.18)}.confirm-actions{display:flex;gap:10px;margin-top:14px}.confirm-title{font-size:18px;font-weight:900;color:var(--text)}
 @media (max-width:900px){.toolbar{grid-template-columns:repeat(3,minmax(0,1fr))}.hero{grid-template-columns:1fr}.gnss-strip{grid-template-columns:1fr 1fr 1fr}}
 @media (max-width:768px){.container{padding:0 6px}.card{padding:12px;border-radius:18px}.toolbar{grid-template-columns:1fr 1fr}.table-wrap{display:none}.mobile-points{display:grid}.gnss-strip{grid-template-columns:1fr 1fr 1fr}}
+#easter-toast{transition:opacity 0.4s}
 </style>
 {% endblock %}
 
@@ -179,12 +180,28 @@ textarea,input,select{width:100%;padding:12px;border:1px solid var(--line);borde
     <p>L'eliminazione del rilievo è irreversibile.</p>
     <button class="btn btn-danger" onclick="confirmDeleteSurvey('{{ sid }}', {{ num_points }})">🗑️ Elimina rilievo</button>
   </div>
+
+  <div id="easter-toast" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);max-width:380px;width:90%;background:#20303c;color:#fff;padding:16px 20px;border-radius:18px;box-shadow:0 4px 24px rgba(0,0,0,.35);font-size:15px;font-weight:700;text-align:center;z-index:99999;line-height:1.4"></div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 const sid = {{ sid|tojson }};
+function easterToast(msg, duration) {
+  duration = duration || 5000;
+  const t = document.getElementById('easter-toast');
+  if (!t) return;
+  t.innerHTML = msg;
+  t.style.display = 'block';
+  t.style.opacity = '1';
+  clearTimeout(window._easterTimer);
+  window._easterTimer = setTimeout(() => {
+    t.style.opacity = '0';
+    setTimeout(() => { t.style.display = 'none'; }, 400);
+  }, duration);
+  t.onclick = () => { t.style.display = 'none'; };
+}
 function confirmDeletePoint(sid, pointIndex, pointName) {
   if (!confirm(`Vuoi eliminare il punto "${pointName}"?`)) return;
   fetch(`/survey/${sid}/point/${pointIndex}/delete`, {method: 'POST'})
@@ -198,9 +215,13 @@ Stai per eliminare il rilievo "${sid}" con ${numPoints} punti.
 
 Scrivi "ELIMINA" per confermare:`);
   if (confirmation !== 'ELIMINA') return;
-  fetch(`/survey/${sid}/delete`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({confirmation:'ELIMINA'})})
-    .then(r => r.json()).then(data => { if (data.success) window.location.href = '/surveys'; else alert('Errore: ' + data.error); })
-    .catch(err => alert('Errore di rete: ' + err));
+  // 🥚 EGG-09 — L'eliminazione drammatica
+  easterToast('🗑️ Eliminazione in corso... Il DL ha approvato? Il committente è d\'accordo? La variante è depositata? ...No? Troppo tardi. Ciao ciao rilievo.');
+  setTimeout(() => {
+    fetch(`/survey/${sid}/delete`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({confirmation:'ELIMINA'})})
+      .then(r => r.json()).then(data => { if (data.success) window.location.href = '/surveys'; else alert('Errore: ' + data.error); })
+      .catch(err => alert('Errore di rete: ' + err));
+  }, 3000);
 }
 
 document.querySelectorAll('.save-note-btn').forEach(btn => btn.addEventListener('click', async ev => {

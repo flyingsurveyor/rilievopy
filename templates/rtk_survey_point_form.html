@@ -70,6 +70,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
 .confirm-title{margin:0 0 6px;color:var(--text)}
 .confirm-text{color:var(--muted);font-size:14px}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:10000}.modal-content{background:#fff;padding:20px;border-radius:14px;max-width:460px;width:92%}.modal-buttons{display:flex;gap:10px;margin-top:14px}
+#easter-toast{transition:opacity 0.4s}
 @media (max-width:768px){
   .svy-shell{padding:8px 8px 98px}
   .active-strip,.status-card,.card{border-radius:18px}
@@ -239,6 +240,8 @@ details.advanced .advanced-body{padding:0 16px 16px}
       </div>
     </div>
   </div>
+
+  <div id="easter-toast" style="display:none;position:fixed;bottom:90px;left:50%;transform:translateX(-50%);max-width:380px;width:90%;background:#20303c;color:#fff;padding:16px 20px;border-radius:18px;box-shadow:0 4px 24px rgba(0,0,0,.35);font-size:15px;font-weight:700;text-align:center;z-index:99999;line-height:1.4"></div>
 </div>
 {% endblock %}
 
@@ -493,6 +496,138 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
   ['btn-record-point','btn-record-point-mobile'].forEach(id => document.getElementById(id)?.addEventListener('click', () => startRecording('point')));
   nameInput?.addEventListener('input', () => { if (activeNextName) activeNextName.textContent = nameInput.value || '—'; });
+})();
+</script>
+<script>
+// ===== Easter Eggs =====
+function easterToast(msg, duration) {
+  duration = duration || 5000;
+  const t = document.getElementById('easter-toast');
+  if (!t) return;
+  t.innerHTML = msg;
+  t.style.display = 'block';
+  t.style.opacity = '1';
+  clearTimeout(window._easterTimer);
+  window._easterTimer = setTimeout(() => {
+    t.style.opacity = '0';
+    setTimeout(() => { t.style.display = 'none'; }, 400);
+  }, duration);
+  t.onclick = () => { t.style.display = 'none'; };
+}
+(function() {
+  const _pdop = {{ gnss_now.pdop|tojson }};
+  const _altMSL = {{ gnss_now.altMSL|tojson }};
+  const _baseline = {{ gnss_now.baseline|tojson }};
+  const _rtk = {{ (gnss_now.rtk or 'none')|lower|tojson }};
+  const _numPoints = {{ num_points }};
+  const _activeTitle = {{ active_title|tojson }};
+  const _saved = {{ saved|tojson }};
+  const _sid = {{ sid|tojson }};
+
+  // 🥚 EGG-02 — Il rilevatore notturno
+  (function() {
+    const h = new Date().getHours();
+    if (h >= 0 && h < 5) {
+      easterToast('🦉 Stai rilevando di notte? I satelliti ci sono, il committente dorme, il DL non rompe le scatole. Momento perfetto.');
+    }
+  })();
+
+  // 🥚 EGG-15 — Il punto salvato di lunedì mattina presto
+  (function() {
+    const now = new Date();
+    if (now.getDay() === 1 && now.getHours() < 8) {
+      const ora = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      easterToast('😤 Lunedì mattina alle ' + ora + ' già in campo. Il mondo è diviso in due categorie: quelli che ancora dormono e tu. Rispetto.');
+    }
+  })();
+
+  // 🥚 EGG-08 — Il rilievo chiamato "prova" o "test"
+  (function() {
+    const kw = ['prova', 'test', 'pippo', 'aaa', 'xxx', 'boh', 'tmp', 'temp'];
+    if (_activeTitle && kw.some(k => _activeTitle.toLowerCase().includes(k))) {
+      easterToast('🧪 Rilievo di prova. Come il 30% dei rilievi di prova che poi diventano quelli definitivi consegnati al cliente firmati e timbrati.');
+    }
+  })();
+
+  // 🥚 EGG-14 — Baseline > 50 km
+  if (_baseline !== null && _baseline > 50000) {
+    easterToast('🚀 Baseline di oltre 50 km dalla base. A questo punto non stai facendo topografia, stai facendo geodesia. O ti sei perso. Chapeau in entrambi i casi.');
+  }
+
+  if (_saved) {
+    // 🥚 EGG-13 — Il punto P001 del primo rilievo
+    if (_numPoints === 1 && !localStorage.getItem('hasSeenFirstPoint_' + _sid)) {
+      localStorage.setItem('hasSeenFirstPoint_' + _sid, '1');
+      easterToast('🌱 Primo punto del rilievo salvato. Ogni grande opera inizia con un punto. Anche la Sagrada Família è partita da P001. Più o meno.');
+    }
+
+    // 🥚 EGG-10 — 300 punti esatti
+    if (_numPoints === 300) {
+      easterToast('⚔️ 300 PUNTI! Come i 300 di Leonida alle Termopili, ma con meno spade e più stazione totale. Questo rilievo è leggenda.');
+    }
+
+    // 🥚 EGG-12 — La quota sotto il mare
+    if (_altMSL !== null && _altMSL < 0) {
+      easterToast('🤿 Quota MSL negativa. O stai lavorando in Olanda, o hai un problema serio con il geoide. In entrambi i casi: in bocca al lupo.');
+    }
+
+    // 🥚 EGG-07 — 5 punti di fila in float
+    (function() {
+      let floatStreak = parseInt(localStorage.getItem('floatStreak') || '0');
+      if (_rtk === 'float') {
+        floatStreak++;
+        localStorage.setItem('floatStreak', floatStreak);
+        if (floatStreak >= 5) {
+          easterToast('📡 5 punti consecutivi in RTK float. Il fix arriverà. Come la parcella. Prima o poi. Nel frattempo continua.');
+        }
+      } else if (_rtk === 'fix') {
+        localStorage.setItem('floatStreak', '0');
+      }
+    })();
+
+    // 🥚 EGG-06 — Venerdì pomeriggio
+    (function() {
+      const now = new Date();
+      if (now.getDay() === 5 && now.getHours() >= 16) {
+        easterToast('🍺 Venerdì pomeriggio in campo. Questo punto vale doppio. Lo sai solo tu. Ora puoi andare.');
+      }
+    })();
+
+    // 🥚 EGG-01 — Il PDOP apocalittico
+    if (_pdop !== null && _pdop > 9) {
+      easterToast('📡 PDOP ' + _pdop.toFixed(2) + ' — Complimenti. Hai appena rilevato con la precisione di un navigatore degli anni \'90 ubriaco. Il punto è salvato, ma non dirlo al collaudatore.');
+    }
+  }
+
+  // 🥚 EGG-03 — Il nome punto "geografico" / EGG-11 — Il nome da geometra DOC
+  document.getElementById('name-input')?.addEventListener('blur', function() {
+    const v = this.value.toUpperCase().trim();
+    const geoKw = ['CASA', 'BAR', 'BAGNO', 'WC', 'GARAGE', 'CANTINA', 'FORNO', 'POZZO', 'CHIESA'];
+    const nomiKw = ['MARIO', 'GIUSEPPE', 'GIOVANNI', 'LUIGI', 'CARLO', 'FRANCO', 'SERGIO', 'BRUNO', 'ANGELO', 'ENZO'];
+    if (geoKw.includes(v)) {
+      // 🥚 EGG-03
+      easterToast('📍 Punto tecnico di estrema importanza catastale. Il committente non potrebbe vivere senza.');
+    } else if (nomiKw.includes(v)) {
+      // 🥚 EGG-11
+      easterToast('👷 Punto intestato a persona fisica. Verificare che il diretto interessato sia georeferenziato correttamente e che la sua posizione sia conforme alle NTC 2018.');
+    }
+  });
+
+  // 🥚 EGG-04 — La descrizione esistenziale
+  document.getElementById('desc-input')?.addEventListener('blur', function() {
+    const kw = ['boh', 'mah', 'non lo so', 'ni', 'forse', 'vabbè', 'vabbe', 'basta'];
+    const v = this.value.toLowerCase();
+    if (kw.some(k => v.includes(k))) {
+      easterToast('🤔 Descrizione salvata con successo. L\'incertezza è il fondamento epistemologico della misura. Heisenberg approva.');
+    }
+  });
+
+  // 🥚 EGG-05 — Il codice TP
+  document.getElementById('codice-select')?.addEventListener('change', function() {
+    if (this.value.toUpperCase() === 'TP') {
+      easterToast('🏁 Codice TP. Il codice universale di chi ha smesso di inventare codici. Una scelta di saggezza assoluta.');
+    }
+  });
 })();
 </script>
 {% endblock %}
