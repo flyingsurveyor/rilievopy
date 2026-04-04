@@ -1,3 +1,4 @@
 flask>=3.0
 pyubx2
 waitress>=3.0
+openpyxl

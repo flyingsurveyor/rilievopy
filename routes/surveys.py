@@ -1,5 +1,5 @@
 """
-Survey routes: list, create, view, add point, export (GeoJSON/CSV/DXF/GPKG/TXT/Map).
+Survey routes: list, create, view, add point, export (GeoJSON/XLSX/DXF/GPKG/TXT/Map).
 """
 
 import io
@@ -582,20 +582,117 @@ def survey_download_geojson(sid):
                                as_attachment=True, download_name=f"{sid}.geojson")
 
 
-@bp.route("/survey/<sid>.csv")
-def survey_download_csv(sid):
+@bp.route("/survey/<sid>.xlsx")
+def survey_download_xlsx(sid):
     try:
         svy = load_survey(sid)
     except FileNotFoundError:
         abort(404)
-    buf = io.StringIO()
-    buf.write("id," + ",".join(CSV_HEADER) + "\n")
-    for f in svy.get("features", []):
-        row = [f.get("id", "")] + flatten_point_for_csv(f)
-        buf.write(",".join(row) + "\n")
-    resp = make_response(buf.getvalue())
-    resp.headers["Content-Type"] = "text/csv; charset=utf-8"
-    resp.headers["Content-Disposition"] = f'attachment; filename="{sid}.csv"'
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return make_response("openpyxl non installato. Eseguire: pip install openpyxl", 500)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = sid[:31]  # Excel limita il nome foglio a 31 caratteri
+
+    # Intestazione
+    headers = ["id"] + CSV_HEADER
+    header_fill = PatternFill(start_color="1D5F8F", end_color="1D5F8F", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    # Formati numerici
+    FMT_9 = '0.000000000'   # 9 decimali per lat/lon
+    FMT_4 = '0.0000'        # 4 decimali
+    FMT_3 = '0.000'         # 3 decimali per quote
+    FMT_2 = '0.00'          # 2 decimali
+    FMT_1 = '0.0'           # 1 decimale
+    FMT_SCI = '0.0000E+00'  # scientifico per covarianze
+    FMT_INT = '0'           # intero
+
+    # Mappa colonna -> formato (basato su CSV_HEADER, offset +2 perché col 1 è "id")
+    col_formats = {
+        "lat": FMT_9, "lon": FMT_9,
+        "alt_hae": FMT_3, "alt_msl": FMT_3,
+        "ecef_x": FMT_4, "ecef_y": FMT_4, "ecef_z": FMT_4,
+        "gdop": FMT_2, "pdop": FMT_2, "hdop": FMT_2, "vdop": FMT_2,
+        "ndop": FMT_2, "edop": FMT_2, "tdop": FMT_2,
+        "h_acc": FMT_3, "v_acc": FMT_3, "p_acc": FMT_3,
+        "cov_nn": FMT_SCI, "cov_ee": FMT_SCI, "cov_dd": FMT_SCI,
+        "cov_ne": FMT_SCI, "cov_nd": FMT_SCI, "cov_ed": FMT_SCI,
+        "rel_n": FMT_4, "rel_e": FMT_4, "rel_d": FMT_4,
+        "rel_sn": FMT_3, "rel_se": FMT_3, "rel_sd": FMT_3,
+        "baseline": FMT_4, "horiz": FMT_4,
+        "bearing_deg": FMT_2, "slope_deg": FMT_2,
+        "sigma_n": FMT_4, "sigma_e": FMT_4, "sigma_u": FMT_4,
+        "duration_s": FMT_1, "interval_s": FMT_2,
+        "gnss_mode": FMT_INT, "num_sv": FMT_INT,
+        "n_kept": FMT_INT, "n_samples": FMT_INT,
+    }
+
+    # Dati
+    for row_idx, feat in enumerate(svy.get("features", []), 2):
+        p = feat.get("properties", {})
+        pid = feat.get("id", "")
+
+        def fv(key):
+            """Restituisce il valore nativo (float/int/str/None) per la cella."""
+            v = p.get(key)
+            if v is None:
+                return None
+            # Campi stringa
+            if key in ("name", "codice", "desc", "timestamp", "rtk", "start_time", "end_time"):
+                return str(v)
+            # Campi numerici interi
+            if key in ("gnss_mode", "num_sv", "n_kept", "n_samples"):
+                try:
+                    return int(v)
+                except (TypeError, ValueError):
+                    return None
+            # Tutti gli altri: float
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+
+        # Colonna 1: id
+        ws.cell(row=row_idx, column=1, value=pid)
+
+        # Colonne dati
+        for col_idx, key in enumerate(CSV_HEADER, 2):
+            val = fv(key)
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            # Applicare formato numerico
+            fmt = col_formats.get(key)
+            if fmt and val is not None and isinstance(val, (int, float)):
+                cell.number_format = fmt
+
+    # Larghezza colonne automatica (approssimativa)
+    for col_idx, header in enumerate(headers, 1):
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = max(10, len(header) + 2)
+
+    # Freeze prima riga
+    ws.freeze_panes = "A2"
+
+    # Salva in buffer
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    resp = make_response(buf.read())
+    resp.headers["Content-Type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    resp.headers["Content-Disposition"] = f'attachment; filename="{sid}.xlsx"'
     return resp
 
 
