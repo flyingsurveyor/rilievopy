@@ -42,6 +42,46 @@ def _get_ppk_conf_dir() -> str:
         return os.path.join(BASE_DIR, 'data', 'conf')
 
 
+def _get_ppk_uploads_dir() -> str:
+    try:
+        from modules.workspace import ppk_uploads_dir
+        return ppk_uploads_dir()
+    except Exception:
+        return os.path.join(BASE_DIR, 'data', 'uploads')
+
+
+def _get_ppk_rinex_dir() -> str:
+    try:
+        from modules.workspace import ppk_rinex_dir
+        return ppk_rinex_dir()
+    except Exception:
+        return os.path.join(BASE_DIR, 'data', 'rinex')
+
+
+def _get_ppk_results_dir() -> str:
+    try:
+        from modules.workspace import ppk_results_dir
+        return ppk_results_dir()
+    except Exception:
+        return os.path.join(BASE_DIR, 'data', 'results')
+
+
+def _get_ppk_pos_dir() -> str:
+    try:
+        from modules.workspace import ppk_pos_dir
+        return ppk_pos_dir()
+    except Exception:
+        return os.path.join(BASE_DIR, 'data', 'pos')
+
+
+def _get_ppk_antex_dir() -> str:
+    try:
+        from modules.workspace import ppk_antex_dir
+        return ppk_antex_dir()
+    except Exception:
+        return os.path.join(BASE_DIR, 'data', 'antex')
+
+
 class _ClassProperty:
     """Descriptor that acts like @property but for class-level access."""
     def __init__(self, func):
@@ -52,31 +92,31 @@ class _ClassProperty:
 
 
 class PPKConfig:
-    """PPK-specific configuration."""
+    """PPK-specific configuration — all user-data paths are workspace-aware."""
 
-    # Non-user directories (uploads, rinex, results, pos, antex) still live
-    # under data/ by default; only conf is workspace-aware.
+    # Legacy fallback dirs (used only if workspace fails)
     DATA_DIR = os.path.join(BASE_DIR, 'data')
-    UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
-    RINEX_DIR = os.path.join(DATA_DIR, 'rinex')
-    RESULTS_DIR = os.path.join(DATA_DIR, 'results')
-    POS_DIR = os.path.join(DATA_DIR, 'pos')
-    ANTEX_DIR = os.path.join(DATA_DIR, 'antex')
     DEFAULT_CONF_DIR = os.path.join(BASE_DIR, 'conf')
 
     # RTKLIB binaries (always under project tools/)
     TOOLS_DIR = os.path.join(BASE_DIR, 'tools')
-    CONVBIN_BIN = _find_binary('convbin', os.path.join(TOOLS_DIR, 'convbin'))
-    RNX2RTKP_BIN = _find_binary('rnx2rtkp', os.path.join(TOOLS_DIR, 'rnx2rtkp'))
-    STR2STR_BIN = _find_binary('str2str', os.path.join(TOOLS_DIR, 'str2str'))
-    POS2KML_BIN = _find_binary('pos2kml', os.path.join(TOOLS_DIR, 'pos2kml'))
+    CONVBIN_BIN  = _find_binary('convbin',  os.path.join(BASE_DIR, 'tools', 'convbin'))
+    RNX2RTKP_BIN = _find_binary('rnx2rtkp', os.path.join(BASE_DIR, 'tools', 'rnx2rtkp'))
+    STR2STR_BIN  = _find_binary('str2str',  os.path.join(BASE_DIR, 'tools', 'str2str'))
+    POS2KML_BIN  = _find_binary('pos2kml',  os.path.join(BASE_DIR, 'tools', 'pos2kml'))
 
     # Limits
     MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 2GB
     RINEX_MAX_EPOCHS_DEFAULT = 5000
     RINEX_DECIMATE_DEFAULT = 1
 
-    CONF_DIR = _ClassProperty(lambda cls: _get_ppk_conf_dir())
+    # All data dirs are workspace-aware via _ClassProperty
+    UPLOAD_DIR  = _ClassProperty(lambda cls: _get_ppk_uploads_dir())
+    RINEX_DIR   = _ClassProperty(lambda cls: _get_ppk_rinex_dir())
+    RESULTS_DIR = _ClassProperty(lambda cls: _get_ppk_results_dir())
+    POS_DIR     = _ClassProperty(lambda cls: _get_ppk_pos_dir())
+    ANTEX_DIR   = _ClassProperty(lambda cls: _get_ppk_antex_dir())
+    CONF_DIR    = _ClassProperty(lambda cls: _get_ppk_conf_dir())
 
     @classmethod
     def ensure_dirs(cls):

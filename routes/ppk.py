@@ -137,7 +137,7 @@ def file_explorer(subpath=''):
     if subpath:
         parts = subpath.split('/', 1)
         base_key = parts[0]
-        rel_path = parts[1] if len(parts) > 1 else ''
+        rel_path = parts[1].lstrip('/') if len(parts) > 1 else ''
     else:
         base_key = None
         rel_path = ''
@@ -149,7 +149,10 @@ def file_explorer(subpath=''):
     else:
         entries = []
         for key, path in base_dirs.items():
-            count = sum(1 for f in Path(path).rglob('*') if f.is_file())
+            try:
+                count = sum(1 for f in Path(path).rglob('*') if f.is_file()) if Path(path).is_dir() else 0
+            except OSError:
+                count = 0
             entries.append({
                 'name': key, 'is_dir': True,
                 'size': f'{count} files', 'modified': '', 'path': key,
@@ -166,7 +169,8 @@ def file_explorer(subpath=''):
             full = os.path.join(browse_path, item)
             stat = os.stat(full)
             is_dir = os.path.isdir(full)
-            entry_path = f'{base_key}/{rel_path}/{item}'.strip('/')
+            rel = '/'.join(filter(None, [rel_path, item]))
+            entry_path = '/'.join(filter(None, [base_key, rel]))
             entries.append({
                 'name': item, 'is_dir': is_dir,
                 'size': format_size(stat.st_size) if not is_dir else '',
