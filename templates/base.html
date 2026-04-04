@@ -46,7 +46,6 @@
         display: flex; align-items: center; gap: 6px;
         white-space: nowrap;
     }
-    .brand-icon { font-size: 22px; color: #e94560; }
     .brand-text {
         font-size: 16px; font-weight: 700; color: #eee;
         letter-spacing: .5px;
@@ -90,6 +89,24 @@
         font-size: 13px; font-weight: 700; color: #94a3b8;
         letter-spacing: .3px; white-space: nowrap;
     }
+
+    /* ── RTCM age badge ── */
+    .rtcm-age {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .2px;
+        white-space: nowrap;
+        padding: 2px 5px;
+        border-radius: 4px;
+        background: rgba(255,255,255,.06);
+        transition: background .3s, color .3s;
+        min-width: 28px;
+        text-align: center;
+    }
+    .rtcm-age.fresh  { color: #2ecc71; background: rgba(46,204,113,.12); }
+    .rtcm-age.warn   { color: #f39c12; background: rgba(243,156,18,.15); }
+    .rtcm-age.stale  { color: #e74c3c; background: rgba(231,76,60,.18); }
+    .rtcm-age.nodata { color: #536878; background: rgba(255,255,255,.04); }
 
     /* ═══ Sidebar ═══ */
     .sidebar {
@@ -161,7 +178,6 @@
         </button>
 
         <div class="topbar-brand">
-            <span class="brand-icon">◎</span>
             <span class="brand-text">Rilievo<span class="brand-accent">PY</span></span>
             <span class="brand-mode {{ mode }}">
                 {% if mode == 'rtk' %}— RTK{% else %}— PPK{% endif %}
@@ -170,6 +186,7 @@
 
         <!-- GNSS status: always visible in topbar -->
         <div class="topbar-gnss">
+            <span class="rtcm-age nodata" id="rtcmAge" title="Age dati RTCM">—</span>
             <span class="gnss-dot nodata" id="gnssDot"></span>
             <span class="gnss-label" id="gnssLabel">—</span>
         </div>
@@ -334,15 +351,20 @@
         (function() {
             var gnssDot = document.getElementById('gnssDot');
             var gnssLbl = document.getElementById('gnssLabel');
+            var rtcmAge = document.getElementById('rtcmAge');
 
             var es = null;
             var reconnectTimer = null;
             var reconnectDelay = 2000;
             var dataTimeout = null;
+            var ageTimer = null;
+            var lastTpvTime = null;
 
             function setNoData() {
                 if (gnssDot) { gnssDot.className = 'gnss-dot nodata'; }
                 if (gnssLbl) { gnssLbl.textContent = '—'; }
+                if (rtcmAge) { rtcmAge.className = 'rtcm-age nodata'; rtcmAge.textContent = '—'; }
+                lastTpvTime = null;
             }
 
             function applyStatus(rtk) {
@@ -359,6 +381,26 @@
                 if (gnssLbl) { gnssLbl.textContent = label; }
             }
 
+            function updateAgeBadge() {
+                if (!rtcmAge) return;
+                if (!lastTpvTime) {
+                    rtcmAge.className = 'rtcm-age nodata';
+                    rtcmAge.textContent = '—';
+                    return;
+                }
+                var ageSec = Math.max(0, Math.round((Date.now() - new Date(lastTpvTime).getTime()) / 1000));
+                var cls, label;
+                if (ageSec < 3) {
+                    cls = 'fresh'; label = ageSec + 's';
+                } else if (ageSec < 8) {
+                    cls = 'warn';  label = ageSec + 's ⚠';
+                } else {
+                    cls = 'stale'; label = ageSec + 's ✕';
+                }
+                rtcmAge.className = 'rtcm-age ' + cls;
+                rtcmAge.textContent = label;
+            }
+
             function resetDataTimeout() {
                 clearTimeout(dataTimeout);
                 dataTimeout = setTimeout(setNoData, 3000);
@@ -368,21 +410,26 @@
                 if (es) { try { es.close(); } catch(_) {} }
                 try {
                     es = new EventSource('/events');
-                    es.onopen = function() { reconnectDelay = 2000; resetDataTimeout(); };
+                    es.onopen = function() {
+                        reconnectDelay = 2000;
+                        resetDataTimeout();
+                        clearInterval(ageTimer);
+                        ageTimer = setInterval(updateAgeBadge, 1000);
+                    };
                     es.onmessage = function(e) {
                         resetDataTimeout();
                         try {
                             var p = JSON.parse(e.data);
-                            var rtk = (p.TPV || {}).rtk || null;
-                            if (rtk) {
-                                applyStatus(rtk);
-                            } else {
-                                setNoData();
-                            }
+                            var tpv = p.TPV || {};
+                            var rtk = tpv.rtk || null;
+                            if (tpv.time) { lastTpvTime = tpv.time; }
+                            if (rtk) { applyStatus(rtk); } else { setNoData(); }
+                            updateAgeBadge();
                         } catch(_) {}
                     };
                     es.onerror = function() {
                         setNoData();
+                        clearInterval(ageTimer);
                         if (es) { try { es.close(); } catch(_) {} es = null; }
                         clearTimeout(reconnectTimer);
                         reconnectTimer = setTimeout(function() {
@@ -398,6 +445,7 @@
             window.addEventListener('beforeunload', function() {
                 clearTimeout(reconnectTimer);
                 clearTimeout(dataTimeout);
+                clearInterval(ageTimer);
                 if (es) { try { es.close(); } catch(_) {} es = null; }
             });
 
@@ -405,6 +453,7 @@
                 if (document.visibilityState === 'hidden') {
                     clearTimeout(reconnectTimer);
                     clearTimeout(dataTimeout);
+                    clearInterval(ageTimer);
                     if (es) { try { es.close(); } catch(_) {} es = null; }
                 } else {
                     if (!es) connect();
