@@ -203,9 +203,6 @@ def cogo_trilateration_save():
         "quality": solution.get("quality")
     }
     
-    # Override TPV.mode to COGO
-    feat["properties"]["TPV"]["mode"] = "COGO"
-    
     svy["features"].append(feat)
     save_survey(survey_id, svy)
     
@@ -431,7 +428,6 @@ def cogo_bearing_intersection_save():
     
     feat["properties"]["origin"] = "bearing-intersection"
     feat["properties"]["cogo_method"] = "bearing-intersection"
-    feat["properties"]["TPV"]["mode"] = "COGO"
     
     svy["features"].append(feat)
     save_survey(survey_id, svy)
@@ -640,7 +636,6 @@ def cogo_polar_save():
     
     feat["properties"]["origin"] = "polar"
     feat["properties"]["cogo_method"] = "polar"
-    feat["properties"]["TPV"]["mode"] = "COGO"
     
     svy["features"].append(feat)
     save_survey(survey_id, svy)
@@ -864,7 +859,6 @@ def cogo_perpendicular_save():
     
     feat["properties"]["origin"] = "perpendicular"
     feat["properties"]["cogo_method"] = "perpendicular"
-    feat["properties"]["TPV"]["mode"] = "COGO"
     
     svy["features"].append(feat)
     save_survey(survey_id, svy)
@@ -1213,7 +1207,6 @@ def cogo_helmert_save():
         
         feat["properties"]["origin"] = "helmert"
         feat["properties"]["cogo_method"] = "helmert"
-        feat["properties"]["TPV"]["mode"] = "COGO"
         
         svy["features"].append(feat)
         saved_ids.append(pid)
