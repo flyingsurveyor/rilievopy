@@ -9,6 +9,7 @@ Reference: RTKLIBExplorer demo5 convbin.c
 
 import os
 import subprocess
+import time
 from pathlib import Path
 
 
@@ -363,10 +364,14 @@ class ConvbinWrapper:
         if not output_dir:
             output_dir = os.path.dirname(input_file) or '.'
 
-        # List files before to detect new ones
-        existing = set()
+        # Snapshot (name → mtime) BEFORE conversion
+        start_time = time.time()
+        existing_mtimes = {}
         if os.path.isdir(output_dir):
-            existing = set(os.listdir(output_dir))
+            for f in os.listdir(output_dir):
+                fp = os.path.join(output_dir, f)
+                if os.path.isfile(fp):
+                    existing_mtimes[f] = os.path.getmtime(fp)
 
         try:
             result = subprocess.run(
@@ -374,20 +379,22 @@ class ConvbinWrapper:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                cwd=output_dir,
             )
 
-            # Find new output files
+            # Detect new files AND overwritten files (mtime >= start_time)
             new_files = []
             if os.path.isdir(output_dir):
-                current = set(os.listdir(output_dir))
-                new = current - existing
-                for f in sorted(new):
-                    full_path = os.path.join(output_dir, f)
-                    if os.path.isfile(full_path):
+                for f in sorted(os.listdir(output_dir)):
+                    fp = os.path.join(output_dir, f)
+                    if not os.path.isfile(fp):
+                        continue
+                    mtime = os.path.getmtime(fp)
+                    if f not in existing_mtimes or mtime >= start_time:
                         new_files.append({
                             'name': f,
-                            'path': full_path,
-                            'size': os.path.getsize(full_path),
+                            'path': fp,
+                            'size': os.path.getsize(fp),
                         })
 
             return {
