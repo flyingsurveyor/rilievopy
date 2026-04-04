@@ -437,7 +437,7 @@ def flatten_point_for_csv(feat: Dict[str, Any]) -> List[str]:
         f(p.get("ecef_y"), "{:.4f}"),
         f(p.get("ecef_z"), "{:.4f}"),
         str(p.get("gnss_mode", "")),
-        p.get("rtk", "") or "",
+        p.get("rtk", ""),
         f(p.get("num_sv", 0), "{}"),
         f(p.get("gdop"), "{:.2f}"),
         f(p.get("pdop"), "{:.2f}"),
@@ -472,8 +472,8 @@ def flatten_point_for_csv(feat: Dict[str, Any]) -> List[str]:
         f(p.get("n_samples", 0), "{}"),
         f(p.get("duration_s"), "{:.1f}"),
         f(p.get("interval_s"), "{:.2f}"),
-        p.get("start_time", "") or "",
-        p.get("end_time", "") or "",
+        p.get("start_time", ""),
+        p.get("end_time", ""),
     ]
 
 
