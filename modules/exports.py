@@ -414,7 +414,9 @@ def format_point_txt(feat: Dict[str, Any], sid: str) -> str:
 
     def _fmt(x, fmt):
         try:
-            return fmt.format(x if x is not None else float('nan'))
+            if x is None:
+                return ""
+            return fmt.format(float(x))
         except Exception:
             return str(x)
 
