@@ -85,6 +85,20 @@ git clone https://github.com/flyingsurveyor/rilievo_gnss.git && cd rilievo_gnss 
 
 ---
 
+## Accesso via mDNS (Termux e Raspberry Pi)
+
+rilievopy supporta **mDNS** (Multicast DNS) per accesso facile su LAN senza dover ricordare l'IP:
+
+- **Default:** `http://rilievopy.local/` (porta 8000)
+- **Configurabile:** vai su `/settings` e modifica l'hostname nella sezione "mDNS Hostname"
+- **Coppia perfetta con RTKino:**
+  - `http://rtkino.local/` → ricevitore GNSS
+  - `http://rilievopy.local/` → app di rilievo su Termux/RPi
+
+**Nota:** mDNS funziona su reti LAN. Su Termux, accessibile sia da localhost che da altri dispositivi sulla stessa rete WiFi. Alcune reti aziendali potrebbero bloccare mDNS.
+
+---
+
 ## Daily Use
 
 ### Android

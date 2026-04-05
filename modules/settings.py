@@ -56,6 +56,9 @@ DEFAULTS: Dict[str, Any] = {
 
     # RTKino HTTP integration
     "rtkino_host": "",
+
+    # mDNS hostname (accesso via http://<hostname>.local/)
+    "mdns_hostname": "rilievopy",
 }
 
 # ---------- File path ----------

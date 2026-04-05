@@ -152,6 +152,34 @@
 
   </form>
 
+  <!-- mDNS section (outside settingsForm) -->
+  <div class="card" id="mdnsCard">
+    <h2><span class="ico">🌐</span> mDNS Hostname</h2>
+    <p style="margin:0 0 10px;font-size:14px;color:#555;">Accedi a rilievopy su LAN senza conoscere l'IP:</p>
+    <p style="margin:0 0 12px;font-size:14px;">
+      <strong>URL attivo:</strong>
+      <code id="mdns-current-url" style="background:#f0f0f0;padding:2px 6px;border-radius:4px;">Caricamento...</code>
+    </p>
+    <div class="row">
+      <div class="field" style="flex:1;">
+        <label>Hostname (lettere minuscole, numeri, trattino)</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="mdns-hostname" placeholder="rilievopy" maxlength="32"
+                 pattern="[a-z0-9-]+" style="flex:1;"/>
+          <span style="color:#666;white-space:nowrap;font-size:15px;">.local</span>
+        </div>
+        <div class="hint">Default: <code>rilievopy</code> → <code>http://rilievopy.local/</code></div>
+      </div>
+    </div>
+    <div class="actions" style="margin-top:8px;">
+      <button type="button" class="btn btn-primary" onclick="saveMdnsHostname()">💾 Salva Hostname</button>
+    </div>
+    <p style="font-size:0.85em;color:#666;margin-top:10px;margin-bottom:0;">
+      mDNS funziona su LAN. Su Termux, accessibile sia da localhost che da altri dispositivi sulla stessa rete WiFi.
+      Alcune reti aziendali potrebbero bloccare mDNS.
+    </p>
+  </div>
+
   <!-- Workspace section (outside settingsForm to avoid submit confusion) -->
   <div class="card" id="workspaceCard">
     <h2><span class="ico">&#128193;</span> Workspace (cartella di lavoro)</h2>
@@ -392,6 +420,50 @@ function wsRestore(input) {
       }
     }).catch(function(){ input.value = ''; showToast('Errore di rete', false); });
 }
+
+// ── mDNS helpers ──────────────────────────────────────────────────────────
+async function loadMdnsStatus() {
+  try {
+    var res = await fetch('/api/mdns/status');
+    var data = await res.json();
+    var inp = document.getElementById('mdns-hostname');
+    var cur = document.getElementById('mdns-current-url');
+    if (inp) inp.value = data.hostname;
+    if (cur) {
+      if (data.url) {
+        cur.innerHTML = '<a href="' + data.url + '" target="_blank">' + data.url + '</a>';
+      } else {
+        cur.textContent = 'Non attivo';
+      }
+    }
+  } catch (e) {
+    console.error('Errore caricamento mDNS:', e);
+  }
+}
+
+async function saveMdnsHostname() {
+  var inp = document.getElementById('mdns-hostname');
+  var hostname = inp ? inp.value.trim() : '';
+  if (!hostname) { showToast('Inserisci un hostname valido', false); return; }
+  try {
+    var res = await fetch('/api/mdns/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({hostname: hostname})
+    });
+    var data = await res.json();
+    if (data.ok) {
+      showToast('mDNS aggiornato! ' + (data.url || ''), true);
+      loadMdnsStatus();
+    } else {
+      showToast('Errore: ' + (data.error || '?'), false);
+    }
+  } catch (e) {
+    showToast('Errore di rete', false);
+  }
+}
+
+loadMdnsStatus();
 
 </script>
 {% endblock %}
