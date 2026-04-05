@@ -6,6 +6,11 @@ import io
 import json
 import logging
 import os
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
 import zipfile
 from datetime import datetime
 
@@ -394,7 +399,6 @@ def api_mdns_save():
 @bp.route("/api/update/check")
 def api_update_check():
     """Compare local git HEAD with remote GitHub HEAD."""
-    import subprocess, urllib.request, json as _json
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # local commit
     try:
@@ -410,7 +414,7 @@ def api_update_check():
         url = "https://api.github.com/repos/flyingsurveyor/rilievopy/commits/main"
         req = urllib.request.Request(url, headers={"User-Agent": "rilievopy-updater"})
         with urllib.request.urlopen(req, timeout=5) as resp:
-            data = _json.loads(resp.read())
+            data = json.loads(resp.read())
             remote = data.get("sha", "")
     except Exception:
         pass
@@ -426,7 +430,6 @@ def api_update_check():
 @bp.route("/api/update/run")
 def api_update_run():
     """Run git pull + pip install, stream output via SSE, then restart."""
-    import subprocess, sys, threading, time
     from flask import Response, stream_with_context
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -490,13 +493,15 @@ def api_update_run():
             restart_cmd = [sys.executable, os.path.join(base, "app.py")]
             if os.name != "nt":
                 import signal
+                log_file = open(os.path.join(base, "rilievo.log"), "a")
                 subprocess.Popen(
                     restart_cmd,
                     cwd=base,
-                    stdout=open(os.path.join(base, "rilievo.log"), "a"),
+                    stdout=log_file,
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
                 )
+                log_file.close()
                 time.sleep(0.5)
                 os.kill(pid, signal.SIGTERM)
             else:
