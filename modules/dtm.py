@@ -77,6 +77,7 @@ class TIN:
         self.points: List[Point3D] = []
         self.triangles: List[Triangle] = []
         self._built = False
+        self._breakline_edges: List[Tuple[int, int]] = []
 
     def add_point(self, x: float, y: float, z: float,
                   name: str = "", code: str = ""):
@@ -279,6 +280,101 @@ class TIN:
         cy = v1z * v2x - v1x * v2z
         cz = v1x * v2y - v1y * v2x
         return 0.5 * math.sqrt(cx * cx + cy * cy + cz * cz)
+
+    def add_breakline(self, points: List[Tuple[float, float, float]]):
+        """
+        Add a breakline to the TIN.
+
+        Appends the breakline's 3D points to the TIN point list and records
+        the consecutive edges so that enforce_breaklines() can force them
+        into the triangulation after build().
+
+        Args:
+            points: list of (x, y, z) tuples defining the breakline vertices.
+        """
+        if len(points) < 2:
+            return
+        start_idx = len(self.points)
+        for x, y, z in points:
+            self.add_point(x, y, z)
+        for i in range(len(points) - 1):
+            self._breakline_edges.append((start_idx + i, start_idx + i + 1))
+        self._built = False
+
+    def enforce_breaklines(self):
+        """
+        Force breakline edges into the triangulation after build().
+
+        For each required edge (a, b) that is not already present in the
+        triangulation, find the two triangles sharing the opposite diagonal
+        and flip it to restore the edge.  The process iterates until all
+        breakline edges are present or no further flip is possible.
+        """
+        if not self._built:
+            self.build()
+
+        if not self._breakline_edges:
+            return
+
+        def _edges_set():
+            """Return the set of canonical directed edges in the triangulation."""
+            es = set()
+            for t in self.triangles:
+                for a, b in t.edges():
+                    es.add((min(a, b), max(a, b)))
+            return es
+
+        def _find_flip(ea, eb):
+            """
+            Find the pair of triangles sharing edge (ec, ed) that is the
+            diagonal of the quad containing (ea, eb) and flip it.
+            Returns True if a flip was performed.
+            """
+            # Locate triangles that contain both ea and eb among their vertices
+            # but do NOT already have the edge ea-eb.
+            # We look for triangles that share the "opposite" edge.
+            tris_with_a = [t for t in self.triangles if ea in t.indices()]
+            tris_with_b = [t for t in self.triangles if eb in t.indices()]
+
+            # Find two triangles forming a quadrilateral that contains ea and eb
+            # as opposite corners (i.e., ea-eb is the diagonal we want to insert).
+            for ta in tris_with_a:
+                for tb in tris_with_b:
+                    if ta is tb:
+                        continue
+                    set_a = set(ta.indices())
+                    set_b = set(tb.indices())
+                    shared = set_a & set_b
+                    if len(shared) == 2:
+                        # They share an edge; check if flipping gives ea-eb
+                        ec, ed = tuple(shared)
+                        other_a = (set_a - shared).pop()
+                        other_b = (set_b - shared).pop()
+                        if {other_a, other_b} == {ea, eb}:
+                            # Flip: remove ta and tb, add two new triangles
+                            self.triangles.remove(ta)
+                            self.triangles.remove(tb)
+                            self.triangles.append(Triangle(ea, eb, ec))
+                            self.triangles.append(Triangle(ea, eb, ed))
+                            return True
+            return False
+
+        # Maximum passes: each edge may need at most one flip per other edge in the
+        # worst case, so len(edges)*3 gives a safe upper bound without risking an
+        # infinite loop.
+        max_passes = len(self._breakline_edges) * 3
+        for _ in range(max_passes):
+            current_edges = _edges_set()
+            all_present = True
+            flipped_any = False
+            for ea, eb in self._breakline_edges:
+                key = (min(ea, eb), max(ea, eb))
+                if key not in current_edges:
+                    all_present = False
+                    if _find_flip(ea, eb):
+                        flipped_any = True
+            if all_present or not flipped_any:
+                break
 
 
 # ================================================================
