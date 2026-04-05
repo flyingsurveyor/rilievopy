@@ -23,7 +23,7 @@ It has been shaped through practical use in the field, with AI-assisted tools us
 
 The focus of this project is function, reliability, and real usability in difficult field conditions.
 
-At the moment the interface is still in Italian language. I'm working on i18n UI.
+At the moment the interface is still in Italian language and evolving in its functionalities. I'm working on a i18n UI.
 
 ---
 
@@ -112,7 +112,7 @@ RilievoPY is designed to work with **[RTKino](https://github.com/flyingsurveyor/
 | **Access** | `http://rtkino.local/` | `http://rilievopy.local/` |
 | **Connection** | TCP streamer on port 7856 | Connects to RTKino via WiFi |
 
-The two projects are independent — RilievoPY can connect to any GNSS source that streams NMEA or UBX over TCP. But together, RTKino + RilievoPY form a complete, low-cost, open-source RTK surveying system.
+Together, RTKino + RilievoPY form a complete, low-cost, open-source RTK surveying system.
 
 ---
 
@@ -129,7 +129,8 @@ pkg install -y git && git clone https://github.com/flyingsurveyor/rilievopy.git 
 ```bash
 git clone https://github.com/flyingsurveyor/rilievopy.git
 cd rilievopy
-bash install.sh
+chmod +x install.sh
+./install.sh
 ```
 
 The installer is interactive and handles everything:
@@ -198,7 +199,8 @@ journalctl -u rilievo -f
    ```bash
    git clone https://github.com/flyingsurveyor/rilievopy.git
    cd rilievopy
-   bash install.sh
+   chmod +x install.sh
+   ./install.sh
    ```
 
 3. During installation, choose **Build** for RTKLIB if you need PPK (takes ~10–15 min on RPi Zero 2W). Choose **Yes** for systemd service.
@@ -327,7 +329,6 @@ rilievopy/
 | `waitress>=3.0` | Production WSGI server | ✅ |
 | `openpyxl` | Excel export | ✅ |
 | `zeroconf` | mDNS service | ✅ |
-| `geopandas` + `shapely` | Enhanced GeoPackage export | Optional |
 | `bleak` | BLE connectivity (Termux) | Optional |
 | `convbin` | Raw GNSS → RINEX (RTKLIB) | Optional (PPK) |
 | `rnx2rtkp` | PPK processing (RTKLIB) | Optional (PPK) |
