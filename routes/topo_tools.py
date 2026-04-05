@@ -17,6 +17,7 @@ from flask import Blueprint, render_template, request, jsonify, make_response
 from modules.dtm import (
     TIN, extract_contours, volume_between_surfaces,
     extract_profile, extract_cross_sections, tin_statistics,
+    volume_between_tins,
 )
 from modules.traverses import (
     StazionePoligonale, calcola_poligonale_aperta,
@@ -24,6 +25,7 @@ from modules.traverses import (
     calcola_livellazione,
 )
 from modules.survey import load_survey, list_survey_ids, SURVEY_DIR, get_survey_dir
+from modules.geodesy import geodetic_to_ecef, ecef_delta_to_enu
 
 bp = Blueprint('topo_tools', __name__)
 
@@ -80,6 +82,7 @@ def _survey_to_local(sid):
         return [], None
     first_props = features[0].get("properties", {})
     olat, olon = first_props.get("lat", 0), first_props.get("lon", 0)
+    X0, Y0, Z0 = geodetic_to_ecef(olat, olon, 0.0)
     points = []
     for feat in features:
         props = feat.get("properties", {})
@@ -87,8 +90,8 @@ def _survey_to_local(sid):
         alt = props.get("alt_msl") or props.get("alt_hae", 0) or 0
         if lat is None or lon is None:
             continue
-        x = (lon - olon) * 111320 * math.cos(math.radians(olat))
-        y = (lat - olat) * 110540
+        Xi, Yi, Zi = geodetic_to_ecef(lat, lon, float(alt))
+        x, y, _ = ecef_delta_to_enu(Xi - X0, Yi - Y0, Zi - Z0, olat, olon)
         points.append({"id": feat.get("id", ""), "name": props.get("name", ""),
             "code": props.get("codice", ""),
             "x": round(x, 3), "y": round(y, 3), "z": round(float(alt), 3)})
@@ -167,6 +170,86 @@ def api_dtm_profile():
         step = float(data.get("step", 1.0))
         profile = extract_profile(tin, start, end, step)
         return jsonify({"profile": profile, "length": math.hypot(end[0]-start[0], end[1]-start[1])})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@bp.route("/api/dtm/cross_sections", methods=["POST"])
+def api_dtm_cross_sections():
+    data = request.get_json()
+    try:
+        tin, _ = _build_tin(data["survey_id"])
+        alignment = [(float(p[0]), float(p[1])) for p in data["alignment"]]
+        interval = float(data.get("interval", 10.0))
+        width = float(data.get("width", 20.0))
+        step = float(data.get("step", 1.0))
+        sections = extract_cross_sections(tin, alignment, interval, width, step)
+        return jsonify({"sections": sections, "n_sections": len(sections)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@bp.route("/api/dtm/volume_tins", methods=["POST"])
+def api_dtm_volume_tins():
+    data = request.get_json()
+    try:
+        tin_upper, _ = _build_tin(data["upper_survey_id"])
+        tin_lower, _ = _build_tin(data["lower_survey_id"])
+        grid_step = float(data.get("grid_step", 1.0))
+        result = volume_between_tins(tin_upper, tin_lower, grid_step)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@bp.route("/api/dtm/slope_map", methods=["POST"])
+def api_dtm_slope_map():
+    data = request.get_json()
+    try:
+        tin, _ = _build_tin(data["survey_id"])
+
+        def _slope_color(slope):
+            if slope <= 15:
+                return "green"
+            elif slope <= 30:
+                return "yellow"
+            elif slope <= 45:
+                return "orange"
+            return "red"
+
+        triangles_out = []
+        for i, tri in enumerate(tin.triangles):
+            slope, aspect = tin.slope_aspect(i)
+            p0, p1, p2 = tin.points[tri.i0], tin.points[tri.i1], tin.points[tri.i2]
+            triangles_out.append({
+                "vertices": [
+                    {"x": p0.x, "y": p0.y, "z": p0.z},
+                    {"x": p1.x, "y": p1.y, "z": p1.z},
+                    {"x": p2.x, "y": p2.y, "z": p2.z},
+                ],
+                "slope": round(slope, 2),
+                "aspect": round(aspect, 2),
+                "color": _slope_color(slope),
+            })
+        return jsonify({"triangles": triangles_out, "n_triangles": len(triangles_out)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@bp.route("/api/dtm/build_with_breaklines", methods=["POST"])
+def api_dtm_build_with_breaklines():
+    data = request.get_json()
+    try:
+        tin, origin = _build_tin(data["survey_id"])
+        breaklines = data.get("breaklines", [])
+        for bl in breaklines:
+            pts = [(float(p[0]), float(p[1]), float(p[2])) for p in bl]
+            tin.add_breakline(pts)
+        if breaklines:
+            tin.enforce_breaklines()
+        stats = tin_statistics(tin)
+        tri_data = [{"v0": {"x": tin.points[t.i0].x, "y": tin.points[t.i0].y, "z": tin.points[t.i0].z},
+                     "v1": {"x": tin.points[t.i1].x, "y": tin.points[t.i1].y, "z": tin.points[t.i1].z},
+                     "v2": {"x": tin.points[t.i2].x, "y": tin.points[t.i2].y, "z": tin.points[t.i2].z}} for t in tin.triangles]
+        pts_data = [{"x": p.x, "y": p.y, "z": p.z, "name": p.name} for p in tin.points]
+        return jsonify({"statistics": stats, "triangles": tri_data, "points": pts_data,
+                        "origin": {"lat": origin[0], "lon": origin[1]}})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 

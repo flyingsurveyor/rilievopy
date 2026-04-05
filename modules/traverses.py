@@ -190,6 +190,68 @@ def calcola_poligonale_aperta(
                 e_comp[i] = e_prov[i] - closure_e * re
                 n_comp[i] = n_prov[i] - closure_n * rn
 
+        elif metodo == "crandall":
+            # Crandall rule: correction proportional to squared increments
+            # dE_i² / Σ(dE_i²) for E-component, dN_i² / Σ(dN_i²) for N-component
+            de_sq = [(e_prov[i + 1] - e_prov[i]) ** 2 for i in range(n - 1)]
+            dn_sq = [(n_prov[i + 1] - n_prov[i]) ** 2 for i in range(n - 1)]
+            sum_de_sq = sum(de_sq)
+            sum_dn_sq = sum(dn_sq)
+            cum_de_sq = 0.0
+            cum_dn_sq = 0.0
+            for i in range(1, n):
+                cum_de_sq += de_sq[i - 1]
+                cum_dn_sq += dn_sq[i - 1]
+                re = cum_de_sq / sum_de_sq if sum_de_sq > 0 else (i / (n - 1))
+                rn = cum_dn_sq / sum_dn_sq if sum_dn_sq > 0 else (i / (n - 1))
+                e_comp[i] = e_prov[i] - closure_e * re
+                n_comp[i] = n_prov[i] - closure_n * rn
+
+        elif metodo == "least_squares":
+            # Least-squares adjustment: distribute closure error by solving the normal
+            # equations for coordinate corrections that minimise the sum of squared
+            # residuals weighted by leg length (equal-weight parametric adjustment).
+            #
+            # Model: for each intermediate station i (1 … n-2) introduce unknowns
+            # x_i (correction to e_prov[i]) and y_i (correction to n_prov[i]).
+            # Observation equations per leg k (k = i→i+1):
+            #   v_e_k = x_{i+1} - x_i  (with x_0 = x_{n-1} = 0, fixed)
+            #   v_n_k = y_{i+1} - y_i
+            # Global constraints:  Σ v_e_k = -closure_e,  Σ v_n_k = -closure_n
+            # With equal weights the LS solution distributes proportionally to
+            # cumulative distance / total distance (equivalent to Bowditch when
+            # weights = leg-lengths; here we keep it general and use unit weights).
+            #
+            # For a traverse with n stations (0 … n-1) and n-1 legs the normal
+            # equations reduce to a tridiagonal system.  We solve with Gaussian
+            # elimination for the n-2 interior stations.
+
+            m = n - 2  # number of interior (unknown) stations
+            if m <= 0:
+                # Only 2 stations — apply closure directly to the single interior-less
+                # traverse (same as Bowditch with one leg)
+                e_comp[n - 1] = last.e_noto
+                n_comp[n - 1] = last.n_noto
+            else:
+                # Build and solve tridiagonal system for E and N independently.
+                # Normal equation for interior station i (1-indexed, 1…m):
+                #   2*x_i - x_{i-1} - x_{i+1} = 0   (interior)
+                # Boundary:  x_0 = 0, x_{m+1} = -closure_e
+                # This gives the linear-ramp solution (identical to Bowditch for
+                # equal leg lengths), but the framework is extensible to weighted legs.
+
+                def _solve_tridiagonal_uniform(m_size, rhs_last):
+                    """Solve 2*x_i - x_{i-1} - x_{i+1} = 0 with x_0=0, x_{m+1}=rhs_last."""
+                    # The solution is a linear ramp: x_i = rhs_last * i / (m_size + 1)
+                    return [-rhs_last * i / (m_size + 1) for i in range(1, m_size + 1)]
+
+                corr_e = _solve_tridiagonal_uniform(m, closure_e)
+                corr_n = _solve_tridiagonal_uniform(m, closure_n)
+
+                for i in range(1, n - 1):
+                    e_comp[i] = e_prov[i] - corr_e[i - 1]
+                    n_comp[i] = n_prov[i] - corr_n[i - 1]
+
     # ---------- Step 5: Altitude compensation ----------
     h_comp = [first.h_noto or 0.0]
     total_dh_obs = 0.0

@@ -15,7 +15,8 @@ from modules.cogo import (
     trilaterate_2d, gon_to_radians, radians_to_gon,
     calculate_bearing_gon, bearing_bearing_intersection,
     polar_to_point, point_offset_from_line,
-    perpendicular_foot_on_line, gon_to_dms, helmert_2d_transform, apply_helmert_2d
+    perpendicular_foot_on_line, gon_to_dms, helmert_2d_transform, apply_helmert_2d,
+    distance_distance_intersection
 )
 from modules.exports import _feature_to_llh
 from modules.survey import (
@@ -432,6 +433,134 @@ def cogo_bearing_intersection_save():
     svy["features"].append(feat)
     save_survey(survey_id, svy)
     
+    return make_response({"success": True, "point_id": pid}, 200)
+
+@bp.route("/cogo/distance-intersection", methods=["GET"])
+def cogo_distance_intersection():
+    """Distance-distance intersection page"""
+    opts = list_all_points_options()
+    options = "\n".join([f'<option value="{v}">{l}</option>' for (l,v) in opts])
+
+    survey_opts = []
+    for sid in list_survey_ids():
+        survey_opts.append(f'<option value="{sid}">{sid}</option>')
+    survey_options = "\n".join(survey_opts)
+
+    return render_template('rtk_cogo_distance.html', options=options, survey_options=survey_options)
+
+@bp.route("/cogo/distance-intersection/calc", methods=["POST"])
+def cogo_distance_intersection_calc():
+    """Calculate distance-distance intersection"""
+    data = request.get_json()
+    if not data:
+        return make_response({"error": "No data"}, 400)
+
+    point1 = data.get("point1")
+    point2 = data.get("point2")
+    distance1 = data.get("distance1")
+    distance2 = data.get("distance2")
+
+    if not point1 or not point2:
+        return make_response({"error": "Punti mancanti"}, 400)
+    if distance1 is None or distance2 is None:
+        return make_response({"error": "Distanze mancanti"}, 400)
+
+    try:
+        svy1 = load_survey(point1["sid"])
+        feat1 = next((f for f in svy1.get("features", []) if f.get("id") == point1["pid"]), None)
+        if not feat1:
+            return make_response({"error": "Punto 1 non trovato"}, 404)
+
+        svy2 = load_survey(point2["sid"])
+        feat2 = next((f for f in svy2.get("features", []) if f.get("id") == point2["pid"]), None)
+        if not feat2:
+            return make_response({"error": "Punto 2 non trovato"}, 404)
+
+        llh1 = _feature_to_llh(feat1)
+        llh2 = _feature_to_llh(feat2)
+
+        if not llh1 or not llh2:
+            return make_response({"error": "Coordinate non valide"}, 400)
+    except FileNotFoundError as e:
+        return make_response({"error": str(e)}, 404)
+
+    # Use first point as ENU origin
+    lat0, lon0, alt0 = llh1
+    X0, Y0, Z0 = geodetic_to_ecef(lat0, lon0, alt0)
+
+    # Convert point 2 to ENU
+    lat2, lon2, alt2 = llh2
+    X2, Y2, Z2 = geodetic_to_ecef(lat2, lon2, alt2)
+    dX, dY, dZ = X2 - X0, Y2 - Y0, Z2 - Z0
+    e2, n2, u2 = ecef_delta_to_enu(dX, dY, dZ, lat0, lon0)
+
+    # Point 1 is at ENU origin
+    e1, n1 = 0.0, 0.0
+
+    solutions_enu = distance_distance_intersection(e1, n1, float(distance1), e2, n2, float(distance2))
+
+    if solutions_enu is None:
+        return make_response({"error": "Punti coincidenti"}, 400)
+
+    if len(solutions_enu) == 0:
+        return make_response({"solutions": [], "message": "Nessuna intersezione: le distanze non si sovrappongono"}, 200)
+
+    avg_alt = (alt0 + alt2) / 2.0
+
+    solutions = []
+    for (e, n) in solutions_enu:
+        lat, lon, _ = enu_to_geodetic(e, n, 0, lat0, lon0, alt0)
+        solutions.append({"e": e, "n": n, "lat": lat, "lon": lon, "alt": avg_alt})
+
+    return make_response({"solutions": solutions}, 200)
+
+@bp.route("/cogo/distance-intersection/save", methods=["POST"])
+def cogo_distance_intersection_save():
+    """Save distance-distance intersection point"""
+    data = request.get_json()
+    if not data:
+        return make_response({"error": "No data"}, 400)
+
+    survey_id = data.get("survey_id")
+    point_name = sanitize_point_name(data.get("point_name", "DD001"))
+    solution = data.get("solution")
+
+    if not survey_id or not solution:
+        return make_response({"error": "Dati mancanti"}, 400)
+
+    try:
+        svy = load_survey(survey_id)
+    except FileNotFoundError:
+        return make_response({"error": "Rilievo non trovato"}, 404)
+
+    pid = next_point_id(svy)
+
+    feat = point_feature(
+        pid=pid,
+        lat=solution["lat"],
+        lon=solution["lon"],
+        altHAE=solution["alt"],
+        altMSL=solution["alt"],
+        X=None, Y=None, Z=None,
+        stats={"mode": 3, "rtk": "cogo-distance-intersection", "numSV": None,
+               "hAcc": None, "vAcc": None, "pAcc": None,
+               "gdop": None, "pdop": None, "hdop": None, "vdop": None,
+               "ndop": None, "edop": None, "tdop": None,
+               "covNN": None, "covEE": None, "covDD": None,
+               "covNE": None, "covND": None, "covED": None,
+               "relN": None, "relE": None, "relD": None,
+               "relsN": None, "relsE": None, "relsD": None,
+               "baseline": None, "horiz": None, "bearing": None, "slope": None},
+        meta={"name": point_name, "desc": "Punto calcolato con intersezione distanza-distanza COGO",
+              "start": now_iso(), "end": now_iso(), "duration": 0, "interval": 0, "n_samples": 0}
+    )
+
+    feat["properties"]["origin"] = "distance-intersection"
+    feat["properties"]["cogo_method"] = "distance-intersection"
+
+    svy["features"].append(feat)
+    save_survey(survey_id, svy)
+
     return make_response({"success": True, "point_id": pid}, 200)
 
 @bp.route("/cogo/polar", methods=["GET"])
