@@ -66,6 +66,20 @@
 {% block content %}
 <div class="container">
 
+  <!-- Update card -->
+  <div class="card" id="updateCard">
+    <h2><span class="ico">🔄</span> Aggiornamento</h2>
+    <div id="update-status" style="font-size:14px;color:#555;margin-bottom:10px;">
+      <span id="update-check-text">Verifica in corso...</span>
+    </div>
+    <div class="actions" style="margin-bottom:10px;">
+      <button type="button" class="btn btn-success" id="update-btn" onclick="runUpdate()" disabled>🔄 Aggiorna ora</button>
+    </div>
+    <pre id="update-log" style="display:none;background:#1e1e1e;color:#d4d4d4;border-radius:6px;
+         padding:12px;font-size:12px;max-height:300px;overflow-y:auto;white-space:pre-wrap;
+         word-break:break-all;margin:0;"></pre>
+  </div>
+
   <!-- Connection status -->
   <div id="connStatus" class="status-bar status-nocfg">
     <span class="dot"></span>
@@ -475,6 +489,85 @@ async function saveMdnsHostname() {
 }
 
 loadMdnsStatus();
+
+// ── Update helpers ────────────────────────────────────────────────────────────
+(function checkUpdate() {
+  fetch('/api/update/check')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var txt = document.getElementById('update-check-text');
+      var btn = document.getElementById('update-btn');
+      if (d.update_available) {
+        txt.innerHTML = '<span style="color:#e67e22;font-weight:600;">🆕 Aggiornamento disponibile</span>' +
+          ' — locale: <code>' + d.local + '</code> → remoto: <code>' + d.remote + '</code>';
+        btn.disabled = false;
+      } else if (d.up_to_date) {
+        txt.innerHTML = '<span style="color:#27ae60;font-weight:600;">✅ Versione aggiornata</span>' +
+          ' (<code>' + d.local + '</code>)';
+        btn.disabled = false; // allow forced update
+      } else {
+        txt.textContent = 'Impossibile verificare la versione remota (nessuna connessione internet?)';
+        btn.disabled = false; // allow trying anyway
+      }
+    }).catch(function(){
+      document.getElementById('update-check-text').textContent = 'Errore durante la verifica versione';
+      document.getElementById('update-btn').disabled = false;
+    });
+})();
+
+function runUpdate() {
+  var btn = document.getElementById('update-btn');
+  var log = document.getElementById('update-log');
+  var statusTxt = document.getElementById('update-check-text');
+  btn.disabled = true;
+  btn.textContent = '⏳ Aggiornamento in corso...';
+  log.style.display = 'block';
+  log.textContent = '';
+
+  var es = new EventSource('/api/update/run');
+  var done = false;
+
+  es.onmessage = function(e) {
+    try {
+      var msg = JSON.parse(e.data);
+      if (msg.line === 'DONE') {
+        es.close();
+        done = true;
+        statusTxt.innerHTML = '<span style="color:#27ae60;font-weight:600;">✅ Riavvio in corso...</span> la pagina si ricaricherà automaticamente.';
+        // poll until app is back up
+        setTimeout(function pollReload(){
+          fetch('/').then(function(r){
+            if (r.ok) location.reload();
+            else setTimeout(pollReload, 2000);
+          }).catch(function(){ setTimeout(pollReload, 2000); });
+        }, 5000);
+        return;
+      }
+      var color = msg.kind === 'ok' ? '#2ecc71' :
+                  msg.kind === 'error' ? '#e74c3c' :
+                  msg.kind === 'warn' ? '#f39c12' : '#d4d4d4';
+      var span = document.createElement('span');
+      span.style.color = color;
+      span.textContent = msg.line + '\n';
+      log.appendChild(span);
+      log.scrollTop = log.scrollHeight;
+    } catch(_) {}
+  };
+
+  es.onerror = function() {
+    if (!done) {
+      es.close();
+      // If app restarted, SSE drops — treat as success if we were already in DONE state
+      statusTxt.innerHTML = '<span style="color:#27ae60;">✅ Connessione SSE chiusa — riavvio in corso...</span>';
+      setTimeout(function pollReload(){
+        fetch('/').then(function(r){
+          if (r.ok) location.reload();
+          else setTimeout(pollReload, 2000);
+        }).catch(function(){ setTimeout(pollReload, 2000); });
+      }, 3000);
+    }
+  };
+}
 
 </script>
 {% endblock %}
