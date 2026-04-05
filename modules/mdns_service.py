@@ -27,7 +27,7 @@ def is_valid_hostname(hostname: str) -> bool:
     - Non può iniziare o finire con trattino
     - Lunghezza 1-32 caratteri
     """
-    if not hostname or len(hostname) < 1 or len(hostname) > 32:
+    if not hostname or len(hostname) > 32:
         return False
     if hostname[0] == '-' or hostname[-1] == '-':
         return False
@@ -72,9 +72,13 @@ def start_mdns(hostname: str, port: int = 8000) -> bool:
 
         _zeroconf = Zeroconf()
 
-        # Ottieni IP locale
+        # Ottieni IP locale (usa connessione UDP per trovare l'IP LAN reale)
         try:
-            local_ip = socket.gethostbyname(socket.gethostname())
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
         except Exception:
             local_ip = "127.0.0.1"
 

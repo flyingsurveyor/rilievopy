@@ -431,7 +431,12 @@ async function loadMdnsStatus() {
     if (inp) inp.value = data.hostname;
     if (cur) {
       if (data.url) {
-        cur.innerHTML = '<a href="' + data.url + '" target="_blank">' + data.url + '</a>';
+        var link = document.createElement('a');
+        link.href = data.url;
+        link.textContent = data.url;
+        link.target = '_blank';
+        cur.textContent = '';
+        cur.appendChild(link);
       } else {
         cur.textContent = 'Non attivo';
       }

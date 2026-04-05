@@ -358,4 +358,4 @@ def api_mdns_save():
         "ok": success,
         "hostname": new_hostname,
         "url": f"http://{new_hostname}.local/" if success else None,
-    })
+    }), (200 if success else 500)
