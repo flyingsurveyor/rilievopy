@@ -904,15 +904,6 @@ def survey_redirect():
     return _redirect("/surveys")
 
 
-@bp.route("/files/<path:filename>")
-def files_route(filename):
-    survey_dir = get_survey_dir()
-    path = os.path.join(survey_dir, filename)
-    if not os.path.isfile(path):
-        abort(404)
-    return send_from_directory(survey_dir, filename, as_attachment=True)
-
-
 # ---------- Session log ----------
 @bp.route("/api/session_log")
 def api_session_log():
