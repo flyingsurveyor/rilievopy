@@ -241,8 +241,16 @@ def calcola_poligonale_aperta(
                 # equal leg lengths), but the framework is extensible to weighted legs.
 
                 def _solve_tridiagonal_uniform(m_size, rhs_last):
-                    """Solve 2*x_i - x_{i-1} - x_{i+1} = 0 with x_0=0, x_{m+1}=rhs_last."""
-                    # The solution is a linear ramp: x_i = rhs_last * i / (m_size + 1)
+                    """Closed-form solution for the uniform-weight LS normal equations.
+
+                    Solves 2*x_i - x_{i-1} - x_{i+1} = 0 (i=1…m_size) with boundary
+                    conditions x_0 = 0 and x_{m_size+1} = -rhs_last.  The system is
+                    tridiagonal and under equal weights its solution is a linear ramp:
+                        x_i = -rhs_last * i / (m_size + 1)
+                    This is equivalent to the Bowditch correction when all leg lengths
+                    are equal.  For weighted legs the tridiagonal system would need to
+                    be solved numerically.
+                    """
                     return [-rhs_last * i / (m_size + 1) for i in range(1, m_size + 1)]
 
                 corr_e = _solve_tridiagonal_uniform(m, closure_e)

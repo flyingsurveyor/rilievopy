@@ -91,7 +91,7 @@ def _survey_to_local(sid):
         if lat is None or lon is None:
             continue
         Xi, Yi, Zi = geodetic_to_ecef(lat, lon, float(alt))
-        x, y, _ = ecef_delta_to_enu(Xi - X0, Yi - Y0, Zi - Z0, olat, olon)
+        x, y, _up = ecef_delta_to_enu(Xi - X0, Yi - Y0, Zi - Z0, olat, olon)
         points.append({"id": feat.get("id", ""), "name": props.get("name", ""),
             "code": props.get("codice", ""),
             "x": round(x, 3), "y": round(y, 3), "z": round(float(alt), 3)})

@@ -359,16 +359,21 @@ class TIN:
                             return True
             return False
 
+        # Maximum passes: each edge may need at most one flip per other edge in the
+        # worst case, so len(edges)*3 gives a safe upper bound without risking an
+        # infinite loop.
         max_passes = len(self._breakline_edges) * 3
         for _ in range(max_passes):
             current_edges = _edges_set()
             all_present = True
+            flipped_any = False
             for ea, eb in self._breakline_edges:
                 key = (min(ea, eb), max(ea, eb))
                 if key not in current_edges:
                     all_present = False
-                    _find_flip(ea, eb)
-            if all_present:
+                    if _find_flip(ea, eb):
+                        flipped_any = True
+            if all_present or not flipped_any:
                 break
 
 
