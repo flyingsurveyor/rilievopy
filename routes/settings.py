@@ -6,6 +6,11 @@ import io
 import json
 import logging
 import os
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
 import zipfile
 from datetime import datetime
 
@@ -387,3 +392,124 @@ def api_mdns_save():
             "ok": False,
             "error": "Errore interno del server",
         })
+
+
+# ── Self-update ────────────────────────────────────────────────────────────────
+
+@bp.route("/api/update/check")
+def api_update_check():
+    """Compare local git HEAD with remote GitHub HEAD."""
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # local commit
+    try:
+        local = subprocess.run(
+            ["git", "-C", base, "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5
+        ).stdout.strip()
+    except Exception:
+        local = "unknown"
+    # remote commit via GitHub API (no auth needed for public repos)
+    remote = None
+    try:
+        url = "https://api.github.com/repos/flyingsurveyor/rilievopy/commits/main"
+        req = urllib.request.Request(url, headers={"User-Agent": "rilievopy-updater"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+            remote = data.get("sha", "")
+    except Exception:
+        pass
+    up_to_date = (local and remote and local == remote)
+    return jsonify({
+        "local": local[:7] if local and local != "unknown" else local,
+        "remote": remote[:7] if remote else None,
+        "up_to_date": up_to_date,
+        "update_available": bool(remote and local != "unknown" and local != remote),
+    })
+
+
+@bp.route("/api/update/run")
+def api_update_run():
+    """Run git pull + pip install, stream output via SSE, then restart."""
+    from flask import Response, stream_with_context
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def generate():
+        def emit(line, kind="log"):
+            return [f"data: {json.dumps({'kind': kind, 'line': line})}\n\n"]
+
+        yield from emit("🔄 Avvio aggiornamento...", "log")
+
+        # ── git pull ──
+        yield from emit("▶ git pull...", "log")
+        try:
+            proc = subprocess.Popen(
+                ["git", "-C", base, "pull", "--ff-only"],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True
+            )
+            for line in proc.stdout:
+                yield from emit(line.rstrip(), "log")
+            proc.wait()
+            if proc.returncode != 0:
+                yield from emit(f"❌ git pull fallito (exit {proc.returncode})", "error")
+                yield from emit("DONE", "done")
+                return
+        except Exception as e:
+            yield from emit(f"❌ Errore git: {e}", "error")
+            yield from emit("DONE", "done")
+            return
+
+        yield from emit("✅ git pull completato", "ok")
+
+        # ── pip install ──
+        yield from emit("▶ pip install -r requirements.txt...", "log")
+        req_file = os.path.join(base, "requirements.txt")
+        if os.path.isfile(req_file):
+            try:
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "pip", "install", "-r", req_file, "-q"],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True
+                )
+                for line in proc.stdout:
+                    yield from emit(line.rstrip(), "log")
+                proc.wait()
+                if proc.returncode != 0:
+                    yield from emit(f"⚠️ pip install con errori (exit {proc.returncode})", "warn")
+                else:
+                    yield from emit("✅ dipendenze aggiornate", "ok")
+            except Exception as e:
+                yield from emit(f"⚠️ Errore pip: {e}", "warn")
+        else:
+            yield from emit("⚠️ requirements.txt non trovato, skipped", "warn")
+
+        yield from emit("✅ Aggiornamento completato. Riavvio in corso...", "ok")
+        yield from emit("DONE", "done")
+
+        # ── Restart: spawn a subprocess that kills & restarts us ──
+        def _restart():
+            time.sleep(1.5)
+            pid = os.getpid()
+            restart_cmd = [sys.executable, os.path.join(base, "app.py")]
+            if os.name != "nt":
+                import signal
+                log_file = open(os.path.join(base, "rilievo.log"), "a")
+                subprocess.Popen(
+                    restart_cmd,
+                    cwd=base,
+                    stdout=log_file,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+                log_file.close()
+                time.sleep(0.5)
+                os.kill(pid, signal.SIGTERM)
+            else:
+                subprocess.Popen(restart_cmd, cwd=base)
+                time.sleep(0.5)
+                os.kill(pid, signal.SIGTERM)
+
+        threading.Thread(target=_restart, daemon=True).start()
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
