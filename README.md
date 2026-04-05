@@ -23,6 +23,8 @@ It has been shaped through practical use in the field, with AI-assisted tools us
 
 The focus of this project is function, reliability, and real usability in difficult field conditions.
 
+At the moment the interface is still in Italian language. I'm working on i18n UI.
+
 ---
 
 ## Features
@@ -48,7 +50,7 @@ The focus of this project is function, reliability, and real usability in diffic
 - **Import**: CSV, TXT, GeoJSON
 - **Backup & Restore** of surveys and PPK configuration as ZIP archive
 
-### COGO Tools
+### COGO Tools EXPERIMENTAL!!
 
 Complete set of coordinate geometry calculations:
 
@@ -70,7 +72,7 @@ Complete set of coordinate geometry calculations:
 - **Import target points** from CSV, GeoJSON, or existing surveys
 - **Point list management** with survey-based organization
 
-### Topographic Tools (Office)
+### Topographic Tools EXPERIMENTAL!!
 
 - **CAD Web** — 2D topographic drawing with snap, layers, dimensions, DXF export
 - **DTM Analysis** — TIN Delaunay triangulation, contour lines, volume computation, cross-section profiles
