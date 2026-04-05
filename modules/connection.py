@@ -12,6 +12,70 @@ from .state import STATE, BytePipe, TCPRelay
 from .ubx_parser import ubx_parse_loop, upstream_loop
 
 
+def _resolve_mdns_host(hostname: str) -> str:
+    """
+    If hostname ends with '.local', try to resolve it via Zeroconf
+    (bypasses the system DNS resolver which doesn't handle mDNS on Android/Termux).
+    Returns the resolved IP string, or the original hostname if resolution fails.
+    """
+    if not hostname.lower().endswith('.local'):
+        return hostname
+    try:
+        from zeroconf import Zeroconf
+        import socket as _socket
+        import time as _time
+
+        # Strip .local suffix (reserved for service lookup if needed)
+        zc = Zeroconf()
+        # Try simple socket resolution first (works if avahi is running)
+        try:
+            ip = _socket.getaddrinfo(hostname, None, _socket.AF_INET)[0][4][0]
+            if ip and not ip.startswith('127.'):
+                zc.close()
+                print(f"# [conn] mDNS resolved {hostname} → {ip} (system resolver)")
+                return ip
+        except Exception:
+            pass
+
+        # Fallback: use Zeroconf ServiceBrowser to find _http._tcp services
+        from zeroconf import ServiceBrowser, ServiceListener
+
+        resolved_ip = [None]
+
+        class _Listener(ServiceListener):
+            def add_service(self, zc, type_, name_):
+                info = zc.get_service_info(type_, name_)
+                if info and info.addresses:
+                    import ipaddress
+                    ip_str = str(ipaddress.ip_address(info.addresses[0]))
+                    resolved_ip[0] = ip_str
+
+            def remove_service(self, zc, type_, name_): pass
+            def update_service(self, zc, type_, name_): pass
+
+        browser = ServiceBrowser(zc, "_http._tcp.local.", _Listener())
+        # Wait up to 3 seconds for a response
+        deadline = _time.time() + 3.0
+        while _time.time() < deadline and resolved_ip[0] is None:
+            _time.sleep(0.1)
+
+        zc.close()
+
+        if resolved_ip[0]:
+            print(f"# [conn] mDNS resolved {hostname} → {resolved_ip[0]} (zeroconf)")
+            return resolved_ip[0]
+        else:
+            print(f"# [conn] mDNS resolution failed for {hostname}, using as-is")
+            return hostname
+
+    except ImportError:
+        print(f"# [conn] zeroconf not available, using {hostname} as-is")
+        return hostname
+    except Exception as e:
+        print(f"# [conn] mDNS resolve error for {hostname}: {e}")
+        return hostname
+
+
 class ConnectionManager:
     """Manages GNSS upstream connection and TCP relay lifecycle."""
 
@@ -54,9 +118,14 @@ class ConnectionManager:
                                     "port": relay_port, "clients": 0})
                 return
 
+            # Resolve .local mDNS hostnames (Android/Termux DNS doesn't handle mDNS)
+            resolved_host = _resolve_mdns_host(gnss_host)
+            if resolved_host != gnss_host:
+                print(f"# {now_iso()} [conn] mDNS: {gnss_host} → {resolved_host}")
+
             self._stop_event.clear()
             self.pipe = BytePipe()
-            self.connected_host = gnss_host
+            self.connected_host = gnss_host  # keep original for display
             self.connected_port = gnss_port
 
             # Start relay if enabled
@@ -81,13 +150,14 @@ class ConnectionManager:
             # Start upstream thread
             self._upstream_thread = threading.Thread(
                 target=upstream_loop,
-                args=(gnss_host, gnss_port, self.pipe, self.relay, retry),
+                args=(resolved_host, gnss_port, self.pipe, self.relay, retry),
                 daemon=True
             )
             self._upstream_thread.start()
 
             print(f"# {now_iso()} [conn] started: {gnss_host}:{gnss_port}"
-                  f" relay={'on' if relay_enabled else 'off'}")
+                  + (f" (resolved: {resolved_host})" if resolved_host != gnss_host else "")
+                  + f" relay={'on' if relay_enabled else 'off'}")
 
     def stop(self):
         """Stop all connections."""
