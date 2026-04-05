@@ -423,11 +423,15 @@ function wsRestore(input) {
 
 // ── mDNS helpers ──────────────────────────────────────────────────────────
 async function loadMdnsStatus() {
+  var cur = document.getElementById('mdns-current-url');
   try {
     var res = await fetch('/api/mdns/status');
+    if (!res.ok) {
+      if (cur) cur.textContent = 'Errore caricamento stato';
+      return;
+    }
     var data = await res.json();
     var inp = document.getElementById('mdns-hostname');
-    var cur = document.getElementById('mdns-current-url');
     if (inp) inp.value = data.hostname;
     if (cur) {
       if (data.url) {
@@ -443,6 +447,7 @@ async function loadMdnsStatus() {
     }
   } catch (e) {
     console.error('Errore caricamento mDNS:', e);
+    if (cur) cur.textContent = 'Non disponibile';
   }
 }
 
@@ -456,15 +461,16 @@ async function saveMdnsHostname() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({hostname: hostname})
     });
-    var data = await res.json();
+    var data;
+    try { data = await res.json(); } catch (_) { data = {}; }
     if (data.ok) {
       showToast('mDNS aggiornato! ' + (data.url || ''), true);
       loadMdnsStatus();
     } else {
-      showToast('Errore: ' + (data.error || '?'), false);
+      showToast('Errore: ' + (data.error || 'risposta non valida'), false);
     }
   } catch (e) {
-    showToast('Errore di rete', false);
+    showToast('Errore di rete: ' + e.message, false);
   }
 }
 

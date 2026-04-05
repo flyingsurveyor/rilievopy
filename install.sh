@@ -488,8 +488,8 @@ VENV_DIR=""
 
 if [ "${PLATFORM}" = "termux" ]; then
     # Termux: install directly (no venv)
-    info "Installing: flask, pyubx2, waitress, openpyxl..."
-    pip install ${PIP_EXTRA_FLAGS} flask pyubx2 waitress openpyxl 2>&1 | tail -5
+    info "Installing: flask, pyubx2, waitress, openpyxl, zeroconf..."
+    pip install ${PIP_EXTRA_FLAGS} flask pyubx2 waitress openpyxl zeroconf 2>&1 | tail -5
     PIP_CMD="pip"
 else
     VENV_DIR="${SCRIPT_DIR}/venv"
@@ -502,8 +502,8 @@ else
     PIP_CMD="pip"
 
     # Install required dependencies
-    info "Installing: flask, pyubx2, waitress, openpyxl..."
-    pip install flask pyubx2 waitress openpyxl 2>&1 | tail -5
+    info "Installing: flask, pyubx2, waitress, openpyxl, zeroconf..."
+    pip install flask pyubx2 waitress openpyxl zeroconf 2>&1 | tail -5
 fi
 
 # Verify core deps installed correctly

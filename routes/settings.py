@@ -4,6 +4,7 @@ Settings page: configure GNSS connection, relay, survey defaults via web UI.
 
 import io
 import json
+import logging
 import os
 import zipfile
 from datetime import datetime
@@ -15,6 +16,8 @@ from modules.connection import CONN
 import modules.workspace as workspace
 
 bp = Blueprint('settings', __name__)
+
+logger = logging.getLogger(__name__)
 
 
 def _app_version() -> str:
@@ -322,40 +325,65 @@ def api_workspace_restore():
 @bp.route("/api/mdns/status")
 def api_mdns_status():
     """Stato attuale mDNS."""
-    from modules import mdns_service
-    current = mdns_service.get_current_hostname()
-    s = cfg.load_settings()
-    return jsonify({
-        "hostname": s.get("mdns_hostname", "rilievopy"),
-        "active": current is not None,
-        "url": f"http://{current}.local/" if current else None,
-    })
+    try:
+        from modules import mdns_service
+        current = mdns_service.get_current_hostname()
+        s = cfg.load_settings()
+        return jsonify({
+            "hostname": s.get("mdns_hostname", "rilievopy"),
+            "active": current is not None,
+            "url": f"http://{current}.local/" if current else None,
+        })
+    except Exception:
+        logger.exception("[mDNS] Errore in api_mdns_status")
+        return jsonify({
+            "hostname": "rilievopy",
+            "active": False,
+            "url": None,
+            "error": "Errore interno del server",
+        })
 
 
 @bp.route("/api/mdns/save", methods=["POST"])
 def api_mdns_save():
     """Salva nuovo hostname mDNS e riavvia il servizio."""
-    from modules import mdns_service
+    try:
+        from modules import mdns_service
 
-    data = request.get_json() or {}
-    new_hostname = mdns_service.normalize_hostname(data.get("hostname", ""))
+        data = request.get_json() or {}
+        new_hostname = mdns_service.normalize_hostname(data.get("hostname", ""))
 
-    if not mdns_service.is_valid_hostname(new_hostname):
+        if not mdns_service.is_valid_hostname(new_hostname):
+            return jsonify({
+                "ok": False,
+                "error": "Hostname non valido (usa solo a-z, 0-9, trattino)",
+            })
+
+        # Salva nei settings
+        cfg.update({"mdns_hostname": new_hostname})
+
+        # Riavvia mDNS con il nuovo hostname
+        s = cfg.load_settings()
+        http_port = s.get("http_port", 8000)
+        success = mdns_service.start_mdns(new_hostname, http_port)
+
+        if success:
+            return jsonify({
+                "ok": True,
+                "hostname": new_hostname,
+                "url": f"http://{new_hostname}.local/",
+            })
+        else:
+            error_msg = mdns_service.get_last_error() or "Avvio mDNS fallito"
+            logger.warning(f"[mDNS] start_mdns fallito per '{new_hostname}': {error_msg}")
+            return jsonify({
+                "ok": False,
+                "hostname": new_hostname,
+                "error": error_msg,
+            })
+    except Exception:
+        logger.exception("[mDNS] Errore in api_mdns_save")
         return jsonify({
             "ok": False,
-            "error": "Hostname non valido (usa solo a-z, 0-9, trattino)",
-        }), 400
-
-    # Salva nei settings
-    cfg.update({"mdns_hostname": new_hostname})
-
-    # Riavvia mDNS con il nuovo hostname
-    s = cfg.load_settings()
-    http_port = s.get("http_port", 8000)
-    success = mdns_service.start_mdns(new_hostname, http_port)
-
-    return jsonify({
-        "ok": success,
-        "hostname": new_hostname,
-        "url": f"http://{new_hostname}.local/" if success else None,
-    }), (200 if success else 500)
+            "error": "Errore interno del server",
+        })
