@@ -1,21 +1,170 @@
-# RilievoPY — Unified RTK/PPK Suite
+# RilievoPY — RTK/PPK GNSS Surveying Suite
 
-RTK real-time surveying + PPK post-processing in a single app.
+<p align="center">
+  <b>RTK real-time surveying + PPK post-processing in a single web app</b><br>
+  Runs on Android (Termux) and Raspberry Pi. No internet required in the field.
+</p>
+
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
+[![Platform: Android](https://img.shields.io/badge/Platform-Android%20(Termux)-green.svg)](https://termux.dev/)
+[![Platform: RPi](https://img.shields.io/badge/Platform-Raspberry%20Pi-red.svg)](https://www.raspberrypi.com/)
+[![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-yellow.svg)](https://www.python.org/)
+[![Companion: RTKino](https://img.shields.io/badge/Companion-RTKino-orange.svg)](https://github.com/flyingsurveyor/RTKino)
+
+**RilievoPY** is an open-source web application for RTK real-time GNSS surveying and PPK post-processing. It runs entirely on a smartphone (via Termux) or a Raspberry Pi, with no cloud dependency, no subscription, and no proprietary software. The interface is accessible from any browser on the same network.
+
+Designed and field-tested as the software companion to [RTKino](https://github.com/flyingsurveyor/RTKino) — a low-cost open-source RTK/PPK GNSS receiver based on ESP32-S3 and u-blox ZED-F9P.
+
+## Note on Development
+
+RilievoPY was built from real-world surveying needs, not from a software-first approach.
+
+It has been shaped through practical use in the field, with AI-assisted tools used to support development and speed up implementation.
+
+The focus of this project is function, reliability, and real usability in difficult field conditions.
 
 ---
 
-## Install (one command)
+## Features
 
-### Android (Termux)
+### RTK Dashboard
+
+- **Live GNSS status** with fix type (No Fix / Float / Fixed), position, accuracy, and DOP values
+- **Real-time satellite count** and signal quality monitoring
+- **SSE-based updates** — no page refresh needed, data streams continuously
+- **RTKino integration** — connects directly to RTKino's TCP streamer (port 7856) over WiFi
+- **TCP Relay** — forwards the incoming NMEA/UBX stream to other clients on the same LAN (e.g. GNSS Master, external loggers)
+- **mDNS** for easy access via `http://rilievopy.local/` without knowing the IP address
+
+### Survey Management
+
+- **Create, manage, and export surveys** with full point metadata
+- **Timed point measurement** with configurable duration and sampling interval
+- **Robust averaging** with three selectable modes: sigma-clipping, trimmed mean, median
+- **RTK quality gate** with configurable thresholds for horizontal accuracy, PDOP, and satellite count
+- **Full GNSS snapshot per point**: coordinates, accuracy, DOP, covariance, fix type
+- **Point codes** — customizable categories for field annotation (compatible with Italian surveying conventions)
+- **Export formats**: GeoJSON, CSV, DXF, GeoPackage (GPKG), Excel (XLSX)
+- **Import**: CSV, TXT, GeoJSON
+- **Backup & Restore** of surveys and PPK configuration as ZIP archive
+
+### COGO Tools
+
+Complete set of coordinate geometry calculations:
+
+| Tool | Description |
+|------|-------------|
+| **Trilateration** | Compute unknown point from distances to known points |
+| **Intersection** | Compute point from bearings or distance+bearing |
+| **Polar** | Compute point from known station, bearing and distance |
+| **Bearing & Distance** | Compute bearing and distance between two points |
+| **Offset** | Compute offset point from line |
+| **Perpendicular** | Drop perpendicular from point to line |
+| **Alignment** | Stake points along a polyline at given intervals |
+| **Helmert (2D)** | Transform between coordinate systems (4-parameter similarity) |
+
+### Stakeout (Setting Out)
+
+- **Navigate to design points** with real-time guidance
+- **Live distance and azimuth** to target, updated via SSE
+- **Import target points** from CSV, GeoJSON, or existing surveys
+- **Point list management** with survey-based organization
+
+### Topographic Tools (Office)
+
+- **CAD Web** — 2D topographic drawing with snap, layers, dimensions, DXF export
+- **DTM Analysis** — TIN Delaunay triangulation, contour lines, volume computation, cross-section profiles
+- **Traverses** — open and closed traverse computation, leveling, area division
+
+### PPK Post-processing
+
+Full PPK workflow integrated in the web UI, powered by [RTKLIB (RTKLIBExplorer demo5)](https://github.com/rtklibexplorer/RTKLIB):
+
+| Page | Description |
+|------|-------------|
+| **PPK Home** | Dashboard with file counts and RTKLIB tool status |
+| **convbin** | Convert raw GNSS logs (UBX, RTCM) to RINEX format |
+| **RINEX QC** | Observation quality check: header, satellite list, SNR plots |
+| **PPK Processing** | Full `rnx2rtkp` configuration editor and processing runner |
+| **Position Viewer** | rtkplot-style charts: position, residuals, satellite availability |
+| **File Explorer** | Manage uploads, RINEX, results, .pos solutions, and RTKLIB configs |
+
+> PPK features require `convbin` and `rnx2rtkp` compiled from RTKLIB. The installer handles this automatically — see [Installation](#installation).
+
+### Workspace Management
+
+- **Configurable workspace directory** — store surveys and PPK data anywhere, including shared storage visible to Android File Manager (`~/storage/shared/RilievoPY`)
+- **Copy / migrate** data between workspaces without data loss
+- **Backup and restore** surveys + PPK configs as a single ZIP file with manifest
+
+---
+
+## Companion Hardware: RTKino
+
+RilievoPY is designed to work with **[RTKino](https://github.com/flyingsurveyor/RTKino)** — an open-source RTK/PPK GNSS receiver built on ESP32-S3 and u-blox ZED-F9P.
+
+| | RTKino | RilievoPY |
+|---|---|---|
+| **Role** | GNSS receiver + corrections | Surveying app + post-processing |
+| **Hardware** | ESP32-S3 + ZED-F9P | Android phone / Raspberry Pi |
+| **Access** | `http://rtkino.local/` | `http://rilievopy.local/` |
+| **Connection** | TCP streamer on port 7856 | Connects to RTKino via WiFi |
+
+The two projects are independent — RilievoPY can connect to any GNSS source that streams NMEA or UBX over TCP. But together, RTKino + RilievoPY form a complete, low-cost, open-source RTK surveying system.
+
+---
+
+## Installation
+
+### Android (Termux) — one command
 
 ```bash
-pkg install -y git && git clone https://github.com/flyingsurveyor/rilievo_gnss.git && cd rilievo_gnss && bash install.sh
+pkg install -y git && git clone https://github.com/flyingsurveyor/rilievopy.git && cd rilievopy && bash install.sh
 ```
 
 ### Raspberry Pi
 
 ```bash
-git clone https://github.com/flyingsurveyor/rilievo_gnss.git && cd rilievo_gnss && bash install.sh
+git clone https://github.com/flyingsurveyor/rilievopy.git
+cd rilievopy
+bash install.sh
+```
+
+The installer is interactive and handles everything:
+
+| Step | What happens |
+|------|-------------|
+| Platform detection | Termux, Raspberry Pi OS, Debian, Arch, macOS, WSL |
+| RTKLIB tools | Optionally clones and compiles `convbin` + `rnx2rtkp` from RTKLIBExplorer demo5 |
+| Python dependencies | Installs Flask, pyubx2, waitress, openpyxl, zeroconf (+ optional geopandas) |
+| Data directories | Creates `surveys/`, `data/uploads/`, `data/rinex/`, `data/results/`, etc. |
+| Termux extras | Installs bleak (BLE), checks Termux:API, installs Termux:Widget shortcuts |
+| systemd service | (Linux only) Optionally installs auto-start on boot |
+
+```
+./install.sh                # Interactive (recommended)
+./install.sh --skip-build   # Skip RTKLIB compilation
+./install.sh --force-build  # Rebuild RTKLIB without asking
+```
+
+### Termux:Widget (Android)
+
+After installation, add the widget to your home screen for one-tap start/stop:
+
+1. Install **Termux:Widget** from [F-Droid](https://f-droid.org/packages/com.termux.widget/)
+2. Long-press an empty area on the home screen → Widget → Termux
+3. Add **`rilievo_avvia`** (start) and **`rilievo_ferma`** (stop)
+
+The start widget checks if the app is already running — if yes, it opens the browser directly without restarting.
+
+### systemd Service (Raspberry Pi)
+
+The installer offers to install a systemd service for automatic start on boot:
+
+```bash
+sudo systemctl status rilievo
+sudo systemctl restart rilievo
+journalctl -u rilievo -f
 ```
 
 ---
@@ -24,174 +173,102 @@ git clone https://github.com/flyingsurveyor/rilievo_gnss.git && cd rilievo_gnss 
 
 ### Android (Termux) — step by step
 
-1. **Install Termux from F-Droid** (not Google Play — the Play Store version is outdated and unsupported):
+1. **Install Termux from F-Droid** (not Google Play — the Play Store version is outdated):
    `https://f-droid.org/packages/com.termux/`
 
-2. **Open Termux** and paste the one-liner above. It will download the app and run the installer automatically.
+2. **Paste the one-liner** above in Termux. The installer will guide you through the setup.
 
-3. **The installer will ask a few questions:**
-   - **RTKLIB tools** (`convbin`, `rnx2rtkp`): these are needed only for PPK post-processing (replaying raw GNSS logs after the survey). For RTK-only field use, choose **Skip**.
-   - **geopandas**: optional library for advanced GeoPackage export. Skip it on low-RAM devices.
-   - **systemd service**: not applicable on Termux — skip this.
+3. **During installation:**
+   - **RTKLIB tools**: needed only for PPK. Choose **Skip** for RTK-only field use.
+   - **geopandas**: optional, skip on low-RAM devices.
 
-4. **Install Termux:Widget from F-Droid:**
-   `https://f-droid.org/packages/com.termux.widget/`
+4. **Install Termux:Widget** and add the widget to your home screen.
 
-5. **Add the widget to your home screen:** long-press an empty area on the home screen → Widget → Termux → select `rilievo_avvia`.
+5. **Tap `rilievo_avvia`** — the app starts in the background and the browser opens at `http://127.0.0.1:8000`.
 
-6. **Tap the widget** — the app starts in the background and the browser opens automatically at `http://127.0.0.1:8000`.
-
-7. **First time only:** go to **Settings** (`/settings`) and enter the IP address and port of your GNSS receiver (the TCP server running on the rover or base station).
-
----
+6. **First time only:** go to `/rtkino` and enter the IP address of your RTKino receiver.
 
 ### Raspberry Pi Zero 2W — step by step
 
-1. **Start from a fresh Raspberry Pi OS Lite** (64-bit recommended).
+1. Start from a fresh **Raspberry Pi OS Lite** (64-bit).
 
-2. **Make sure git is installed:**
+2. Clone and install:
    ```bash
-   sudo apt install -y git
-   ```
-
-3. **Clone and install:**
-   ```bash
-   git clone https://github.com/flyingsurveyor/rilievo_gnss.git
-   cd rilievo_gnss
+   git clone https://github.com/flyingsurveyor/rilievopy.git
+   cd rilievopy
    bash install.sh
    ```
 
-4. **The installer will ask:**
-   - **RTKLIB tools**: choose **Build** if you need PPK post-processing (compilation takes ~10–15 minutes on RPi Zero 2W). Choose **Skip** if unsure.
-   - **geopandas**: skip on RPi Zero (low RAM, very long install time).
-   - **systemd service**: choose **Yes** if you want the app to start automatically every time the Pi boots.
+3. During installation, choose **Build** for RTKLIB if you need PPK (takes ~10–15 min on RPi Zero 2W). Choose **Yes** for systemd service.
 
-5. **Start manually** (if you chose not to install the systemd service):
-   ```bash
-   cd rilievo_gnss
-   source venv/bin/activate
-   python3 app.py
-   ```
-
-6. **Find the Pi's IP address:**
+4. Find the Pi's IP:
    ```bash
    hostname -I
    ```
 
-7. **Open the browser** on any device connected to the same network:
-   `http://<rpi-ip>:8000`
+5. Open `http://<rpi-ip>:8000` or `http://rilievopy.local/` from any device on the same network.
 
-8. **First time only:** go to **Settings** (`/settings`) and configure the GNSS TCP connection (IP address and port of the rover or base station).
-
----
-
-## Accesso via mDNS (Termux e Raspberry Pi)
-
-rilievopy supporta **mDNS** (Multicast DNS) per accesso facile su LAN senza dover ricordare l'IP:
-
-- **Default:** `http://rilievopy.local/` (porta 8000)
-- **Configurabile:** vai su `/settings` e modifica l'hostname nella sezione "mDNS Hostname"
-- **Coppia perfetta con RTKino:**
-  - `http://rtkino.local/` → ricevitore GNSS
-  - `http://rilievopy.local/` → app di rilievo su Termux/RPi
-
-**Nota:** mDNS funziona su reti LAN. Su Termux, accessibile sia da localhost che da altri dispositivi sulla stessa rete WiFi. Alcune reti aziendali potrebbero bloccare mDNS.
+6. **First time only:** go to `/rtkino` and configure the RTKino connection.
 
 ---
 
-## Daily Use
+## Web Interface
 
-### Android
+### RTK
 
-- Tap the **`rilievo_avvia`** widget on the home screen to start the app.
-- The app checks if Flask is already running — if yes, it opens the browser directly without restarting.
-- Tap the **`rilievo_ferma`** widget to stop the app.
-- Log file is at `rilievo_gnss/rilievo.log` — useful for debugging if something goes wrong.
-
-### Raspberry Pi
-
-- If the systemd service is installed, the app **starts automatically on every boot** — nothing to do.
-- Check service status:
-  ```bash
-  sudo systemctl status rilievo
-  ```
-- Restart the service:
-  ```bash
-  sudo systemctl restart rilievo
-  ```
-- View live logs:
-  ```bash
-  journalctl -u rilievo -f
-  ```
-- Access the app from any device on the same network: `http://<rpi-ip>:8000`
-
----
-
-## GNSS Connection
-
-The app connects to your GNSS receiver over TCP (the receiver acts as a TCP server).
-
-1. Open **Settings** at `/settings` on first launch.
-2. Set the **GNSS receiver IP** and **port** (for example `192.168.1.100:9001`).
-3. The **TCPRelay** option allows the app to forward the incoming NTRIP/RTCM stream to other clients on the same local network — useful when multiple devices need the same correction stream.
-4. Save the settings and return to the dashboard. Fix status (float/fixed/no fix) will appear as soon as the receiver is connected and sending data.
-
----
-
-## Quick Start (advanced / developers)
-
-```bash
-# First time: install dependencies + optionally compile RTKLIB
-./install.sh
-
-# Run
-source venv/bin/activate   # (not needed on Termux)
-python3 app.py
-```
-
-The app starts immediately with no prompts. Open the browser:
-
-- **RTK Dashboard**: `http://localhost:8000/`
-- **PPK Home**: `http://localhost:8000/ppk/home`
-- **Settings**: `http://localhost:8000/settings`
-
-## Pages
-
-### RTK (real-time surveying)
 | Route | Description |
 |-------|-------------|
-| `/` | Dashboard — live GNSS status (fix, DOP, satellites) |
-| `/surveys` | Survey list — create/view/export surveys |
-| `/cogo` | COGO tools — trilateration, intersections, Helmert, etc. |
+| `/` | Dashboard — live GNSS status, fix type, DOP, satellites |
+| `/surveys` | Survey list — create, view, export surveys |
+| `/cogo` | COGO tools hub |
 | `/stakeout` | Stakeout — navigate to target points |
 | `/compare` | Compare two survey points |
-| `/import` | Import CSV/TXT/GeoJSON |
-| `/settings` | Configure GNSS connection, relay, survey params |
+| `/import` | Import CSV / TXT / GeoJSON |
+| `/rtkino` | RTKino connection and configuration |
+| `/settings` | App settings, workspace, mDNS, backup/restore |
 
-### Topografia (ufficio)
+### Topographic Tools
+
 | Route | Description |
 |-------|-------------|
-| `/cad` | CAD web — disegno topografico 2D con snap, layer, misure |
-| `/dtm` | DTM analysis — TIN Delaunay, curve di livello, volumi, profili |
-| `/traverses` | Poligonali — aperte/chiuse, livellazione, frazionamento aree |
+| `/cad` | CAD web — 2D topographic drawing |
+| `/dtm` | DTM analysis — TIN, contours, volumes, profiles |
+| `/traverses` | Traverse computation, leveling, area division |
 
-### PPK (post-processing)
+### PPK
+
 | Route | Description |
 |-------|-------------|
-| `/ppk/home` | PPK dashboard — file counts, tool status |
-| `/convbin` | Convert raw GNSS → RINEX |
-| `/rinex` | RINEX observation QC — header, satellites, SNR |
-| `/ppk` | PPK processing — full rnx2rtkp config editor |
-| `/posview` | Position viewer — rtkplot-style charts |
-| `/files` | File explorer — uploads, rinex, results, pos, conf |
+| `/ppk/home` | PPK dashboard |
+| `/convbin` | Raw GNSS → RINEX conversion |
+| `/rinex` | RINEX observation QC |
+| `/ppk` | PPK processing (rnx2rtkp) |
+| `/posview` | Position viewer |
+| `/files` | File explorer |
 
-## Structure
+---
+
+## mDNS Access
+
+RilievoPY supports **mDNS** for easy access on LAN without knowing the IP address:
+
+- Default: `http://rilievopy.local/` (port 8000)
+- Configurable from `/settings` → mDNS Hostname
+- Works on Termux and Raspberry Pi — accessible from any device on the same WiFi network
+
+**Pair with RTKino:**
+- `http://rtkino.local/` → GNSS receiver
+- `http://rilievopy.local/` → surveying app
+
+---
+
+## Project Structure
 
 ```
-rilievo/
-├── app.py                          # Entry point
+rilievopy/
+├── app.py                          # Entry point (Flask + Waitress)
 ├── install.sh                      # Interactive installer
-├── requirements.txt                # flask, pyubx2
+├── requirements.txt                # flask, pyubx2, waitress, openpyxl, zeroconf
 │
 ├── modules/                        # Business logic (no Flask deps)
 │   ├── utils.py                    # Conversions, robust averaging
@@ -200,55 +277,125 @@ rilievo/
 │   ├── dtm.py                      # DTM: TIN Delaunay, contours, volumes, profiles
 │   ├── traverses.py                # Traverses: open/closed, leveling, area division
 │   ├── state.py                    # Shared state, BytePipe, TCPRelay
-│   ├── ubx_parser.py              # UBX parser + upstream TCP
+│   ├── ubx_parser.py               # UBX parser + upstream TCP
 │   ├── connection.py               # GNSS connection manager
 │   ├── settings.py                 # Persistent settings (JSON)
 │   ├── survey.py                   # Survey CRUD (GeoJSON)
-│   ├── exports.py                  # DXF, GeoPackage, TXT
-│   ├── compare.py                  # Point comparison
-│   ├── templates_html.py          # RTK HTML templates
-│   ├── ppk_config.py              # PPK paths + binary discovery
-│   ├── convbin.py                  # Convbin wrapper
-│   ├── rnx2rtkp.py                # rnx2rtkp wrapper
-│   ├── rinex_parser.py            # RINEX observation parser
-│   ├── pos_parser.py              # .pos solution parser
-│   └── conf_manager.py            # RTKLIB .conf editor
+│   ├── exports.py                  # DXF, GeoPackage, XLSX, CSV
+│   ├── mdns_service.py             # mDNS via zeroconf
+│   ├── ppk_config.py               # PPK paths + binary discovery
+│   ├── convbin.py                  # convbin wrapper
+│   ├── rnx2rtkp.py                 # rnx2rtkp wrapper
+│   ├── rinex_parser.py             # RINEX observation parser
+│   ├── pos_parser.py               # .pos solution parser
+│   ├── conf_manager.py             # RTKLIB .conf editor
+│   └── workspace.py                # Workspace management
 │
 ├── routes/                         # Flask blueprints
-│   ├── dashboard.py               # / + /events (SSE)
-│   ├── settings.py                # /settings + /api/settings
-│   ├── surveys.py                 # /surveys, exports
-│   ├── cogo.py                    # /cogo/*
-│   ├── stakeout.py                # /stakeout
-│   ├── compare.py                 # /compare
-│   ├── import_export.py           # /import
-│   └── ppk.py                     # All PPK routes
+│   ├── dashboard.py                # / + /events (SSE)
+│   ├── settings.py                 # /settings + workspace + mDNS APIs
+│   ├── surveys.py                  # /surveys, exports
+│   ├── cogo.py                     # /cogo/*
+│   ├── stakeout.py                 # /stakeout
+│   ├── compare.py                  # /compare
+│   ├── import_export.py            # /import
+│   ├── rtkino.py                   # /rtkino (RTKino integration)
+│   ├── topo_tools.py               # /cad, /dtm, /traverses
+│   └── ppk.py                      # All PPK routes
 │
-├── templates/                      # Jinja2 templates (PPK pages)
-│   ├── base.html                  # Unified nav (RTK + PPK)
-│   ├── index.html                 # PPK home
-│   ├── convbin.html               # Convbin page
-│   ├── rinex.html                 # RINEX QC
-│   ├── rnx2rtkp.html             # PPK processing
-│   ├── posview.html               # Position viewer
-│   └── files.html                 # File explorer
-│
-├── static/css/style.css            # PPK page styles
-├── static/js/upload.js             # Upload helper
+├── templates/                      # Jinja2 HTML templates
+├── static/                         # CSS, JS assets
 ├── conf/                           # Default RTKLIB configs
-├── tools/                          # RTKLIB binaries (convbin, rnx2rtkp)
-├── data/                           # PPK working data
-│   ├── uploads/                   # Raw GNSS files
-│   ├── rinex/                     # RINEX files
-│   ├── results/                   # Processing results
-│   ├── pos/                       # .pos solutions
-│   ├── conf/                      # User configs
-│   └── antex/                     # Antenna models
-└── surveys/                        # RTK surveys + settings
+├── tools/                          # RTKLIB binaries (compiled by installer)
+├── scripts/                        # Termux:Widget scripts
+│   ├── termux_widget_start.sh      # Start app + open browser
+│   └── termux_widget_stop.sh       # Stop app
+├── data/                           # PPK working data (gitignored)
+└── surveys/                        # RTK surveys + settings (gitignored)
 ```
+
+---
 
 ## Dependencies
 
-**Required:** `flask>=3.0`, `pyubx2`
-**Optional:** `geopandas`, `shapely` (enhanced GeoPackage export)
-**PPK tools:** `convbin`, `rnx2rtkp` (compiled by `install.sh`)
+| Package | Role | Required |
+|---------|------|----------|
+| `flask>=3.0` | Web framework | ✅ |
+| `pyubx2` | UBX protocol parser | ✅ |
+| `waitress>=3.0` | Production WSGI server | ✅ |
+| `openpyxl` | Excel export | ✅ |
+| `zeroconf` | mDNS service | ✅ |
+| `geopandas` + `shapely` | Enhanced GeoPackage export | Optional |
+| `bleak` | BLE connectivity (Termux) | Optional |
+| `convbin` | Raw GNSS → RINEX (RTKLIB) | Optional (PPK) |
+| `rnx2rtkp` | PPK processing (RTKLIB) | Optional (PPK) |
+
+---
+
+## Daily Use
+
+### Android
+
+- Tap **`rilievo_avvia`** widget to start. The app checks if Flask is already running — if yes, opens the browser directly.
+- Tap **`rilievo_ferma`** widget to stop.
+- Log file: `rilievopy/rilievo.log`
+
+### Raspberry Pi
+
+- If systemd service is installed: app starts automatically on every boot.
+- Check status: `sudo systemctl status rilievo`
+- View live logs: `journalctl -u rilievo -f`
+- Access from any device on the network: `http://<rpi-ip>:8000` or `http://rilievopy.local/`
+
+---
+
+## Troubleshooting
+
+| Problem | Likely Cause | Solution |
+|---------|-------------|----------|
+| App doesn't start | Missing dependency | Check `rilievo.log`, re-run `install.sh` |
+| No GNSS data on dashboard | RTKino not configured or not reachable | Go to `/rtkino`, verify IP and that RTKino is on the same WiFi |
+| PPK tools show "not found" | RTKLIB not compiled | Re-run `./install.sh --force-build` |
+| `http://rilievopy.local/` not reachable | mDNS blocked by network | Use IP address directly; check `/settings` → mDNS |
+| Export fails (GeoPackage) | geopandas not installed | Install: `pip install geopandas shapely`, or use the SQLite fallback |
+| Low RAM on RPi Zero | OOM during RTKLIB build | Increase swap to 2 GB before building |
+
+---
+
+## Contributing
+
+Contributions are welcome. Please open an issue before submitting a pull request for significant changes.
+
+---
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+You are free to use, modify, and distribute this software. If you modify it and deploy it as a network service, you must release your source code under the same license.
+
+See [LICENSE](LICENSE) for the full text.
+
+---
+
+## Disclaimer
+
+RilievoPY is not a commercial product. It is provided as-is, without warranty of any kind. The user is solely responsible for validating all measurements and ensuring fitness for their intended application. Do not use this software for safety-critical or legally binding surveys without independent verification.
+
+---
+
+## Acknowledgments
+
+- [Tim Everett / RTKLIBExplorer](https://rtklibexplorer.wordpress.com/) for maintaining and evolving RTKLIB
+- [u-blox](https://www.u-blox.com/) for the ZED-F9P and its documentation
+- [pyubx2](https://github.com/semuconsulting/pyubx2) by semuconsulting
+- [Flask](https://flask.palletsprojects.com/) and the Pallets project
+- [Termux](https://termux.dev/) for making Linux on Android a reality
+- The open-source GNSS community
+
+---
+
+<p align="center">
+  <b>Made with ❤️ for land surveying</b><br><br>
+  <a href="https://github.com/flyingsurveyor">FlyingSurveyor</a> · Italy
+</p>
