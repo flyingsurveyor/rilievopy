@@ -134,6 +134,14 @@ def main():
     # Create Flask app
     app = create_app()
     print(f"# {now_iso()} [web] http://{http_bind}:{http_port}")
+
+    # Avvia mDNS per accesso facile via LAN
+    from modules import mdns_service
+    mdns_hostname = s.get("mdns_hostname", "rilievopy")
+    if mdns_service.start_mdns(mdns_hostname, http_port):
+        print(f"# {now_iso()} [mdns] Accesso LAN: http://{mdns_hostname}.local/")
+    else:
+        print(f"# {now_iso()} [mdns] Avvio fallito (hostname non valido o rete non disponibile)")
     print(f"# {now_iso()} [web] RTK: /  /surveys  /cogo  /stakeout")
     print(f"# {now_iso()} [web] PPK: /convbin  /rinex  /ppk  /posview")
     print(f"# {now_iso()} [web] Settings: /settings")

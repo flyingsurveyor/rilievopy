@@ -315,3 +315,47 @@ def api_workspace_restore():
         return jsonify({"ok": False, "error": str(e)}), 500
 
     return jsonify({"ok": True, "restored": restored})
+
+
+# ─── mDNS API ─────────────────────────────────────────────────────────────────
+
+@bp.route("/api/mdns/status")
+def api_mdns_status():
+    """Stato attuale mDNS."""
+    from modules import mdns_service
+    current = mdns_service.get_current_hostname()
+    s = cfg.load_settings()
+    return jsonify({
+        "hostname": s.get("mdns_hostname", "rilievopy"),
+        "active": current is not None,
+        "url": f"http://{current}.local/" if current else None,
+    })
+
+
+@bp.route("/api/mdns/save", methods=["POST"])
+def api_mdns_save():
+    """Salva nuovo hostname mDNS e riavvia il servizio."""
+    from modules import mdns_service
+
+    data = request.get_json() or {}
+    new_hostname = mdns_service.normalize_hostname(data.get("hostname", ""))
+
+    if not mdns_service.is_valid_hostname(new_hostname):
+        return jsonify({
+            "ok": False,
+            "error": "Hostname non valido (usa solo a-z, 0-9, trattino)",
+        }), 400
+
+    # Salva nei settings
+    cfg.update({"mdns_hostname": new_hostname})
+
+    # Riavvia mDNS con il nuovo hostname
+    s = cfg.load_settings()
+    http_port = s.get("http_port", 8000)
+    success = mdns_service.start_mdns(new_hostname, http_port)
+
+    return jsonify({
+        "ok": success,
+        "hostname": new_hostname,
+        "url": f"http://{new_hostname}.local/" if success else None,
+    }), (200 if success else 500)
