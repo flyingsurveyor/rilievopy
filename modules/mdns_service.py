@@ -7,6 +7,7 @@ Ispirato all'implementazione di RTKino (ESP32/ESPmDNS).
 import re
 import socket
 import logging
+import threading
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ DEFAULT_HOSTNAME = "rilievopy"
 _zeroconf = None
 _service_info = None
 _current_hostname: Optional[str] = None
+_last_error: Optional[str] = None
 
 
 def is_valid_hostname(hostname: str) -> bool:
@@ -49,19 +51,24 @@ def start_mdns(hostname: str, port: int = 8000) -> bool:
     Avvia il servizio mDNS con l'hostname specificato.
     Identico concettualmente a applyMdnsHostname() di RTKino.
 
+    La registrazione Zeroconf avviene in un thread daemon per non bloccare
+    il thread HTTP. L'hostname viene impostato subito (ottimisticamente) e
+    reimpostato a None se la registrazione fallisce in background.
+
     Args:
         hostname: Nome host (senza .local)
         port: Porta HTTP del server Flask
 
     Returns:
-        True se avviato con successo
+        True se l'avvio è stato iniziato con successo
     """
-    global _zeroconf, _service_info, _current_hostname
+    global _zeroconf, _service_info, _current_hostname, _last_error
 
     hostname = normalize_hostname(hostname)
 
     if not is_valid_hostname(hostname):
-        logger.error(f"[mDNS] Hostname non valido: '{hostname}'")
+        _last_error = f"Hostname non valido: '{hostname}'"
+        logger.error(f"[mDNS] {_last_error}")
         return False
 
     # Ferma il servizio precedente se esiste
@@ -70,20 +77,25 @@ def start_mdns(hostname: str, port: int = 8000) -> bool:
     try:
         from zeroconf import ServiceInfo, Zeroconf
 
-        _zeroconf = Zeroconf()
-
         # Ottieni IP locale (usa connessione UDP per trovare l'IP LAN reale)
+        local_ip = "127.0.0.1"
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.settimeout(0)
+            s.settimeout(1)
             s.connect(("8.8.8.8", 80))
             local_ip = s.getsockname()[0]
-            s.close()
         except Exception:
-            local_ip = "127.0.0.1"
+            pass
+        finally:
+            try:
+                s.close()
+            except Exception:
+                pass
+
+        zc = Zeroconf()
 
         # Crea ServiceInfo per HTTP (come RTKino: MDNS.addService("http", "tcp", 80))
-        _service_info = ServiceInfo(
+        si = ServiceInfo(
             "_http._tcp.local.",
             f"{hostname}._http._tcp.local.",
             addresses=[socket.inet_aton(local_ip)],
@@ -92,18 +104,32 @@ def start_mdns(hostname: str, port: int = 8000) -> bool:
             server=f"{hostname}.local.",
         )
 
-        # Registra il servizio
-        _zeroconf.register_service(_service_info)
+        _zeroconf = zc
+        _service_info = si
         _current_hostname = hostname
+        _last_error = None
 
-        logger.info(f"[mDNS] Avviato: http://{hostname}.local/ (porta {port})")
-        print(f"# [mDNS] http://{hostname}.local/")
+        # Registra in background per non bloccare il thread HTTP
+        def _do_register(zc_ref, si_ref, hn):
+            global _current_hostname, _last_error
+            try:
+                zc_ref.register_service(si_ref)
+                logger.info(f"[mDNS] Avviato: http://{hn}.local/ (porta {port})")
+                print(f"# [mDNS] http://{hn}.local/")
+            except Exception as exc:
+                logger.error(f"[mDNS] Registrazione fallita: {exc}")
+                _last_error = f"Registrazione fallita: {exc}"
+                _current_hostname = None
+
+        threading.Thread(target=_do_register, args=(zc, si, hostname), daemon=True).start()
         return True
 
     except ImportError:
-        logger.warning("[mDNS] Libreria zeroconf non disponibile — installa con: pip install zeroconf")
+        _last_error = "Libreria zeroconf non installata — esegui: pip install zeroconf"
+        logger.warning(f"[mDNS] {_last_error}")
         return False
     except Exception as e:
+        _last_error = str(e)
         logger.error(f"[mDNS] Avvio fallito: {e}")
         _zeroconf = None
         _service_info = None
@@ -131,3 +157,8 @@ def stop_mdns():
 def get_current_hostname() -> Optional[str]:
     """Ritorna l'hostname mDNS attualmente attivo."""
     return _current_hostname
+
+
+def get_last_error() -> Optional[str]:
+    """Ritorna l'ultimo errore mDNS, se presente."""
+    return _last_error
