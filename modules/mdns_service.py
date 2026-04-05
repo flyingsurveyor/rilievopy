@@ -20,6 +20,7 @@ _zeroconf = None
 _service_info = None
 _current_hostname: Optional[str] = None
 _last_error: Optional[str] = None
+_state_lock = threading.Lock()
 
 
 def is_valid_hostname(hostname: str) -> bool:
@@ -106,20 +107,24 @@ def start_mdns(hostname: str, port: int = 8000) -> bool:
 
         _zeroconf = zc
         _service_info = si
-        _current_hostname = hostname
         _last_error = None
 
-        # Registra in background per non bloccare il thread HTTP
+        # Registra in background per non bloccare il thread HTTP.
+        # _current_hostname viene impostato solo dopo registrazione riuscita.
         def _do_register(zc_ref, si_ref, hn):
             global _current_hostname, _last_error
             try:
                 zc_ref.register_service(si_ref)
+                with _state_lock:
+                    _current_hostname = hn
+                    _last_error = None
                 logger.info(f"[mDNS] Avviato: http://{hn}.local/ (porta {port})")
                 print(f"# [mDNS] http://{hn}.local/")
             except Exception as exc:
                 logger.error(f"[mDNS] Registrazione fallita: {exc}")
-                _last_error = f"Registrazione fallita: {exc}"
-                _current_hostname = None
+                with _state_lock:
+                    _last_error = f"Registrazione fallita: {exc}"
+                    _current_hostname = None
 
         threading.Thread(target=_do_register, args=(zc, si, hostname), daemon=True).start()
         return True
@@ -156,9 +161,11 @@ def stop_mdns():
 
 def get_current_hostname() -> Optional[str]:
     """Ritorna l'hostname mDNS attualmente attivo."""
-    return _current_hostname
+    with _state_lock:
+        return _current_hostname
 
 
 def get_last_error() -> Optional[str]:
     """Ritorna l'ultimo errore mDNS, se presente."""
-    return _last_error
+    with _state_lock:
+        return _last_error

@@ -334,13 +334,13 @@ def api_mdns_status():
             "active": current is not None,
             "url": f"http://{current}.local/" if current else None,
         })
-    except Exception as e:
+    except Exception:
         logger.exception("[mDNS] Errore in api_mdns_status")
         return jsonify({
             "hostname": "rilievopy",
             "active": False,
             "url": None,
-            "error": str(e),
+            "error": "Errore interno del server",
         })
 
 
@@ -381,9 +381,9 @@ def api_mdns_save():
                 "hostname": new_hostname,
                 "error": error_msg,
             })
-    except Exception as e:
+    except Exception:
         logger.exception("[mDNS] Errore in api_mdns_save")
         return jsonify({
             "ok": False,
-            "error": str(e),
+            "error": "Errore interno del server",
         })
