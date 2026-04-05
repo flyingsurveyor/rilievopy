@@ -6,7 +6,7 @@ PORT=8000
 
 # Trova la directory del progetto
 PROJECT_DIR=""
-for candidate in "$HOME/rilievo_gnss" "$HOME/rilievo" "$HOME/rilievo_gnss/rilievo_gnss"; do
+for candidate in "$HOME/rilievopy" "$HOME/rilievo_gnss" "$HOME/rilievo" "$HOME/rilievo_gnss/rilievo_gnss"; do
     if [ -f "${candidate}/app.py" ]; then
         PROJECT_DIR="${candidate}"
         break
@@ -30,10 +30,26 @@ fi
 
 URL="http://127.0.0.1:${PORT}"
 
+# Rileva IP LAN (funziona sia su WiFi che su hotspot)
+get_lan_ip() {
+    python3 -c "
+import socket
+try:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(1)
+    s.connect(('8.8.8.8', 80))
+    print(s.getsockname()[0])
+    s.close()
+except:
+    print('127.0.0.1')
+" 2>/dev/null
+}
+
 # Controlla se Flask è già in esecuzione
 if pgrep -f "python.*app\.py" > /dev/null 2>&1; then
+    LOCAL_IP=$(get_lan_ip)
     termux-notification --id 9010 --title "🛰️ RilievoPY" \
-        --content "App già attiva — apertura browser" --priority default
+        --content "App già attiva — http://${LOCAL_IP}:${PORT}" --priority default
     termux-open-url "$URL"
     exit 0
 fi
@@ -59,8 +75,10 @@ done
 termux-notification-remove 9010
 
 if [ "$READY" -eq 1 ]; then
+    LOCAL_IP=$(get_lan_ip)
     termux-notification --id 9010 --title "✅ RilievoPY" \
-        --content "App avviata — tap per aprire" --priority default
+        --content "Avviato — http://${LOCAL_IP}:${PORT}" --priority default
+    termux-toast "RilievoPY attivo — http://${LOCAL_IP}:${PORT}"
     termux-open-url "$URL"
 else
     termux-notification --id 9010 --title "⚠️ RilievoPY" \
