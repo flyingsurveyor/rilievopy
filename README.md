@@ -95,7 +95,14 @@ rilievopy supporta **mDNS** (Multicast DNS) per accesso facile su LAN senza dove
   - `http://rtkino.local/` → ricevitore GNSS
   - `http://rilievopy.local/` → app di rilievo su Termux/RPi
 
-**Nota:** mDNS funziona su reti LAN. Su Termux, accessibile sia da localhost che da altri dispositivi sulla stessa rete WiFi. Alcune reti aziendali potrebbero bloccare mDNS.
+**Dipendenza:** mDNS richiede il pacchetto Python `zeroconf`, installato automaticamente da `install.sh`.
+Se mDNS non funziona, verifica con: `pip install zeroconf`
+
+**Nota su Android (Termux):** i nomi `.local` spesso **non vengono risolti dal browser sullo stesso telefono** (Android non usa mDNS come resolver di sistema). In questo caso:
+- Sullo **stesso smartphone**: usa `http://127.0.0.1:8000/`
+- Da **altri dispositivi** (PC, tablet, iPhone) sulla stessa rete WiFi: usa `http://rilievopy.local:8000/` oppure `http://<ip-del-telefono>:8000/`
+
+**Nota generale:** mDNS funziona su reti LAN. Alcune reti aziendali potrebbero bloccare mDNS.
 
 ---
 
@@ -191,7 +198,7 @@ The app starts immediately with no prompts. Open the browser:
 rilievo/
 ├── app.py                          # Entry point
 ├── install.sh                      # Interactive installer
-├── requirements.txt                # flask, pyubx2
+├── requirements.txt                # flask, pyubx2, waitress, openpyxl, zeroconf
 │
 ├── modules/                        # Business logic (no Flask deps)
 │   ├── utils.py                    # Conversions, robust averaging
@@ -249,6 +256,6 @@ rilievo/
 
 ## Dependencies
 
-**Required:** `flask>=3.0`, `pyubx2`
+**Required:** `flask>=3.0`, `pyubx2`, `waitress>=3.0`, `openpyxl`, `zeroconf` (mDNS)
 **Optional:** `geopandas`, `shapely` (enhanced GeoPackage export)
 **PPK tools:** `convbin`, `rnx2rtkp` (compiled by `install.sh`)

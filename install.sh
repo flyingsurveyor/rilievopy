@@ -488,8 +488,8 @@ VENV_DIR=""
 
 if [ "${PLATFORM}" = "termux" ]; then
     # Termux: install directly (no venv)
-    info "Installing: flask, pyubx2, waitress, openpyxl..."
-    pip install ${PIP_EXTRA_FLAGS} flask pyubx2 waitress openpyxl 2>&1 | tail -5
+    info "Installing Python dependencies from requirements.txt..."
+    pip install ${PIP_EXTRA_FLAGS} -r "${SCRIPT_DIR}/requirements.txt" 2>&1 | tail -5
     PIP_CMD="pip"
 else
     VENV_DIR="${SCRIPT_DIR}/venv"
@@ -502,8 +502,8 @@ else
     PIP_CMD="pip"
 
     # Install required dependencies
-    info "Installing: flask, pyubx2, waitress, openpyxl..."
-    pip install flask pyubx2 waitress openpyxl 2>&1 | tail -5
+    info "Installing Python dependencies from requirements.txt..."
+    pip install -r "${SCRIPT_DIR}/requirements.txt" 2>&1 | tail -5
 fi
 
 # Verify core deps installed correctly
@@ -511,12 +511,17 @@ DEPS_OK=1
 python3 -c "import flask" 2>/dev/null || { err "flask not installed!"; DEPS_OK=0; }
 python3 -c "import pyubx2" 2>/dev/null || { err "pyubx2 not installed!"; DEPS_OK=0; }
 python3 -c "import openpyxl" 2>/dev/null || { err "openpyxl not installed!"; DEPS_OK=0; }
+python3 -c "import zeroconf" 2>/dev/null || { warn "zeroconf not installed — mDNS (.local) will not work. Fix: pip install -r requirements.txt"; }
 
 if [ "${DEPS_OK}" -eq 1 ]; then
     log "Core dependencies OK ($(timer_show))"
 else
     err "Some dependencies failed to install. Check errors above."
 fi
+
+info "mDNS note: zeroconf is required for .local hostname resolution (e.g. rilievopy.local)."
+info "  On Android, .local names may not resolve in the browser on the same phone."
+info "  Use http://127.0.0.1:8000/ on-device and http://<ip>:8000/ from other devices."
 
 # ── Optional: geopandas for enhanced GeoPackage export ──
 echo ""
@@ -729,6 +734,8 @@ python3 -c "import pyubx2; print('  ✓ pyubx2', pyubx2.version)" 2>/dev/null \
     || echo "  ✗ pyubx2 — NOT INSTALLED"
 python3 -c "import openpyxl; print('  ✓ openpyxl', openpyxl.__version__)" 2>/dev/null \
     || echo "  ✗ openpyxl — NOT INSTALLED"
+python3 -c "import zeroconf; print('  ✓ zeroconf', zeroconf.__version__, '(mDNS)')" 2>/dev/null \
+    || echo "  ✗ zeroconf — NOT INSTALLED (mDNS .local will not work — fix: pip install -r requirements.txt)"
 python3 -c "import geopandas; print('  ✓ geopandas', geopandas.__version__, '(optional)')" 2>/dev/null \
     || echo -e "  ${DIM}· geopandas — not installed (optional)${NC}"
 
