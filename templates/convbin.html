@@ -414,7 +414,21 @@
                 li.className = 'file-item';
                 li.dataset.path = f.path;
                 li.setAttribute('onclick', 'selectFile(this)');
-                li.innerHTML = `<div class="file-icon ubx">${ext}</div><div class="file-info"><div class="file-name">${f.name}</div><div class="file-meta">${f.size} · ${f.modified}</div></div>`;
+                const iconDiv = document.createElement('div');
+                iconDiv.className = 'file-icon ubx';
+                iconDiv.textContent = ext;
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'file-info';
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'file-name';
+                nameDiv.textContent = f.name;
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'file-meta';
+                metaDiv.textContent = f.size + ' · ' + f.modified;
+                infoDiv.appendChild(nameDiv);
+                infoDiv.appendChild(metaDiv);
+                li.appendChild(iconDiv);
+                li.appendChild(infoDiv);
                 list.appendChild(li);
             });
         } catch (err) {
@@ -559,19 +573,37 @@
             document.getElementById('outputBadge').style.cssText = 'background:#eafaf1; color:#27ae60';
 
             const filesDiv = document.getElementById('outputFiles');
-            filesDiv.innerHTML = '<h3 style="font-size:14px; margin-bottom:8px;">Output Files</h3>';
+            filesDiv.innerHTML = '';
+            const heading = document.createElement('h3');
+            heading.style.cssText = 'font-size:14px; margin-bottom:8px;';
+            heading.textContent = 'Output Files';
+            filesDiv.appendChild(heading);
             if (result.output_files && result.output_files.length > 0) {
                 result.output_files.forEach(f => {
                     const ext = f.name.split('.').pop().substring(0, 4).toUpperCase();
-                    filesDiv.innerHTML += `
-                        <div class="file-item">
-                            <div class="file-icon obs">${ext}</div>
-                            <div class="file-info">
-                                <div class="file-name">${f.name}</div>
-                                <div class="file-meta">${formatSize(f.size)}</div>
-                            </div>
-                            <a href="/rinex" class="btn btn-sm btn-secondary">Analyze →</a>
-                        </div>`;
+                    const item = document.createElement('div');
+                    item.className = 'file-item';
+                    const iconDiv = document.createElement('div');
+                    iconDiv.className = 'file-icon obs';
+                    iconDiv.textContent = ext;
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'file-info';
+                    const nameDiv = document.createElement('div');
+                    nameDiv.className = 'file-name';
+                    nameDiv.textContent = f.name;
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'file-meta';
+                    metaDiv.textContent = formatSize(f.size);
+                    infoDiv.appendChild(nameDiv);
+                    infoDiv.appendChild(metaDiv);
+                    const link = document.createElement('a');
+                    link.href = '/rinex';
+                    link.className = 'btn btn-sm btn-secondary';
+                    link.textContent = 'Analyze →';
+                    item.appendChild(iconDiv);
+                    item.appendChild(infoDiv);
+                    item.appendChild(link);
+                    filesDiv.appendChild(item);
                 });
             } else {
                 filesDiv.innerHTML += '<div class="text-muted">No output files detected</div>';

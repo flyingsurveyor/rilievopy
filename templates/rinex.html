@@ -246,7 +246,21 @@
                 li.className = 'file-item';
                 li.dataset.path = f.path;
                 li.setAttribute('onclick', 'selectObsFile(this)');
-                li.innerHTML = `<div class="file-icon obs">OBS</div><div class="file-info"><div class="file-name">${f.name}</div><div class="file-meta">${f.size} · ${f.modified}</div></div>`;
+                const iconDiv = document.createElement('div');
+                iconDiv.className = 'file-icon obs';
+                iconDiv.textContent = 'OBS';
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'file-info';
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'file-name';
+                nameDiv.textContent = f.name;
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'file-meta';
+                metaDiv.textContent = f.size + ' · ' + f.modified;
+                infoDiv.appendChild(nameDiv);
+                infoDiv.appendChild(metaDiv);
+                li.appendChild(iconDiv);
+                li.appendChild(infoDiv);
                 list.appendChild(li);
             });
         } catch (err) {

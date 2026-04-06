@@ -755,7 +755,7 @@ function _ppkProcessingDone(data, errMsg) {
         document.getElementById('res-epochs').textContent = '—';
         document.getElementById('res-single').textContent = '—';
         if (data.error || errMsg) {
-            output.innerHTML = `<span class="error">${data.error || errMsg}</span>\n${combined}`;
+            output.textContent = (data.error || errMsg) + '\n' + combined;
         }
     }
 }

@@ -60,6 +60,12 @@ def handle_timeout(e):
 
 # ─── Utilities ────────────────────────────────
 
+def _is_within_dir(path, directory):
+    """Check that 'path' is safely within 'directory', avoiding prefix attacks."""
+    real_path = os.path.realpath(path)
+    real_dir = os.path.realpath(directory)
+    return real_path == real_dir or real_path.startswith(real_dir + os.sep)
+
 def list_files(directory, extensions):
     files = []
     if not os.path.isdir(directory):
@@ -167,7 +173,7 @@ def file_explorer(subpath=''):
 
     if base_key and base_key in base_dirs:
         browse_path = os.path.join(base_dirs[base_key], rel_path)
-        if not os.path.realpath(browse_path).startswith(os.path.realpath(base_dirs[base_key])):
+        if not _is_within_dir(browse_path, base_dirs[base_key]):
             return "Access denied", 403
     else:
         entries = []
@@ -268,7 +274,7 @@ def upload_file():
         return jsonify({'error': 'Invalid filename — only alphanumeric characters, dots, dashes and underscores are allowed'}), 400
     filepath = os.path.join(target_dir, safe_name)
     real_filepath = os.path.realpath(filepath)
-    if not real_filepath.startswith(os.path.realpath(target_dir)):
+    if not _is_within_dir(filepath, target_dir):
         return jsonify({'error': 'Access denied'}), 403
     f.save(filepath)
 
@@ -287,7 +293,7 @@ def delete_file():
 
     real_path = os.path.realpath(filepath)
     allowed = any(
-        real_path.startswith(os.path.realpath(d))
+        _is_within_dir(filepath, d)
         for d in [Cfg.UPLOAD_DIR, Cfg.RINEX_DIR, Cfg.RESULTS_DIR,
                   Cfg.POS_DIR, Cfg.CONF_DIR, Cfg.ANTEX_DIR]
     )
@@ -308,7 +314,7 @@ def download_file():
 
     real_path = os.path.realpath(filepath)
     allowed = any(
-        real_path.startswith(os.path.realpath(d))
+        _is_within_dir(filepath, d)
         for d in [Cfg.UPLOAD_DIR, Cfg.RINEX_DIR, Cfg.RESULTS_DIR,
                   Cfg.POS_DIR, Cfg.CONF_DIR, Cfg.ANTEX_DIR]
     )
@@ -472,7 +478,7 @@ def run_convbin():
         return jsonify({'error': f'Input file not found: {input_file}'}), 400
 
     # Validate input_file is within allowed upload directory
-    if not os.path.realpath(input_file).startswith(os.path.realpath(Cfg.UPLOAD_DIR)):
+    if not _is_within_dir(input_file, Cfg.UPLOAD_DIR):
         return jsonify({'error': 'Access denied: input file outside uploads directory'}), 403
 
     output_dir_raw = data.get('output_dir', 'rinex')
@@ -482,13 +488,11 @@ def run_convbin():
         output_dir = os.path.dirname(input_file) or Cfg.RINEX_DIR
     else:
         # For custom output dirs, restrict to allowed data directories
-        candidate = os.path.realpath(output_dir_raw)
-        allowed = [os.path.realpath(d) for d in [
-            Cfg.RINEX_DIR, Cfg.UPLOAD_DIR, Cfg.RESULTS_DIR, Cfg.POS_DIR]]
-        if not any(candidate.startswith(d) for d in allowed):
-            output_dir = Cfg.RINEX_DIR  # fall back to safe default
-        else:
+        allowed_out = [Cfg.RINEX_DIR, Cfg.UPLOAD_DIR, Cfg.RESULTS_DIR, Cfg.POS_DIR]
+        if any(_is_within_dir(output_dir_raw, d) for d in allowed_out):
             output_dir = output_dir_raw
+        else:
+            output_dir = Cfg.RINEX_DIR  # fall back to safe default
     os.makedirs(output_dir, exist_ok=True)
 
     options = {
@@ -901,14 +905,14 @@ def run_rnx2rtkp():
         return jsonify({'error': 'Rover observation file not found'}), 400
 
     # Validate rover_obs is within allowed directories
-    _allowed_dirs = [os.path.realpath(Cfg.RINEX_DIR), os.path.realpath(Cfg.UPLOAD_DIR)]
-    if not any(os.path.realpath(rover_obs).startswith(d) for d in _allowed_dirs):
+    _allowed_dirs = [Cfg.RINEX_DIR, Cfg.UPLOAD_DIR]
+    if not any(_is_within_dir(rover_obs, d) for d in _allowed_dirs):
         return jsonify({'error': 'Access denied: rover observation file is outside allowed directories'}), 403
 
     # Gap 8: validate nav file existence and access before launching subprocess
     if nav_files:
         invalid_nav = [p for p in nav_files
-                       if not any(os.path.realpath(p).startswith(d) for d in _allowed_dirs)]
+                       if not any(_is_within_dir(p, d) for d in _allowed_dirs)]
         if invalid_nav:
             return jsonify({'error': 'Access denied: navigation file outside allowed directories'}), 403
         missing_nav = [p for p in nav_files if not os.path.isfile(p)]
@@ -918,7 +922,7 @@ def run_rnx2rtkp():
                     os.path.basename(p) for p in missing_nav)
             }), 400
 
-    base_name = os.path.splitext(os.path.basename(rover_obs))[0]
+    base_name = secure_filename(os.path.splitext(os.path.basename(rover_obs))[0]) or 'output'
     timestamp = datetime.now().strftime('%H%M%S')
     output_file = os.path.join(Cfg.POS_DIR, f'{base_name}_{timestamp}.pos')
     os.makedirs(Cfg.POS_DIR, exist_ok=True)
