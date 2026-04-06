@@ -211,3 +211,67 @@ class RTKinoAPI:
     def config_import(self, config: Dict) -> Optional[Any]:
         """POST /api/config/import → import impostazioni RTKino."""
         return self._post("/api/config/import", config)
+
+    # ── GNSS log files ────────────────────────────────────────────────────────
+
+    def gnss_list_files(self) -> Optional[Dict]:
+        """GET /api/gnss/files → list UBX log files on RTKino SD card."""
+        return self._get("/api/gnss/files")
+
+    def gnss_download_file(self, filename: str) -> Optional[bytes]:
+        """GET /download?file=<filename> → download raw UBX binary file from RTKino.
+
+        Returns raw bytes on success, None on error.
+        Streams the response in chunks to handle large files (50-500 MB) efficiently.
+        Uses a longer timeout (120 s) suitable for large file transfers.
+        """
+        url = self.base_url + "/download?" + urllib.parse.urlencode({"file": filename})
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "RilievoPY/1.0"},
+            )
+            chunks = []
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                while True:
+                    chunk = resp.read(65536)  # 64 KB chunks
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+            return b"".join(chunks)
+        except urllib.error.URLError as exc:
+            logger.debug("[rtkino_api] GET /download?file=%s error: %s", filename, exc)
+            return None
+        except Exception as exc:
+            logger.debug("[rtkino_api] GET /download?file=%s unexpected error: %s", filename, exc)
+            return None
+
+    def gnss_download_file_to_path(self, filename: str, dest_path: str) -> Optional[int]:
+        """GET /download?file=<filename> → stream UBX file directly to *dest_path*.
+
+        Writes the response in 64 KB chunks to avoid buffering large files in memory.
+        Returns the number of bytes written on success, None on error.
+        Uses a longer timeout (120 s) suitable for large file transfers.
+        """
+        url = self.base_url + "/download?" + urllib.parse.urlencode({"file": filename})
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "RilievoPY/1.0"},
+            )
+            total = 0
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                with open(dest_path, "wb") as fh:
+                    while True:
+                        chunk = resp.read(65536)  # 64 KB chunks
+                        if not chunk:
+                            break
+                        fh.write(chunk)
+                        total += len(chunk)
+            return total
+        except urllib.error.URLError as exc:
+            logger.debug("[rtkino_api] GET /download?file=%s error: %s", filename, exc)
+            return None
+        except Exception as exc:
+            logger.debug("[rtkino_api] GET /download?file=%s unexpected error: %s", filename, exc)
+            return None

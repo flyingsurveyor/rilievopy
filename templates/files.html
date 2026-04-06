@@ -21,9 +21,16 @@
 <!-- Upload bar + button -->
 <div class="flex-between mb-2" style="flex-wrap:wrap; gap:8px;">
     <div></div>
-    <button class="btn btn-sm btn-secondary" onclick="document.getElementById('fileUpload').click()">
-        ⬆ Upload File
-    </button>
+    <div style="display:flex; gap:8px; align-items:center;">
+        {% if current_path == 'uploads' %}
+        <button class="btn btn-sm btn-secondary" id="btnRtkinoImport" onclick="openRtkinoModal()">
+            📡 Import from RTKino
+        </button>
+        {% endif %}
+        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('fileUpload').click()">
+            ⬆ Upload File
+        </button>
+    </div>
     <input type="file" id="fileUpload" hidden multiple>
 </div>
 
@@ -86,10 +93,133 @@
     </div>
     {% endif %}
 </div>
+
+{% if current_path == 'uploads' %}
+<!-- RTKino Import Modal -->
+<div id="rtkinoModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div class="card" style="width:min(600px,95vw); max-height:80vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #eee;">
+            <h3 style="margin:0;">📡 Import from RTKino</h3>
+            <button class="btn btn-sm btn-secondary" onclick="closeRtkinoModal()">✕</button>
+        </div>
+        <div id="rtkinoFileList" style="overflow-y:auto; flex:1; padding:8px;">
+            <div style="color:#7f8c8d; text-align:center; padding:16px;">Loading…</div>
+        </div>
+        <div style="padding:12px 20px; border-top:1px solid #eee; text-align:right;">
+            <button class="btn btn-sm btn-secondary" onclick="loadRtkinoFiles()">🔄 Refresh</button>
+            <button class="btn btn-sm btn-secondary" onclick="closeRtkinoModal()" style="margin-left:8px;">Close</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+    // ─── RTKino Import Modal ───
+    {% if current_path == 'uploads' %}
+    var _rtkinoConfigured = {{ 'true' if rtkino_configured else 'false' }};
+
+    function openRtkinoModal() {
+        document.getElementById('rtkinoModal').style.display = 'flex';
+        loadRtkinoFiles();
+    }
+
+    function closeRtkinoModal() {
+        document.getElementById('rtkinoModal').style.display = 'none';
+    }
+
+    async function loadRtkinoFiles() {
+        var listEl = document.getElementById('rtkinoFileList');
+        listEl.innerHTML = '<div style="color:#7f8c8d; text-align:center; padding:16px;">Loading…</div>';
+
+        if (!_rtkinoConfigured) {
+            listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📡</div><div class="empty-state-text">RTKino non configurato — imposta l\'IP in Impostazioni → RTKino</div></div>';
+            return;
+        }
+
+        try {
+            var resp = await fetch('/api/ppk/rtkino/files');
+            var data = await resp.json();
+            if (!data.ok) {
+                listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">' + (data.error || 'Errore') + '</div></div>';
+                return;
+            }
+            if (!data.files || data.files.length === 0) {
+                listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div><div class="empty-state-text">Nessun file UBX su RTKino</div></div>';
+                return;
+            }
+            var html = '<ul class="file-list">';
+            data.files.forEach(function(f) {
+                var sizeStr = formatBytes(f.size || 0);
+                var importedBadge = f.already_imported
+                    ? '<span class="badge" style="background:#27ae60; color:#fff; font-size:10px;">✓ Already imported</span>'
+                    : '';
+                var importBtn = f.already_imported
+                    ? '<button class="btn btn-sm btn-secondary" disabled>✓ Imported</button>'
+                    : '<button class="btn btn-sm btn-secondary" onclick="importRtkinoFile(\'' + escHtml(f.name) + '\', this)">⬇ Import</button>';
+                html += '<li class="file-item" id="rtkino-file-' + escHtml(f.name) + '">'
+                      + '<div class="file-icon ubx">UBX</div>'
+                      + '<div class="file-info">'
+                      +   '<div class="file-name">' + escHtml(f.name) + ' ' + importedBadge + '</div>'
+                      +   '<div class="file-meta">' + sizeStr + '</div>'
+                      + '</div>'
+                      + '<div class="file-actions">' + importBtn + '</div>'
+                      + '</li>';
+            });
+            html += '</ul>';
+            listEl.innerHTML = html;
+        } catch (err) {
+            listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">Errore di connessione: ' + escHtml(err.message) + '</div></div>';
+        }
+    }
+
+    async function importRtkinoFile(filename, btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Importing…';
+
+        try {
+            var resp = await fetch('/api/ppk/rtkino/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: filename }),
+            });
+            var data = await resp.json();
+            if (data.ok) {
+                btn.textContent = '✓ Imported';
+                var item = document.getElementById('rtkino-file-' + escHtml(filename));
+                if (item) {
+                    var nameEl = item.querySelector('.file-name');
+                    if (nameEl && !nameEl.querySelector('.badge')) {
+                        nameEl.insertAdjacentHTML('beforeend', ' <span class="badge" style="background:#27ae60; color:#fff; font-size:10px;">✓ Already imported</span>');
+                    }
+                }
+                // Refresh the main file list after a short delay
+                setTimeout(function() { window.location.reload(); }, 1200);
+            } else {
+                btn.disabled = false;
+                btn.textContent = '⬇ Import';
+                alert('Import failed: ' + (data.error || 'unknown error'));
+            }
+        } catch (err) {
+            btn.disabled = false;
+            btn.textContent = '⬇ Import';
+            alert('Import failed: ' + err.message);
+        }
+    }
+
+    function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+        return (bytes / 1073741824).toFixed(2) + ' GB';
+    }
+
+    function escHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    {% endif %}
     // ─── Upload (uses global uploadFilesWithProgress from upload.js) ───
     document.getElementById('fileUpload').addEventListener('change', async function() {
         var files = Array.from(this.files || []);
