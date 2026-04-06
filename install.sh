@@ -27,7 +27,7 @@ set +e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS_DIR="${SCRIPT_DIR}/tools"
 RTKLIB_REPO="https://github.com/rtklibexplorer/RTKLIB.git"
-RTKLIB_BRANCH="demo5"
+RTKLIB_BRANCH="main"
 RTKLIB_DIR="${SCRIPT_DIR}/.rtklib-src"
 SERVICE_NAME="rilievo"
 DEFAULT_PORT=8000
@@ -235,7 +235,7 @@ elif [ "${FOUND_TOOLS}" -eq 2 ] && [ "${MISSING_TOOLS}" -eq 0 ]; then
     echo -e "${BOLD}All RTKLIB tools are already installed.${NC}"
     echo ""
     echo "  1) Keep current installation (recommended)"
-    echo "  2) Rebuild from RTKLIBExplorer demo5 (latest fixes)"
+    echo "  2) Rebuild from RTKLIBExplorer main/RTKLIB-EX 2.5.0 (latest fixes)"
     echo ""
     read -p "$(echo -e "${CYAN}[?]${NC} Choose [1]: ")" -n 1 -r CHOICE
     echo ""
@@ -251,7 +251,7 @@ elif [ "${MISSING_TOOLS}" -gt 0 ]; then
     echo "  These are needed only for PPK post-processing."
     echo "  RTK surveying (dashboard, rilievi, COGO, stakeout) works without them."
     echo ""
-    echo "  1) Build from RTKLIBExplorer demo5 (recommended)"
+    echo "  1) Build from RTKLIBExplorer main/RTKLIB-EX 2.5.0 (recommended)"
     echo "  2) Skip — I'll install them manually later"
     echo ""
     read -p "$(echo -e "${CYAN}[?]${NC} Choose [1]: ")" -n 1 -r CHOICE
@@ -374,10 +374,26 @@ if [ "${DO_BUILD}" -eq 1 ]; then
         fi
     else
         info "Source already present: ${RTKLIB_DIR}"
-        if ask_Yn "Pull latest updates?"; then
-            cd "${RTKLIB_DIR}"
-            git pull --ff-only || warn "Could not pull (no network?)"
-            cd "${SCRIPT_DIR}"
+        # Check current branch — if it's the retired demo5, re-clone from main
+        CURRENT_BRANCH=$(git -C "${RTKLIB_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+        if [ "${CURRENT_BRANCH}" = "demo5" ]; then
+            warn "Source is on the retired 'demo5' branch."
+            warn "Switching to '${RTKLIB_BRANCH}' branch (RTKLIB-EX)..."
+            rm -rf "${RTKLIB_DIR}"
+            info "Cloning RTKLIBExplorer (${RTKLIB_BRANCH} branch)..."
+            timer_start
+            if git clone --depth 1 --branch "${RTKLIB_BRANCH}" "${RTKLIB_REPO}" "${RTKLIB_DIR}"; then
+                log "Cloned ($(timer_show))"
+            else
+                err "Git clone failed."
+                DO_BUILD=0
+            fi
+        else
+            if ask_Yn "Pull latest updates?"; then
+                cd "${RTKLIB_DIR}"
+                git pull --ff-only || warn "Could not pull (no network?)"
+                cd "${SCRIPT_DIR}"
+            fi
         fi
     fi
 fi
