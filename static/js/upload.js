@@ -94,7 +94,8 @@ async function uploadFilesWithProgress(files, progressEl, onDone) {
             bar.style.width = '100%';
             text.textContent = prefix + f.name + ' ✓';
         } catch (err) {
-            text.innerHTML = '<span style="color:#e74c3c">' + prefix + f.name + ' — ' + err.message + '</span>';
+            text.textContent = prefix + f.name + ' — ' + err.message;
+            text.style.color = '#e74c3c';
             throw err;
         }
     }

@@ -265,7 +265,7 @@ def upload_file():
     os.makedirs(target_dir, exist_ok=True)
     safe_name = secure_filename(f.filename)
     if not safe_name:
-        return jsonify({'error': 'Invalid filename'}), 400
+        return jsonify({'error': 'Invalid filename — only alphanumeric characters, dots, dashes and underscores are allowed'}), 400
     filepath = os.path.join(target_dir, safe_name)
     real_filepath = os.path.realpath(filepath)
     if not real_filepath.startswith(os.path.realpath(target_dir)):
@@ -471,13 +471,24 @@ def run_convbin():
     if not os.path.isfile(input_file):
         return jsonify({'error': f'Input file not found: {input_file}'}), 400
 
+    # Validate input_file is within allowed upload directory
+    if not os.path.realpath(input_file).startswith(os.path.realpath(Cfg.UPLOAD_DIR)):
+        return jsonify({'error': 'Access denied: input file outside uploads directory'}), 403
+
     output_dir_raw = data.get('output_dir', 'rinex')
     if output_dir_raw in ('rinex', '', None):
         output_dir = Cfg.RINEX_DIR
     elif output_dir_raw == 'same':
         output_dir = os.path.dirname(input_file) or Cfg.RINEX_DIR
     else:
-        output_dir = output_dir_raw
+        # For custom output dirs, restrict to allowed data directories
+        candidate = os.path.realpath(output_dir_raw)
+        allowed = [os.path.realpath(d) for d in [
+            Cfg.RINEX_DIR, Cfg.UPLOAD_DIR, Cfg.RESULTS_DIR, Cfg.POS_DIR]]
+        if not any(candidate.startswith(d) for d in allowed):
+            output_dir = Cfg.RINEX_DIR  # fall back to safe default
+        else:
+            output_dir = output_dir_raw
     os.makedirs(output_dir, exist_ok=True)
 
     options = {
@@ -889,8 +900,17 @@ def run_rnx2rtkp():
     if not rover_obs or not os.path.isfile(rover_obs):
         return jsonify({'error': 'Rover observation file not found'}), 400
 
-    # Gap 8: validate nav file existence before launching subprocess
+    # Validate rover_obs is within allowed directories
+    _allowed_dirs = [os.path.realpath(Cfg.RINEX_DIR), os.path.realpath(Cfg.UPLOAD_DIR)]
+    if not any(os.path.realpath(rover_obs).startswith(d) for d in _allowed_dirs):
+        return jsonify({'error': 'Access denied: rover observation file is outside allowed directories'}), 403
+
+    # Gap 8: validate nav file existence and access before launching subprocess
     if nav_files:
+        invalid_nav = [p for p in nav_files
+                       if not any(os.path.realpath(p).startswith(d) for d in _allowed_dirs)]
+        if invalid_nav:
+            return jsonify({'error': 'Access denied: navigation file outside allowed directories'}), 403
         missing_nav = [p for p in nav_files if not os.path.isfile(p)]
         if missing_nav:
             return jsonify({
