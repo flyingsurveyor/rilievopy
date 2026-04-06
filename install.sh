@@ -377,8 +377,8 @@ if [ "${DO_BUILD}" -eq 1 ]; then
         # Check current branch — if it's the retired demo5, re-clone from main
         CURRENT_BRANCH=$(git -C "${RTKLIB_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
         if [ "${CURRENT_BRANCH}" = "demo5" ]; then
-            warn "Il sorgente è sul branch 'demo5' che è stato ritirato."
-            warn "Aggiornamento al branch '${RTKLIB_BRANCH}' (RTKLIB-EX)..."
+            warn "Source is on the retired 'demo5' branch."
+            warn "Switching to '${RTKLIB_BRANCH}' branch (RTKLIB-EX)..."
             rm -rf "${RTKLIB_DIR}"
             info "Cloning RTKLIBExplorer (${RTKLIB_BRANCH} branch)..."
             timer_start
