@@ -173,6 +173,9 @@ def file_explorer(subpath=''):
         base_key = None
         rel_path = ''
 
+    s = _settings.load_settings()
+    rtkino_configured = bool(s.get('rtkino_host', ''))
+
     if base_key and base_key in base_dirs:
         browse_path = os.path.join(base_dirs[base_key], rel_path)
         if not _is_within_dir(browse_path, base_dirs[base_key]):
@@ -188,8 +191,6 @@ def file_explorer(subpath=''):
                 'name': key, 'is_dir': True,
                 'size': f'{count} files', 'modified': '', 'path': key,
             })
-        s = _settings.load_settings()
-        rtkino_configured = bool(s.get('rtkino_host', ''))
         return render_template('files.html', active='files', entries=entries,
                                current_path='', breadcrumbs=[],
                                rtkino_configured=rtkino_configured)
@@ -222,9 +223,6 @@ def file_explorer(subpath=''):
         if part:
             accum = f'{accum}/{part}'.strip('/')
             breadcrumbs.append({'name': part, 'path': accum})
-
-    s = _settings.load_settings()
-    rtkino_configured = bool(s.get('rtkino_host', ''))
 
     return render_template('files.html', active='files', entries=entries,
                            current_path=subpath, breadcrumbs=breadcrumbs,
