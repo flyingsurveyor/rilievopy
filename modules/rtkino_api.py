@@ -275,3 +275,61 @@ class RTKinoAPI:
         except Exception as exc:
             logger.debug("[rtkino_api] GET /download?file=%s unexpected error: %s", filename, exc)
             return None
+
+    def gnss_download_file_to_path_with_progress(
+        self,
+        filename: str,
+        dest_path: str,
+        progress_callback=None,
+    ) -> Optional[int]:
+        """GET /download?file=<filename> → stream UBX file to *dest_path* with progress.
+
+        Calls ``progress_callback(bytes_downloaded, total_bytes_or_none)`` after every
+        64 KB chunk.  *total_bytes_or_none* is the Content-Length value from the
+        response headers (int) or None when the header is absent.
+
+        Returns the total number of bytes written on success, None on error.
+        Uses a longer timeout (120 s) suitable for large file transfers.
+        """
+        url = self.base_url + "/download?" + urllib.parse.urlencode({"file": filename})
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "RilievoPY/1.0"},
+            )
+            total = 0
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                content_length = resp.headers.get("Content-Length")
+                total_bytes = int(content_length) if content_length else None
+                with open(dest_path, "wb") as fh:
+                    while True:
+                        chunk = resp.read(65536)  # 64 KB chunks
+                        if not chunk:
+                            break
+                        fh.write(chunk)
+                        total += len(chunk)
+                        if progress_callback is not None:
+                            try:
+                                progress_callback(total, total_bytes)
+                            except Exception:
+                                pass
+            return total
+        except urllib.error.HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read(512).decode("utf-8", errors="replace")
+            except Exception:
+                pass
+            logger.warning(
+                "[rtkino_api] GET /download?file=%s HTTP %s: %s",
+                filename, exc.code, body,
+            )
+            return None
+        except urllib.error.URLError as exc:
+            logger.warning("[rtkino_api] GET /download?file=%s error: %s", filename, exc)
+            return None
+        except Exception as exc:
+            logger.warning(
+                "[rtkino_api] GET /download?file=%s unexpected error: %s", filename, exc,
+            )
+            return None
