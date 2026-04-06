@@ -518,23 +518,7 @@ else
     err "Some dependencies failed to install. Check errors above."
 fi
 
-# ── Optional: geopandas for enhanced GeoPackage export ──
-echo ""
-info "Optional: ${BOLD}geopandas${NC} enables enhanced GeoPackage export."
-info "Without it, a pure-SQLite fallback is used (works fine for most cases)."
-
-if ask_yn "Install geopandas + shapely? (may take a few minutes on RPi)"; then
-    timer_start
-    info "Installing geopandas, shapely..."
-    if ${PIP_CMD} install geopandas shapely 2>&1 | tail -5; then
-        log "geopandas installed ($(timer_show))"
-    else
-        warn "geopandas installation failed — pure-SQLite fallback will be used"
-        warn "This is fine. You can install it later with: pip install geopandas shapely"
-    fi
-else
-    info "Skipped — pure-SQLite GeoPackage export will be used"
-fi
+info "GeoPackage export: pure-SQLite implementation (no geopandas required)"
 
 # ═══════════════════════════════════════════════════════════════════
 # 9. Termux extras (BLE, notifications, widget)
@@ -600,24 +584,28 @@ if [ "${PLATFORM}" = "termux" ]; then
         fi
     fi
 
-    # ── 9d. Install widget scripts ──────────────────────────────────
+    # ── 9d. Install widget scripts in tasks/ (background execution, no visible session) ──
+    TASKS_DIR="$HOME/.shortcuts/tasks"
     echo ""
     mkdir -p "$SHORTCUTS_DIR"
+    mkdir -p "$TASKS_DIR"
     chmod 700 "$SHORTCUTS_DIR"
+    chmod 700 "$TASKS_DIR"
 
     if [ -f "${SCRIPT_DIR}/scripts/termux_widget_start.sh" ]; then
         cp "${SCRIPT_DIR}/scripts/termux_widget_start.sh" \
-            "$SHORTCUTS_DIR/rilievo_avvia.sh"
+            "$TASKS_DIR/rilievo_avvia.sh"
         cp "${SCRIPT_DIR}/scripts/termux_widget_stop.sh" \
-            "$SHORTCUTS_DIR/rilievo_ferma.sh"
-        chmod +x "$SHORTCUTS_DIR/rilievo_avvia.sh"
-        chmod +x "$SHORTCUTS_DIR/rilievo_ferma.sh"
-        log "Script widget installati in $SHORTCUTS_DIR"
+            "$TASKS_DIR/rilievo_ferma.sh"
+        chmod +x "$TASKS_DIR/rilievo_avvia.sh"
+        chmod +x "$TASKS_DIR/rilievo_ferma.sh"
+        log "Script widget installati in $TASKS_DIR"
         echo ""
-        info "Per usare i widget:"
+        info "Per usare i widget (modalità Task — nessuna sessione visibile):"
         echo "  1. Tieni premuto sulla home screen → Widget"
-        echo "  2. Cerca 'Termux' → Termux:Widget"
+        echo "  2. Cerca 'Termux' → seleziona Termux:Task (non Shortcut)"
         echo "  3. Seleziona 'rilievo_avvia' per avviare, 'rilievo_ferma' per fermare"
+        echo "  Nota: i task girano in background senza aprire una sessione Termux"
     else
         warn "Script widget non trovati in ${SCRIPT_DIR}/scripts/ — salto installazione"
     fi
@@ -729,9 +717,6 @@ python3 -c "import pyubx2; print('  ✓ pyubx2', pyubx2.version)" 2>/dev/null \
     || echo "  ✗ pyubx2 — NOT INSTALLED"
 python3 -c "import openpyxl; print('  ✓ openpyxl', openpyxl.__version__)" 2>/dev/null \
     || echo "  ✗ openpyxl — NOT INSTALLED"
-python3 -c "import geopandas; print('  ✓ geopandas', geopandas.__version__, '(optional)')" 2>/dev/null \
-    || echo -e "  ${DIM}· geopandas — not installed (optional)${NC}"
-
 echo ""
 
 # RTKLIB tools
@@ -765,8 +750,8 @@ if [ "${PLATFORM}" = "termux" ]; then
     echo "    cd ${SCRIPT_DIR}"
     echo "    python3 app.py"
     echo ""
-    echo -e "${BOLD}Avvio rapido con Termux:Widget:${NC}"
-    echo "    Tap su widget 'rilievo_avvia' dalla home screen"
+    echo -e "${BOLD}Avvio rapido con Termux:Task:${NC}"
+    echo "    Tap su widget 'rilievo_avvia' dalla home screen (Termux:Task)"
     echo ""
     echo -e "${BOLD}Connessione BLE a RTKINO:${NC}"
     echo "    Abilitare BLE nelle impostazioni: http://127.0.0.1:${DEFAULT_PORT}/settings"
