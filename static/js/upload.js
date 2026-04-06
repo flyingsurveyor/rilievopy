@@ -10,10 +10,13 @@ function uploadFileWithProgress(file, opts) {
      * opts.onError(error)                  — called on failure
      * opts.url                             — endpoint (default: /api/upload)
      * opts.fieldName                       — form field name (default: 'file')
+     * opts.timeout                         — ms before ontimeout fires (default: 10 min)
      */
     opts = opts || {};
     const url = opts.url || '/api/upload';
     const fieldName = opts.fieldName || 'file';
+    // 10 minuti di timeout: sufficiente per file UBX/RAW grandi su connessioni lente
+    const timeout = opts.timeout || 10 * 60 * 1000;
 
     return new Promise(function(resolve, reject) {
         var formData = new FormData();
@@ -21,6 +24,7 @@ function uploadFileWithProgress(file, opts) {
 
         var xhr = new XMLHttpRequest();
         xhr.open('POST', url, true);
+        xhr.timeout = timeout;
 
         xhr.upload.onprogress = function(e) {
             if (e.lengthComputable) {
@@ -44,6 +48,12 @@ function uploadFileWithProgress(file, opts) {
 
         xhr.onerror = function() {
             var msg = 'Network error during upload';
+            if (opts.onError) opts.onError(msg);
+            reject(new Error(msg));
+        };
+
+        xhr.ontimeout = function() {
+            var msg = 'Upload timeout — file troppo grande o connessione troppo lenta';
             if (opts.onError) opts.onError(msg);
             reject(new Error(msg));
         };
