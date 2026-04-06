@@ -40,7 +40,9 @@ function uploadFileWithProgress(file, opts) {
                 if (opts.onComplete) opts.onComplete(data);
                 resolve(data);
             } else {
-                var errMsg = xhr.responseText || ('Upload failed (' + xhr.status + ')');
+                var errData = null;
+                try { errData = JSON.parse(xhr.responseText); } catch(e) {}
+                var errMsg = (errData && errData.error) || xhr.responseText || ('Upload failed (' + xhr.status + ')');
                 if (opts.onError) opts.onError(errMsg);
                 reject(new Error(errMsg));
             }
@@ -65,8 +67,9 @@ function uploadFileWithProgress(file, opts) {
 /**
  * Upload multiple files sequentially with per-file progress.
  * progressEl: { wrap, bar, text } — DOM elements for progress display
+ * onDone: optional callback called after all files succeed
  */
-async function uploadFilesWithProgress(files, progressEl) {
+async function uploadFilesWithProgress(files, progressEl, onDone) {
     var wrap = progressEl.wrap;
     var bar = progressEl.bar;
     var text = progressEl.text;
@@ -91,11 +94,13 @@ async function uploadFilesWithProgress(files, progressEl) {
             bar.style.width = '100%';
             text.textContent = prefix + f.name + ' ✓';
         } catch (err) {
-            text.innerHTML = '<span style="color:#e74c3c">' + prefix + f.name + ' — ' + err.message + '</span>';
+            text.textContent = prefix + f.name + ' — ' + err.message;
+            text.style.color = '#e74c3c';
             throw err;
         }
     }
 
     text.textContent = files.length + ' file(s) uploaded';
+    if (onDone) onDone();
     return true;
 }

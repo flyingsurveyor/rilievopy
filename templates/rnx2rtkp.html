@@ -93,6 +93,12 @@
                            .OBS,.RNX,.NAV">
         </label>
     </div>
+    <div id="ppkUploadProgressWrap" class="hidden mt-1">
+        <div id="ppkUploadProgressText" style="font-size:12px; color:#7f8c8d; margin-bottom:4px;"></div>
+        <div style="width:100%; background:#ecf0f1; border-radius:8px; overflow:hidden; height:10px;">
+            <div id="ppkUploadProgressBar" style="width:0%; height:100%; background:#3498db; transition:width 0.2s;"></div>
+        </div>
+    </div>
 </div>
 
 <!-- ═══ CONFIGURATION PRESET ═══ -->
@@ -198,7 +204,13 @@
             👁 Preview Command
         </button>
         <div id="processStatus" class="status-indicator hidden">
-            <span class="spinner"></span> Processing...
+            <span class="spinner"></span> <span id="processStatusText">Processing...</span>
+        </div>
+    </div>
+
+    <!-- Live log tail (shown during async job) -->
+    <div id="liveLogWrap" class="hidden mt-1">
+        <div class="console" id="liveLog" style="max-height:140px; overflow-y:auto; font-size:11px; color:#2ecc71; background:#2c3e50; white-space:pre-wrap;">
         </div>
     </div>
 
@@ -527,33 +539,62 @@ async function refreshFileLists() {
 }
 
 function setupUploads() {
-    document.getElementById('fileUpload').addEventListener('change', function() {
-        uploadFiles(this.files, '/api/upload', () => {
-            refreshFileLists();
-        });
+    document.getElementById('fileUpload').addEventListener('change', async function() {
+        if (!this.files.length) return;
+        try {
+            await uploadFilesWithProgress(Array.from(this.files), {
+                wrap: document.getElementById('ppkUploadProgressWrap'),
+                bar: document.getElementById('ppkUploadProgressBar'),
+                text: document.getElementById('ppkUploadProgressText'),
+            }, refreshFileLists);
+        } catch (err) {
+            alert('Upload error: ' + err.message);
+        }
+        this.value = '';
     });
-    document.getElementById('confUpload').addEventListener('change', function() {
-        uploadFiles(this.files, '/api/rnx2rtkp/conf/upload', () => {
-            location.reload();
-        });
+    document.getElementById('confUpload').addEventListener('change', async function() {
+        if (!this.files.length) return;
+        try {
+            await uploadFilesWithProgress(Array.from(this.files), {
+                wrap: document.getElementById('ppkUploadProgressWrap'),
+                bar: document.getElementById('ppkUploadProgressBar'),
+                text: document.getElementById('ppkUploadProgressText'),
+            }, function() { location.reload(); });
+        } catch (err) {
+            alert('Upload error: ' + err.message);
+        }
+        this.value = '';
     });
-    document.getElementById('antexUpload').addEventListener('change', function() {
-        uploadFiles(this.files, '/api/antex/upload');
+    document.getElementById('antexUpload').addEventListener('change', async function() {
+        if (!this.files.length) return;
+        try {
+            await uploadFilesWithProgress(Array.from(this.files), {
+                wrap: document.getElementById('ppkUploadProgressWrap'),
+                bar: document.getElementById('ppkUploadProgressBar'),
+                text: document.getElementById('ppkUploadProgressText'),
+            }, refreshAntexList);
+        } catch (err) {
+            alert('Upload error: ' + err.message);
+        }
+        this.value = '';
     });
 }
 
-function uploadFiles(files, url, onDone) {
-    Array.from(files).forEach(file => {
-        const fd = new FormData();
-        fd.append('file', file);
-        fetch(url, {method: 'POST', body: fd})
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) alert(data.error);
-                if (onDone) onDone(data);
-            })
-            .catch(err => alert('Upload error: ' + err));
-    });
+async function refreshAntexList() {
+    try {
+        const resp = await fetch('/api/antex/list').then(r => r.json());
+        const sel = document.querySelector('select[name="ant2-anttype"], #antexSelect');
+        if (!sel) return;
+        const current = sel.value;
+        sel.innerHTML = '<option value="">— none —</option>';
+        (resp.files || []).forEach(f => {
+            const opt = new Option(f.name, f.path);
+            sel.appendChild(opt);
+        });
+        if (current) sel.value = current;
+    } catch (err) {
+        console.warn('refreshAntexList error:', err);
+    }
 }
 
 // ═══ Preview command (always works, even without binary) ═══
@@ -584,6 +625,8 @@ function previewCommand() {
 }
 
 // ═══ Process ═══
+var _ppkPollTimer = null;
+
 function runProcessing() {
     const roverObs = document.getElementById('roverObs').value;
     if (!roverObs) { alert('Select a rover observation file'); return; }
@@ -597,9 +640,16 @@ function runProcessing() {
 
     const btn = document.getElementById('processBtn');
     const status = document.getElementById('processStatus');
+    const statusText = document.getElementById('processStatusText');
+    const liveLogWrap = document.getElementById('liveLogWrap');
+    const liveLog = document.getElementById('liveLog');
+
     btn.disabled = true;
     btn.textContent = '⏳ Processing...';
     status.classList.remove('hidden');
+    statusText.textContent = 'Starting job...';
+    liveLogWrap.classList.remove('hidden');
+    liveLog.textContent = '';
 
     // Build request
     const payload = {
@@ -613,6 +663,8 @@ function runProcessing() {
     // Show command preview
     document.getElementById('cmdPreview').textContent = 'Processing...';
 
+    const startTime = Date.now();
+
     fetch('/api/rnx2rtkp/process', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -620,48 +672,92 @@ function runProcessing() {
     })
     .then(r => r.json())
     .then(data => {
-        btn.disabled = false;
-        btn.textContent = '▶ Process PPK';
-        status.classList.add('hidden');
-
-        // Show command
-        document.getElementById('cmdPreview').textContent = data.command || '';
-
-        // Show output
-        const output = document.getElementById('processOutput');
-        const combined = (data.stdout || '') + '\n' + (data.stderr || '');
-        output.textContent = combined.trim() || 'No output';
-
-        // Show results section
-        document.getElementById('resultsSection').classList.remove('hidden');
-
-        if (data.output_file && data.returncode === 0) {
-            // Set download link
-            const dlBtn = document.getElementById('downloadPos');
-            dlBtn.href = '/api/download?path=' + encodeURIComponent(data.output_file.path);
-
-            // Set PosView link
-            const pvBtn = document.getElementById('viewInPosView');
-            pvBtn.href = '/posview?file=' + encodeURIComponent(data.output_file.path);
-
-            // Load and display results
-            loadResults(data.output_file.path);
-        } else {
-            document.getElementById('res-fix').textContent = '—';
-            document.getElementById('res-float').textContent = '—';
-            document.getElementById('res-epochs').textContent = '—';
-            document.getElementById('res-single').textContent = '—';
-            if (data.error) {
-                output.innerHTML = `<span class="error">${data.error}</span>\n${combined}`;
-            }
+        if (data.error) {
+            _ppkProcessingDone(null, data.error);
+            return;
         }
+        if (data.command) {
+            document.getElementById('cmdPreview').textContent = data.command;
+        }
+        const jobId = data.job_id;
+        statusText.textContent = 'Running...';
+
+        // Poll every 3 seconds
+        if (_ppkPollTimer) clearInterval(_ppkPollTimer);
+        _ppkPollTimer = setInterval(async function() {
+            try {
+                const elapsed = Math.round((Date.now() - startTime) / 1000);
+                statusText.textContent = `Running… ${elapsed}s`;
+
+                const jobResp = await fetch('/api/rnx2rtkp/job/' + jobId).then(r => r.json());
+
+                // Update live log
+                if (jobResp.log && jobResp.log.length > 0) {
+                    liveLog.textContent = jobResp.log.join('\n');
+                    liveLog.scrollTop = liveLog.scrollHeight;
+                }
+
+                if (jobResp.status !== 'running') {
+                    clearInterval(_ppkPollTimer);
+                    _ppkPollTimer = null;
+                    _ppkProcessingDone(jobResp, null);
+                }
+            } catch (pollErr) {
+                // Network hiccup — keep polling
+                console.warn('Poll error (will retry):', pollErr);
+            }
+        }, 3000);
     })
     .catch(err => {
-        btn.disabled = false;
-        btn.textContent = '▶ Process PPK';
-        status.classList.add('hidden');
-        alert('Error: ' + err);
+        _ppkProcessingDone(null, err.message || String(err));
     });
+}
+
+function _ppkProcessingDone(data, errMsg) {
+    const btn = document.getElementById('processBtn');
+    const status = document.getElementById('processStatus');
+    btn.disabled = false;
+    btn.textContent = '▶ Process PPK';
+    status.classList.add('hidden');
+
+    if (errMsg) {
+        alert('Error: ' + errMsg);
+        return;
+    }
+
+    // Show command
+    if (data.command) {
+        document.getElementById('cmdPreview').textContent = data.command;
+    }
+
+    // Show output
+    const output = document.getElementById('processOutput');
+    const combined = (data.stdout || '') + '\n' + (data.stderr || '');
+    output.textContent = combined.trim() || 'No output';
+
+    // Show results section
+    document.getElementById('resultsSection').classList.remove('hidden');
+
+    if (data.output_file && data.returncode === 0) {
+        // Set download link
+        const dlBtn = document.getElementById('downloadPos');
+        dlBtn.href = '/api/download?path=' + encodeURIComponent(data.output_file.path);
+
+        // Set PosView link
+        const pvBtn = document.getElementById('viewInPosView');
+        pvBtn.href = '/posview?file=' + encodeURIComponent(data.output_file.path);
+
+        // Load and display results
+        loadResults(data.output_file.path);
+    } else {
+        document.getElementById('res-fix').textContent = '—';
+        document.getElementById('res-float').textContent = '—';
+        document.getElementById('res-epochs').textContent = '—';
+        document.getElementById('res-single').textContent = '—';
+        if (data.error || errMsg) {
+            output.textContent = (data.error || errMsg) + '\n' + combined;
+        }
+    }
 }
 
 function loadResults(posPath) {
@@ -732,5 +828,12 @@ function drawQualityChart(qualities) {
         ctx.fillText(l.t, x + 5, h - 2);
     });
 }
+
+// ═══ Cross-tab file-ready notification (Bug 5) ═══
+window.addEventListener('storage', function(e) {
+    if (e.key === 'rinex_updated') {
+        refreshFileLists();
+    }
+});
 </script>
 {% endblock %}

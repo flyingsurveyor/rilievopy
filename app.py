@@ -33,6 +33,17 @@ def create_app():
     # Ensure PPK data directories exist
     PPKConfig.ensure_dirs()
 
+    # Global error handlers for upload-size and timeout errors
+    from flask import jsonify as _jsonify
+
+    @app.errorhandler(413)
+    def handle_too_large(e):
+        return _jsonify({'error': 'File too large — maximum size is 2 GB'}), 413
+
+    @app.errorhandler(408)
+    def handle_timeout(e):
+        return _jsonify({'error': 'Request timeout — file upload took too long'}), 408
+
     # Register RTK blueprints
     from routes.dashboard import bp as dashboard_bp
     from routes.surveys import bp as surveys_bp

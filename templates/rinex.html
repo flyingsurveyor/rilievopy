@@ -40,11 +40,13 @@
         {% endfor %}
     </ul>
     {% else %}
-    <div class="empty-state">
-        <div class="empty-state-icon">📊</div>
-        <div class="empty-state-text">No RINEX observation files found</div>
-        <div class="empty-state-hint">Convert raw data with Convbin or upload .obs files</div>
-    </div>
+    <ul class="file-list" id="obsFileList">
+        <li style="padding:16px; color:#95a5a6; text-align:center;">
+            <div class="empty-state-icon">📊</div>
+            <div class="empty-state-text">No RINEX observation files found</div>
+            <div class="empty-state-hint">Convert raw data with Convbin or upload .obs files</div>
+        </li>
+    </ul>
     {% endif %}
 
     <div class="form-row mt-2">
@@ -219,11 +221,57 @@
                 wrap: document.getElementById('obsUploadProgressWrap'),
                 bar: document.getElementById('obsUploadProgressBar'),
                 text: document.getElementById('obsUploadProgressText'),
-            });
+            }, refreshObsFiles);
             setStatus('Ready', '');
-            window.location.reload();
         } catch (err) {
             setStatus('Upload failed: ' + (err.message || 'error'), 'error');
+        }
+        this.value = '';
+    });
+
+    // Refresh obs file list from server (Bug 5/7)
+    async function refreshObsFiles() {
+        try {
+            const resp = await fetch('/api/rinex/obs_files').then(r => r.json());
+            const files = resp.files || [];
+            const list = document.getElementById('obsFileList');
+            if (!list) return;
+            if (files.length === 0) {
+                list.innerHTML = '<li style="padding:16px; color:#95a5a6; text-align:center;">No RINEX observation files found</li>';
+                return;
+            }
+            list.innerHTML = '';
+            files.forEach(f => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.dataset.path = f.path;
+                li.setAttribute('onclick', 'selectObsFile(this)');
+                const iconDiv = document.createElement('div');
+                iconDiv.className = 'file-icon obs';
+                iconDiv.textContent = 'OBS';
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'file-info';
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'file-name';
+                nameDiv.textContent = f.name;
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'file-meta';
+                metaDiv.textContent = f.size + ' · ' + f.modified;
+                infoDiv.appendChild(nameDiv);
+                infoDiv.appendChild(metaDiv);
+                li.appendChild(iconDiv);
+                li.appendChild(infoDiv);
+                list.appendChild(li);
+            });
+        } catch (err) {
+            console.warn('refreshObsFiles error:', err);
+        }
+    }
+
+    // Cross-tab notification: refresh when convbin completes in another tab (Bug 5)
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'rinex_updated') {
+            refreshObsFiles();
         }
     });
 
