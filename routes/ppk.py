@@ -279,20 +279,21 @@ def api_ppk_rtkino_import():
             'skipped': True,
         })
 
-    raw = api.gnss_download_file(filename)
-    if raw is None:
+    # Stream directly to disk to handle large files efficiently
+    size = api.gnss_download_file_to_path(filename, dest_path)
+    if size is None:
+        # Clean up partial file if it was created
+        if os.path.exists(dest_path):
+            try:
+                os.remove(dest_path)
+            except OSError:
+                pass
         return jsonify({'ok': False, 'error': 'Download fallito da RTKino'}), 502
-
-    try:
-        with open(dest_path, 'wb') as fh:
-            fh.write(raw)
-    except OSError as exc:
-        return jsonify({'ok': False, 'error': f'Errore scrittura file: {exc}'}), 500
 
     return jsonify({
         'ok': True,
         'filename': safe_name,
-        'size': len(raw),
+        'size': size,
         'path': dest_path,
         'skipped': False,
     })

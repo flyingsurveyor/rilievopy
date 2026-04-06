@@ -188,7 +188,7 @@
             var data = await resp.json();
             if (data.ok) {
                 btn.textContent = '✓ Imported';
-                var item = document.getElementById('rtkino-file-' + filename);
+                var item = document.getElementById('rtkino-file-' + escHtml(filename));
                 if (item) {
                     var nameEl = item.querySelector('.file-name');
                     if (nameEl && !nameEl.querySelector('.badge')) {
