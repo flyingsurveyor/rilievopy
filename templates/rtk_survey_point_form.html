@@ -51,7 +51,7 @@ details.advanced summary::-webkit-details-marker{display:none}
 details.advanced .advanced-body{padding:0 16px 16px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:var(--soft);color:var(--accent);padding:8px 10px;border-radius:999px;font-size:13px;font-weight:800}
 .flash-ok,.flash-error{padding:12px 14px;border-radius:14px;margin-bottom:10px;font-weight:800}.flash-ok{background:#dff6e8;color:#17643b}.flash-error{background:#fde8e8;color:#8e2727}
-.progress-bar{height:16px;background:#e8edf1;border-radius:999px;overflow:hidden}.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#27ae60,#2ecc71);transition:width .2s ease}.progress-text{font-size:12px;font-weight:800;color:#355;display:flex;justify-content:space-between;margin-top:4px}
+.progress-bar{height:16px;background:#e8edf1;border-radius:999px;overflow:hidden}.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#27ae60,#2ecc71);transition:width .2s ease}.progress-text{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:4px}
 .voice-buttons{display:grid;grid-template-columns:1fr;gap:10px}
 .btn{border:none;border-radius:14px;padding:13px 16px;font-size:15px;font-weight:900;cursor:pointer}
 .btn-soft{background:var(--soft);color:var(--accent)}
@@ -59,17 +59,16 @@ details.advanced .advanced-body{padding:0 16px 16px}
 .btn-main{background:var(--ok);color:#fff;width:100%;padding:18px;font-size:22px;letter-spacing:.02em}
 .btn-main[disabled]{opacity:.6;cursor:not-allowed}
 .rec-status{display:none;margin-top:10px;padding:12px;border-radius:12px;background:#fff4df;color:#7a4d00;font-weight:800}
-.note-list{display:grid;gap:10px;margin-top:12px}.note-item{border:1px solid #dbe4ea;border-radius:12px;padding:10px;background:#fafcfd}.note-meta{font-size:12px;color:#60707d;margin-bottom:6px}.note-item audio{width:100%}
+.note-list{display:grid;gap:10px;margin-top:12px}.note-item{border:1px solid #dbe4ea;border-radius:12px;padding:10px;background:#fafcfd}.note-meta{font-size:12px;color:#60707d;margin-bottom:6px}.note-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.note-actions .btn{padding:10px 12px;font-size:13px;border-radius:10px}
 .action-bar{position:fixed;left:10px;right:10px;bottom:10px;padding:10px;display:flex;flex-direction:column;gap:8px;z-index:80}
 .action-bar-status{display:none;padding:6px 4px 0}
 .action-bar-status.visible{display:block}
 .action-bar-btns{display:grid;grid-template-columns:72px 1fr 72px;gap:10px}
-.action-icon,.action-link{display:flex;align-items:center;justify-content:center;font-size:24px;padding:12px;background:var(--soft);color:var(--accent);border:none;border-radius:14px;font-weight:900;text-decoration:none}
+.action-icon,.action-link{display:flex;align-items:center;justify-content:center;font-size:24px;padding:12px;background:var(--soft);color:var(--accent);border:none;border-radius:14px;font-weight:900;text-decoration:none;cursor:pointer}
 .saved-msg{font-size:14px;font-weight:900;color:var(--ok);padding:4px 0 2px}
-.note-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.note-actions .btn{padding:10px 12px;font-size:13px;border-radius:10px}
 .confirm-title{margin:0 0 6px;color:var(--text)}
 .confirm-text{color:var(--muted);font-size:14px}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:10000}.modal-content{background:#fff;padding:20px;border-radius:14px;max-width:460px;width:92%}.modal-buttons{display:flex;gap:10px;margin-top:14px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:10000}.modal-content{background:#fff;padding:20px;border-radius:14px;max-width:360px;width:90%}.modal-buttons{display:flex;gap:10px;margin-top:16px}
 @media (max-width:768px){
   .svy-shell{padding:8px 8px 98px}
   .active-strip,.status-card,.card{border-radius:18px}
@@ -385,10 +384,13 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
   async function submitPoint() {
     clearError();
+    // FIX: aggiorna l'hidden field e cattura FormData PRIMA di disabilitare i campi.
+    // I campi disabled vengono esclusi da FormData, quindi la sequenza corretta è:
+    // 1) aggiorna codHidden  2) costruisci FormData  3) poi disabilita i campi UI.
     codHidden.value = codSel.value;
+    const fd = new FormData(form);
     setFormBusy(true);
     startProgress(Number(durSel.value || 10));
-    const fd = new FormData(form);
     let resp;
     try { resp = await fetch(form.action, { method: 'POST', body: fd }); }
     catch (e) { setFormBusy(false); stopProgress(); showError('Errore di rete: ' + e); return; }
@@ -398,7 +400,8 @@ details.advanced .advanced-body{padding:0 16px 16px}
       const data = await resp.json();
       if (data.error === 'no_gnss_data') { setFormBusy(false); stopProgress(); showError('❌ ' + (data.message || 'Nessun dato GNSS')); return; }
       if (data.quality_warning) {
-        setFormBusy(false); stopProgress();
+        setFormBusy(false);
+        stopProgress();
         warningsList.innerHTML = '';
         (data.warnings || []).forEach(w => { const li = document.createElement('li'); li.textContent = w; warningsList.appendChild(li); });
         qualityModal.style.display = 'flex';
