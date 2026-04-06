@@ -200,6 +200,26 @@
         btn.disabled = true;
         btn.textContent = '⏳ Downloading…';
 
+        var progressWrap = document.getElementById('uploadProgressWrap');
+        var progressBar  = document.getElementById('uploadProgressBar');
+        var progressText = document.getElementById('uploadProgressText');
+
+        // Show the progress bar (reuse the existing upload progress UI)
+        progressWrap.classList.remove('hidden');
+        progressBar.style.width = '0%';
+        progressText.textContent = 'Avvio download…';
+
+        // Close modal so user can see the progress bar
+        closeRtkinoModal();
+
+        var pollTimer = null;
+
+        function hideProgress() {
+            progressWrap.classList.add('hidden');
+            progressBar.style.width = '0%';
+            progressText.textContent = '';
+        }
+
         try {
             var resp = await fetch('/api/ppk/rtkino/import', {
                 method: 'POST',
@@ -207,25 +227,75 @@
                 body: JSON.stringify({ filename: filename }),
             });
             var data = await resp.json();
-            if (data.ok) {
-                btn.textContent = '✓ Già importato';
-                var item = document.getElementById('rtkino-file-' + escHtml(filename));
-                if (item) {
-                    var nameEl = item.querySelector('.file-name');
-                    if (nameEl && !nameEl.querySelector('.badge')) {
-                        nameEl.insertAdjacentHTML('beforeend', ' <span class="badge" style="background:#27ae60; color:#fff; font-size:10px;">✓ Già importato</span>');
-                    }
-                }
-                var sizeStr = data.size ? ' (' + formatBytes(data.size) + ')' : '';
-                showToast('✅ ' + filename + ' importato' + sizeStr, true);
-                // Refresh the main file list after a short delay
-                setTimeout(function() { window.location.reload(); }, 2000);
-            } else {
+
+            if (!data.ok) {
+                hideProgress();
                 btn.disabled = false;
                 btn.textContent = '⬇ Import';
-                showToast('❌ Download fallito: ' + (data.error || 'unknown error'), false);
+                showToast('❌ ' + (data.error || 'Errore avvio download'), false);
+                return;
             }
+
+            // Fast-path: file was already on disk
+            if (data.skipped) {
+                hideProgress();
+                btn.textContent = '✓ Già importato';
+                var sizeStr = data.size ? ' (' + formatBytes(data.size) + ')' : '';
+                showToast('✅ ' + filename + ' già presente' + sizeStr, true);
+                return;
+            }
+
+            // Async path: poll job progress
+            var jobId = data.job_id;
+
+            pollTimer = setInterval(async function() {
+                try {
+                    var jobResp = await fetch('/api/ppk/rtkino/import/' + jobId);
+                    var job = await jobResp.json();
+
+                    var dl = job.bytes_downloaded || 0;
+                    var tot = job.total_bytes;
+                    var pct = job.percent;
+
+                    var dlStr = formatBytes(dl);
+                    if (tot) {
+                        var totStr = formatBytes(tot);
+                        progressText.textContent = 'Download ' + escHtml(filename) + ' — ' + dlStr + ' / ' + totStr + (pct !== null ? ' (' + pct + '%)' : '');
+                        progressBar.style.width = (pct !== null ? pct : 0) + '%';
+                    } else {
+                        progressText.textContent = 'Download ' + escHtml(filename) + ' — ' + dlStr;
+                        // Indeterminate: animate with a pulsing width
+                        progressBar.style.width = '60%';
+                    }
+
+                    if (job.status === 'done') {
+                        clearInterval(pollTimer);
+                        progressBar.style.width = '100%';
+                        progressText.textContent = '✅ Download completato — ' + formatBytes(job.size || dl);
+                        setTimeout(hideProgress, 1500);
+                        btn.textContent = '✓ Già importato';
+                        var sizeStr = job.size ? ' (' + formatBytes(job.size) + ')' : '';
+                        showToast('✅ ' + filename + ' importato' + sizeStr, true);
+                        setTimeout(function() { window.location.reload(); }, 2000);
+                    } else if (job.status === 'error') {
+                        clearInterval(pollTimer);
+                        hideProgress();
+                        btn.disabled = false;
+                        btn.textContent = '⬇ Import';
+                        showToast('❌ Download fallito: ' + (job.error || 'errore sconosciuto'), false);
+                    }
+                } catch (pollErr) {
+                    clearInterval(pollTimer);
+                    hideProgress();
+                    btn.disabled = false;
+                    btn.textContent = '⬇ Import';
+                    showToast('❌ Errore polling: ' + pollErr.message, false);
+                }
+            }, 500);
+
         } catch (err) {
+            if (pollTimer) clearInterval(pollTimer);
+            hideProgress();
             btn.disabled = false;
             btn.textContent = '⬇ Import';
             showToast('❌ Download fallito: ' + err.message, false);

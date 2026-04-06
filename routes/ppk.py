@@ -250,7 +250,7 @@ def api_ppk_rtkino_files():
 
 @bp.route('/api/ppk/rtkino/import', methods=['POST'])
 def api_ppk_rtkino_import():
-    """Import a UBX file from RTKino into the PPK uploads folder."""
+    """Start an async RTKino UBX download job; returns {job_id} immediately."""
     data = request.get_json() or {}
     filename = data.get('filename', '')
     if not filename:
@@ -267,34 +267,64 @@ def api_ppk_rtkino_import():
     os.makedirs(Cfg.UPLOAD_DIR, exist_ok=True)
     dest_path = os.path.join(Cfg.UPLOAD_DIR, safe_name)
 
-    # Skip download if file already exists
+    # Fast-path: file already present on disk — no download needed
     if os.path.exists(dest_path):
         return jsonify({
             'ok': True,
+            'skipped': True,
             'filename': safe_name,
             'size': os.path.getsize(dest_path),
-            'path': dest_path,
-            'skipped': True,
         })
 
-    # Stream directly to disk to handle large files efficiently
-    size = api.gnss_download_file_to_path(filename, dest_path)
-    if size is None:
-        # Clean up partial file if it was created
-        if os.path.exists(dest_path):
-            try:
-                os.remove(dest_path)
-            except OSError:
-                pass
-        return jsonify({'ok': False, 'error': 'Download fallito da RTKino'}), 502
+    job_id = uuid.uuid4().hex
+    with running_processes_lock:
+        running_processes[job_id] = {
+            'type': 'rtkino_import',
+            'status': 'downloading',
+            'started_at': time.time(),
+            'filename': safe_name,
+            'bytes_downloaded': 0,
+            'total_bytes': None,
+        }
 
-    return jsonify({
-        'ok': True,
-        'filename': safe_name,
-        'size': size,
-        'path': dest_path,
-        'skipped': False,
-    })
+    t = threading.Thread(
+        target=_run_rtkino_import_thread,
+        args=(job_id, api, filename, safe_name, dest_path),
+        daemon=True,
+    )
+    t.start()
+
+    return jsonify({'ok': True, 'job_id': job_id, 'filename': safe_name})
+
+
+@bp.route('/api/ppk/rtkino/import/<job_id>')
+def api_ppk_rtkino_import_status(job_id):
+    """Poll the progress of an async RTKino import job."""
+    with running_processes_lock:
+        job = running_processes.get(job_id)
+    if job is None:
+        return jsonify({'error': 'Job not found'}), 404
+
+    status = job.get('status', 'unknown')
+    bytes_dl = job.get('bytes_downloaded', 0)
+    total = job.get('total_bytes')
+    percent = None
+    if total and total > 0:
+        percent = round(bytes_dl / total * 100, 1)
+
+    resp = {
+        'job_id': job_id,
+        'status': status,
+        'filename': job.get('filename', ''),
+        'bytes_downloaded': bytes_dl,
+        'total_bytes': total,
+        'percent': percent,
+    }
+    if status == 'done':
+        resp['size'] = job.get('size', bytes_dl)
+    if status == 'error':
+        resp['error'] = job.get('error', 'Download fallito da RTKino')
+    return jsonify(resp)
 
 @bp.route('/api/upload', methods=['POST'])
 def upload_file():
@@ -520,6 +550,52 @@ def _run_rnx2rtkp_thread(job_id, cmd, output_file, tmp_conf, cmd_str):
                 'finished_at': time.time(),
                 'error': str(exc),
                 'log_list': list(ring),
+            })
+    finally:
+        _cleanup_old_jobs()
+
+
+def _run_rtkino_import_thread(job_id, api, filename, safe_name, dest_path):
+    """Worker thread for async RTKino UBX import with progress tracking."""
+    def _progress(bytes_downloaded, total_bytes):
+        with running_processes_lock:
+            running_processes[job_id]['bytes_downloaded'] = bytes_downloaded
+            running_processes[job_id]['total_bytes'] = total_bytes
+
+    try:
+        size = api.gnss_download_file_to_path_with_progress(
+            filename, dest_path, progress_callback=_progress,
+        )
+        if size is None:
+            # Clean up any partial file
+            try:
+                os.remove(dest_path)
+            except OSError:
+                pass
+            with running_processes_lock:
+                running_processes[job_id].update({
+                    'status': 'error',
+                    'finished_at': time.time(),
+                    'error': 'Download fallito da RTKino',
+                })
+        else:
+            with running_processes_lock:
+                running_processes[job_id].update({
+                    'status': 'done',
+                    'finished_at': time.time(),
+                    'bytes_downloaded': size,
+                    'size': size,
+                })
+    except Exception as exc:
+        try:
+            os.remove(dest_path)
+        except OSError:
+            pass
+        with running_processes_lock:
+            running_processes[job_id].update({
+                'status': 'error',
+                'finished_at': time.time(),
+                'error': str(exc),
             })
     finally:
         _cleanup_old_jobs()
