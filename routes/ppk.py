@@ -33,6 +33,8 @@ from modules.pos_parser import (
     parse_pos, decimate_for_charts, Q_LABELS, Q_COLORS,
     compute_session_stats, weighted_mean_station,
 )
+from modules import settings as _settings
+from modules.rtkino_manager import RTKINO
 
 bp = Blueprint('ppk', __name__)
 
@@ -187,7 +189,8 @@ def file_explorer(subpath=''):
                 'size': f'{count} files', 'modified': '', 'path': key,
             })
         return render_template('files.html', active='files', entries=entries,
-                               current_path='', breadcrumbs=[])
+                               current_path='', breadcrumbs=[],
+                               rtkino_configured=False)
 
     if not os.path.exists(browse_path):
         return "Not found", 404
@@ -218,11 +221,81 @@ def file_explorer(subpath=''):
             accum = f'{accum}/{part}'.strip('/')
             breadcrumbs.append({'name': part, 'path': accum})
 
+    rtkino_configured = False
+    if base_key == 'uploads' and not rel_path:
+        s = _settings.load_settings()
+        rtkino_configured = bool(s.get('rtkino_host', ''))
+
     return render_template('files.html', active='files', entries=entries,
-                           current_path=subpath, breadcrumbs=breadcrumbs)
+                           current_path=subpath, breadcrumbs=breadcrumbs,
+                           rtkino_configured=rtkino_configured)
 
 
-# ─── Upload / Delete / Download ──────────────
+# ─── RTKino UBX import (PPK uploads) ─────────
+
+@bp.route('/api/ppk/rtkino/files')
+def api_ppk_rtkino_files():
+    """List UBX files available on RTKino SD card."""
+    api = RTKINO.get_api()
+    if not api:
+        return jsonify({'ok': False, 'error': 'RTKino non configurato'}), 400
+    data = api.gnss_list_files()
+    if data is None:
+        return jsonify({'ok': False, 'error': 'Impossibile contattare RTKino'}), 502
+    files = data.get('files', []) if isinstance(data, dict) else []
+    # Annotate which files already exist in uploads
+    existing = set(os.listdir(Cfg.UPLOAD_DIR)) if os.path.isdir(Cfg.UPLOAD_DIR) else set()
+    for f in files:
+        f['already_imported'] = f.get('name', '') in existing
+    return jsonify({'ok': True, 'files': files})
+
+
+@bp.route('/api/ppk/rtkino/import', methods=['POST'])
+def api_ppk_rtkino_import():
+    """Import a UBX file from RTKino into the PPK uploads folder."""
+    data = request.get_json() or {}
+    filename = data.get('filename', '')
+    if not filename:
+        return jsonify({'ok': False, 'error': 'filename richiesto'}), 400
+
+    safe_name = secure_filename(filename)
+    if not safe_name:
+        return jsonify({'ok': False, 'error': 'filename non valido'}), 400
+
+    api = RTKINO.get_api()
+    if not api:
+        return jsonify({'ok': False, 'error': 'RTKino non configurato'}), 400
+
+    os.makedirs(Cfg.UPLOAD_DIR, exist_ok=True)
+    dest_path = os.path.join(Cfg.UPLOAD_DIR, safe_name)
+
+    # Skip download if file already exists
+    if os.path.exists(dest_path):
+        return jsonify({
+            'ok': True,
+            'filename': safe_name,
+            'size': os.path.getsize(dest_path),
+            'path': dest_path,
+            'skipped': True,
+        })
+
+    raw = api.gnss_download_file(filename)
+    if raw is None:
+        return jsonify({'ok': False, 'error': 'Download fallito da RTKino'}), 502
+
+    try:
+        with open(dest_path, 'wb') as fh:
+            fh.write(raw)
+    except OSError as exc:
+        return jsonify({'ok': False, 'error': f'Errore scrittura file: {exc}'}), 500
+
+    return jsonify({
+        'ok': True,
+        'filename': safe_name,
+        'size': len(raw),
+        'path': dest_path,
+        'skipped': False,
+    })
 
 @bp.route('/api/upload', methods=['POST'])
 def upload_file():
