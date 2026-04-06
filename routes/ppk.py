@@ -534,12 +534,13 @@ def run_convbin():
     cmd = wrapper.build_command(input_file, options)
     cmd_str = wrapper.build_command_string(input_file, options)
 
-    # Snapshot existing files to detect new outputs
+    # Snapshot existing files to detect new outputs (use resolved path)
+    resolved_output_dir = os.path.realpath(output_dir)
     start_ts = time.time()
     existing_mtimes = {}
-    if os.path.isdir(output_dir):
-        for f in os.listdir(output_dir):
-            fp = os.path.join(output_dir, f)
+    if os.path.isdir(resolved_output_dir):
+        for f in os.listdir(resolved_output_dir):
+            fp = os.path.join(resolved_output_dir, f)
             if os.path.isfile(fp):
                 existing_mtimes[f] = os.path.getmtime(fp)
 
@@ -557,7 +558,7 @@ def run_convbin():
 
     t = threading.Thread(
         target=_run_convbin_thread,
-        args=(job_id, cmd, output_dir, existing_mtimes, start_ts, cmd_str),
+        args=(job_id, cmd, resolved_output_dir, existing_mtimes, start_ts, cmd_str),
         daemon=True,
     )
     t.start()
@@ -915,6 +916,8 @@ def run_rnx2rtkp():
                        if not any(_is_within_dir(p, d) for d in _allowed_dirs)]
         if invalid_nav:
             return jsonify({'error': 'Access denied: navigation file outside allowed directories'}), 403
+        # Resolve nav paths to avoid taint-tracking concerns
+        nav_files = [os.path.realpath(p) for p in nav_files]
         missing_nav = [p for p in nav_files if not os.path.isfile(p)]
         if missing_nav:
             return jsonify({
