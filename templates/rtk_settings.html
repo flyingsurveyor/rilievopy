@@ -69,11 +69,12 @@
   <!-- Update card -->
   <div class="card" id="updateCard">
     <h2><span class="ico">🔄</span> Aggiornamento</h2>
-    <div id="update-status" style="font-size:14px;color:#555;margin-bottom:10px;">
-      <span id="update-check-text">Verifica in corso...</span>
+    <div id="update-status" style="font-size:14px;color:#555;margin-bottom:12px;">
+      <span id="update-check-text">⏳ Verifica in corso...</span>
     </div>
     <div class="actions" style="margin-bottom:10px;">
-      <button type="button" class="btn btn-success" id="update-btn" onclick="runUpdate()" disabled>🔄 Aggiorna ora</button>
+      <button type="button" class="btn btn-success" id="update-btn" onclick="runUpdate()" style="display:none;" disabled>🔄 Aggiorna ora</button>
+      <button type="button" class="btn btn-outline" id="recheck-btn" onclick="recheckUpdate()" style="display:none;" disabled>🔍 Ricontrolla</button>
     </div>
     <pre id="update-log" style="display:none;background:#1e1e1e;color:#d4d4d4;border-radius:6px;
          padding:12px;font-size:12px;max-height:300px;overflow-y:auto;white-space:pre-wrap;
@@ -491,38 +492,87 @@ async function saveMdnsHostname() {
 loadMdnsStatus();
 
 // ── Update helpers ────────────────────────────────────────────────────────────
-(function checkUpdate() {
+function setUpdateState(state, data) {
+  var card = document.getElementById('updateCard');
+  var txt = document.getElementById('update-check-text');
+  var updateBtn = document.getElementById('update-btn');
+  var recheckBtn = document.getElementById('recheck-btn');
+  card.style.borderLeft = '';
+  card.style.background = '';
+  recheckBtn.textContent = '🔍 Ricontrolla';
+  if (state === 'checking') {
+    txt.innerHTML = '⏳ Verifica in corso...';
+    updateBtn.style.display = 'none';
+    recheckBtn.style.display = 'none';
+  } else if (state === 'up_to_date') {
+    card.style.borderLeft = '4px solid #27ae60';
+    card.style.background = '#f0fff4';
+    txt.innerHTML = '<span style="color:#27ae60;font-weight:600;">✅ Versione aggiornata</span>' +
+      ' (<code>' + data.local + '</code>)';
+    updateBtn.textContent = '🔄 Aggiorna comunque';
+    updateBtn.className = 'btn btn-outline';
+    updateBtn.style.display = '';
+    updateBtn.disabled = false;
+    recheckBtn.style.display = '';
+    recheckBtn.disabled = false;
+  } else if (state === 'update_available') {
+    card.style.borderLeft = '4px solid #e67e22';
+    card.style.background = '#fffdf0';
+    txt.innerHTML = '<span style="color:#e67e22;font-weight:600;">🆕 Aggiornamento disponibile</span>' +
+      ' — locale: <code>' + data.local + '</code> → remoto: <code>' + data.remote + '</code>';
+    updateBtn.textContent = '🔄 Aggiorna ora';
+    updateBtn.className = 'btn btn-success';
+    updateBtn.style.display = '';
+    updateBtn.disabled = false;
+    recheckBtn.style.display = '';
+    recheckBtn.disabled = false;
+  } else if (state === 'error') {
+    card.style.borderLeft = '4px solid #e74c3c';
+    card.style.background = '#fff8f8';
+    txt.innerHTML = '<span style="color:#e74c3c;font-weight:600;">⚠️ Impossibile verificare</span>' +
+      ' (nessuna connessione internet?)';
+    updateBtn.textContent = '🔄 Aggiorna comunque';
+    updateBtn.className = 'btn btn-outline';
+    updateBtn.style.display = '';
+    updateBtn.disabled = false;
+    recheckBtn.textContent = '🔍 Riprova';
+    recheckBtn.style.display = '';
+    recheckBtn.disabled = false;
+  }
+}
+
+function recheckUpdate() {
+  setUpdateState('checking', {});
   fetch('/api/update/check')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var txt = document.getElementById('update-check-text');
-      var btn = document.getElementById('update-btn');
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
       if (d.update_available) {
-        txt.innerHTML = '<span style="color:#e67e22;font-weight:600;">🆕 Aggiornamento disponibile</span>' +
-          ' — locale: <code>' + d.local + '</code> → remoto: <code>' + d.remote + '</code>';
-        btn.disabled = false;
+        setUpdateState('update_available', d);
       } else if (d.up_to_date) {
-        txt.innerHTML = '<span style="color:#27ae60;font-weight:600;">✅ Versione aggiornata</span>' +
-          ' (<code>' + d.local + '</code>)';
-        btn.disabled = false; // allow forced update
+        setUpdateState('up_to_date', d);
       } else {
-        txt.textContent = 'Impossibile verificare la versione remota (nessuna connessione internet?)';
-        btn.disabled = false; // allow trying anyway
+        setUpdateState('error', {});
       }
-    }).catch(function(){
-      document.getElementById('update-check-text').textContent = 'Errore durante la verifica versione';
-      document.getElementById('update-btn').disabled = false;
+    }).catch(function() {
+      setUpdateState('error', {});
     });
-})();
+}
+
+recheckUpdate();
 
 function runUpdate() {
-  var btn = document.getElementById('update-btn');
+  var updateBtn = document.getElementById('update-btn');
+  var recheckBtn = document.getElementById('recheck-btn');
   var log = document.getElementById('update-log');
   var statusTxt = document.getElementById('update-check-text');
-  btn.disabled = true;
-  btn.textContent = '⏳ Aggiornamento in corso...';
+  var card = document.getElementById('updateCard');
+  updateBtn.disabled = true;
+  updateBtn.textContent = '⏳ Aggiornamento in corso...';
+  recheckBtn.style.display = 'none';
   log.style.display = 'block';
   log.textContent = '';
+  card.style.borderLeft = '';
+  card.style.background = '';
 
   var es = new EventSource('/api/update/run');
   var done = false;
