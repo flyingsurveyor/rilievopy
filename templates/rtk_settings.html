@@ -499,7 +499,6 @@ function setUpdateState(state, data) {
   var recheckBtn = document.getElementById('recheck-btn');
   card.style.borderLeft = '';
   card.style.background = '';
-  recheckBtn.textContent = '🔍 Ricontrolla';
   if (state === 'checking') {
     txt.innerHTML = '⏳ Verifica in corso...';
     updateBtn.style.display = 'none';
@@ -513,6 +512,7 @@ function setUpdateState(state, data) {
     updateBtn.className = 'btn btn-outline';
     updateBtn.style.display = '';
     updateBtn.disabled = false;
+    recheckBtn.textContent = '🔍 Ricontrolla';
     recheckBtn.style.display = '';
     recheckBtn.disabled = false;
   } else if (state === 'update_available') {
@@ -524,6 +524,7 @@ function setUpdateState(state, data) {
     updateBtn.className = 'btn btn-success';
     updateBtn.style.display = '';
     updateBtn.disabled = false;
+    recheckBtn.textContent = '🔍 Ricontrolla';
     recheckBtn.style.display = '';
     recheckBtn.disabled = false;
   } else if (state === 'error') {
