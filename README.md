@@ -141,7 +141,7 @@ The installer is interactive and handles everything:
 | RTKLIB tools | Optionally clones and compiles `convbin` + `rnx2rtkp` from RTKLIBExplorer demo5 |
 | Python dependencies | Installs Flask, pyubx2, waitress, openpyxl, zeroconf (+ optional geopandas) |
 | Data directories | Creates `surveys/`, `data/uploads/`, `data/rinex/`, `data/results/`, etc. |
-| Termux extras | Installs bleak (BLE), checks Termux:API, installs Termux:Widget shortcuts |
+| Termux extras | Installs bleak (BLE); Termux:API and Termux:Widget are **optional** — the app works without them |
 | systemd service | (Linux only) Optionally installs auto-start on boot |
 
 ```
@@ -150,15 +150,27 @@ The installer is interactive and handles everything:
 ./install.sh --force-build  # Rebuild RTKLIB without asking
 ```
 
-### Termux:Widget (Android)
+### Termux:Widget (Android) — optional
 
-After installation, add the widget to your home screen for one-tap start/stop:
+Termux:Widget and Termux:API are **not required** to use RilievoPY. The app runs and is fully usable via the browser at `http://127.0.0.1:8000` (or `http://localhost:8000`) without them.
+
+**Starting without a widget:**
+```bash
+cd ~/rilievopy && python app.py
+```
+Then open `http://127.0.0.1:8000` in any browser on the device.
+
+**One-tap start with Termux:Widget (optional convenience):**
 
 1. Install **Termux:Widget** from [F-Droid](https://f-droid.org/packages/com.termux.widget/)
 2. Long-press an empty area on the home screen → Widget → Termux
 3. Add **`rilievo_avvia`** (start) and **`rilievo_ferma`** (stop)
 
 The start widget checks if the app is already running — if yes, it opens the browser directly without restarting.
+
+**Push notifications with Termux:API (optional):**
+
+Install **Termux:API** from [F-Droid](https://f-droid.org/packages/com.termux.api/) to enable Android push notifications (RTK fix loss alerts), vibration, and text-to-speech. The app works fully without it.
 
 ### systemd Service (Raspberry Pi)
 
@@ -185,9 +197,11 @@ journalctl -u rilievo -f
    - **RTKLIB tools**: needed only for PPK. Choose **Skip** for RTK-only field use.
    - **geopandas**: optional, skip on low-RAM devices.
 
-4. **Install Termux:Widget** and add the widget to your home screen.
+4. **Start the app** — either:
+   - From Termux: `cd ~/rilievopy && python app.py`
+   - Or with the widget: install **Termux:Widget** (optional) and tap **`rilievo_avvia`**
 
-5. **Tap `rilievo_avvia`** — the app starts in the background and the browser opens at `http://127.0.0.1:8000`.
+5. **Open the browser** at `http://127.0.0.1:8000` (or `http://localhost:8000`).
 
 6. **First time only:** go to `/rtkino` and enter the IP address of your RTKino receiver.
 
@@ -339,8 +353,9 @@ rilievopy/
 
 ### Android
 
-- Tap **`rilievo_avvia`** widget to start. The app checks if Flask is already running — if yes, opens the browser directly.
-- Tap **`rilievo_ferma`** widget to stop.
+- **Without widget:** run `cd ~/rilievopy && python app.py` in Termux, then open `http://127.0.0.1:8000` in any browser.
+- **With Termux:Widget (optional):** tap **`rilievo_avvia`** to start. The app checks if Flask is already running — if yes, opens the browser directly.
+- Tap **`rilievo_ferma`** widget (or Ctrl+C in Termux) to stop.
 - Log file: `rilievopy/rilievo.log`
 
 ### Raspberry Pi

@@ -556,48 +556,37 @@ if [ "${PLATFORM}" = "termux" ]; then
         warn "bleak non installato — connessione BLE non disponibile"
     fi
 
-    # ── 9b. Termux:API ──────────────────────────────────────────────
+    # ── 9b. Termux:API (opzionale) ──────────────────────────────────
     echo ""
     if command -v termux-notification &>/dev/null; then
         log "Termux:API già installata"
     else
-        warn "Termux:API non trovata — notifiche Android non disponibili"
+        info "Termux:API non trovata — opzionale, l'app funziona senza"
         echo ""
-        echo "  Termux:API è necessaria per:"
+        echo "  Termux:API aggiunge funzionalità extra (non richieste):"
         echo "  • Notifiche push (perdita fix RTK)"
         echo "  • Vibrazione"
         echo "  • Text-to-speech"
         echo ""
-        echo "  Scarica e installa:"
+        echo "  Puoi installarla in qualsiasi momento da:"
         echo "  https://f-droid.org/packages/com.termux.api/"
-        echo ""
-        if ask_yn "Apro il link di download nel browser?"; then
-            termux-open-url "https://f-droid.org/packages/com.termux.api/" 2>/dev/null \
-                || am start -a android.intent.action.VIEW \
-                   -d "https://f-droid.org/packages/com.termux.api/" 2>/dev/null \
-                || info "Apri manualmente: https://f-droid.org/packages/com.termux.api/"
-        fi
     fi
 
-    # ── 9c. Termux:Widget ───────────────────────────────────────────
+    # ── 9c. Termux:Widget (opzionale) ───────────────────────────────
     SHORTCUTS_DIR="$HOME/.shortcuts"
     echo ""
     if [ -d "$SHORTCUTS_DIR" ] || command -v termux-widget &>/dev/null; then
         log "Termux:Widget disponibile"
     else
-        warn "Termux:Widget non trovato"
+        info "Termux:Widget non trovato — opzionale, l'app funziona senza"
         echo ""
-        echo "  Termux:Widget ti permette di avviare Rilievo con un tap dalla home screen."
+        echo "  Termux:Widget aggiunge avvio con un tap dalla home screen."
+        echo "  Senza widget, avvia l'app direttamente da Termux:"
+        echo "    cd ~/rilievopy && python app.py"
+        echo "  e apri http://127.0.0.1:8000 nel browser."
         echo ""
-        echo "  Scarica e installa:"
+        echo "  Per installare Termux:Widget in seguito:"
         echo "  https://f-droid.org/packages/com.termux.widget/"
-        echo ""
-        if ask_yn "Apro il link di download nel browser?"; then
-            termux-open-url "https://f-droid.org/packages/com.termux.widget/" 2>/dev/null \
-                || am start -a android.intent.action.VIEW \
-                   -d "https://f-droid.org/packages/com.termux.widget/" 2>/dev/null \
-                || info "Apri manualmente: https://f-droid.org/packages/com.termux.widget/"
-        fi
     fi
 
     # ── 9d. Install widget scripts in tasks/ (background execution, no visible session) ──
