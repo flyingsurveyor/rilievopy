@@ -46,11 +46,13 @@
         {% endfor %}
     </ul>
     {% else %}
-    <div class="empty-state">
-        <div class="empty-state-icon">📡</div>
-        <div class="empty-state-text">No raw files found</div>
-        <div class="empty-state-hint">Upload .ubx or other raw receiver files</div>
-    </div>
+    <ul class="file-list" id="fileList">
+        <li style="padding:16px; color:#95a5a6; text-align:center;">
+            <div class="empty-state-icon">📡</div>
+            <div class="empty-state-text">No raw files found</div>
+            <div class="empty-state-hint">Upload .ubx or other raw receiver files</div>
+        </li>
+    </ul>
     {% endif %}
 </div>
 
@@ -386,15 +388,43 @@
                 wrap: document.getElementById('convUploadProgressWrap'),
                 bar: document.getElementById('convUploadProgressBar'),
                 text: document.getElementById('convUploadProgressText'),
-            });
+            }, refreshRawFiles);
             setStatus('Ready', '');
-            window.location.reload();
         } catch (err) {
             setStatus('Upload failed', 'error');
         }
+        this.value = '';
     });
 
-    // ── Run convbin ──
+    // ── Refresh raw file list from server ──
+    async function refreshRawFiles() {
+        try {
+            const resp = await fetch('/api/convbin/raw_files').then(r => r.json());
+            const files = resp.files || [];
+            const list = document.getElementById('fileList');
+            if (!list) return;
+            if (files.length === 0) {
+                list.innerHTML = '<li style="padding:16px; color:#95a5a6; text-align:center;">No raw files found</li>';
+                return;
+            }
+            list.innerHTML = '';
+            files.forEach(f => {
+                const ext = (f.name.split('.').pop() || '').substring(0, 3).toUpperCase();
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.dataset.path = f.path;
+                li.setAttribute('onclick', 'selectFile(this)');
+                li.innerHTML = `<div class="file-icon ubx">${ext}</div><div class="file-info"><div class="file-name">${f.name}</div><div class="file-meta">${f.size} · ${f.modified}</div></div>`;
+                list.appendChild(li);
+            });
+        } catch (err) {
+            console.warn('refreshRawFiles error:', err);
+        }
+    }
+
+    // ── Run convbin (async job) ──
+    var _convbinPollTimer = null;
+
     async function runConvbin() {
         if (!selectedFile) return;
 
@@ -453,60 +483,110 @@
             include_leaps: document.getElementById('optInclLeaps').checked,
             station_id: document.getElementById('optStationId').value,
             trace: parseInt(document.getElementById('optTrace').value),
-            output_dir: outputDirSel,  // manda 'rinex' o 'same' come stringa esplicita
+            output_dir: outputDirSel,
         };
 
         try {
+            const startTime = Date.now();
             const resp = await fetch('/api/convbin/run', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(options),
             });
-            const result = await resp.json();
+            const data = await resp.json();
 
-            document.getElementById('cmdOutput').textContent = result.command || '—';
-
-            if (result.success || result.returncode === 0) {
-                consoleEl.innerHTML = '';
-                if (result.output) consoleEl.textContent += result.output + '\n';
-                if (result.errors) consoleEl.innerHTML += '<span class="warn">' + escapeHtml(result.errors) + '</span>\n';
-                consoleEl.textContent += '\n✓ Conversion complete.\n';
-
-                document.getElementById('outputBadge').textContent = 'success';
-                document.getElementById('outputBadge').style.cssText = 'background:#eafaf1; color:#27ae60';
-
-                const filesDiv = document.getElementById('outputFiles');
-                filesDiv.innerHTML = '<h3 style="font-size:14px; margin-bottom:8px;">Output Files</h3>';
-                if (result.output_files && result.output_files.length > 0) {
-                    result.output_files.forEach(f => {
-                        const ext = f.name.split('.').pop().substring(0, 4).toUpperCase();
-                        filesDiv.innerHTML += `
-                            <div class="file-item">
-                                <div class="file-icon obs">${ext}</div>
-                                <div class="file-info">
-                                    <div class="file-name">${f.name}</div>
-                                    <div class="file-meta">${formatSize(f.size)}</div>
-                                </div>
-                                <a href="/rinex" class="btn btn-sm btn-secondary">Analyze →</a>
-                            </div>`;
-                    });
-                } else {
-                    filesDiv.innerHTML += '<div class="text-muted">No output files detected</div>';
-                }
-                setStatus('Ready', '');
-            } else {
-                consoleEl.innerHTML = '<span class="error">' + escapeHtml(result.errors || result.error || 'Unknown error') + '</span>';
+            if (data.error) {
+                consoleEl.innerHTML = '<span class="error">' + escapeHtml(data.error) + '</span>';
                 document.getElementById('outputBadge').textContent = 'error';
                 document.getElementById('outputBadge').style.cssText = 'background:#fdedec; color:#c0392b';
                 setStatus('Error', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Convert to RINEX';
+                return;
             }
+
+            if (data.command) {
+                document.getElementById('cmdOutput').textContent = data.command;
+            }
+
+            const jobId = data.job_id;
+            consoleEl.textContent = 'Job started, waiting for result...\n';
+
+            // Poll job status every 2 seconds
+            if (_convbinPollTimer) clearInterval(_convbinPollTimer);
+            _convbinPollTimer = setInterval(async function() {
+                try {
+                    const elapsed = Math.round((Date.now() - startTime) / 1000);
+                    const jobResp = await fetch('/api/convbin/job/' + jobId).then(r => r.json());
+
+                    // Update live log
+                    if (jobResp.log && jobResp.log.length > 0) {
+                        consoleEl.textContent = jobResp.log.join('\n') + '\n';
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                    }
+
+                    if (jobResp.status !== 'running') {
+                        clearInterval(_convbinPollTimer);
+                        _convbinPollTimer = null;
+                        _convbinJobDone(jobResp);
+                    } else {
+                        btn.innerHTML = `<span class="spinner"></span> Converting… ${elapsed}s`;
+                    }
+                } catch (pollErr) {
+                    console.warn('Convbin poll error (will retry):', pollErr);
+                }
+            }, 2000);
+
         } catch (err) {
             consoleEl.innerHTML = '<span class="error">Request failed: ' + escapeHtml(err.message) + '</span>';
             setStatus('Error', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Convert to RINEX';
         }
+    }
+
+    function _convbinJobDone(result) {
+        const btn = document.getElementById('btnRun');
+        const consoleEl = document.getElementById('consoleOutput');
 
         btn.disabled = false;
         btn.textContent = 'Convert to RINEX';
+
+        if (result.success || result.returncode === 0) {
+            consoleEl.textContent = (result.output || '') + '\n✓ Conversion complete.\n';
+
+            document.getElementById('outputBadge').textContent = 'success';
+            document.getElementById('outputBadge').style.cssText = 'background:#eafaf1; color:#27ae60';
+
+            const filesDiv = document.getElementById('outputFiles');
+            filesDiv.innerHTML = '<h3 style="font-size:14px; margin-bottom:8px;">Output Files</h3>';
+            if (result.output_files && result.output_files.length > 0) {
+                result.output_files.forEach(f => {
+                    const ext = f.name.split('.').pop().substring(0, 4).toUpperCase();
+                    filesDiv.innerHTML += `
+                        <div class="file-item">
+                            <div class="file-icon obs">${ext}</div>
+                            <div class="file-info">
+                                <div class="file-name">${f.name}</div>
+                                <div class="file-meta">${formatSize(f.size)}</div>
+                            </div>
+                            <a href="/rinex" class="btn btn-sm btn-secondary">Analyze →</a>
+                        </div>`;
+                });
+            } else {
+                filesDiv.innerHTML += '<div class="text-muted">No output files detected</div>';
+            }
+            setStatus('Ready', '');
+
+            // Notify other open tabs that RINEX files have changed (Bug 5)
+            try { localStorage.setItem('rinex_updated', Date.now()); } catch(e) {}
+
+        } else {
+            consoleEl.innerHTML = '<span class="error">' + escapeHtml(result.output || result.error || 'Unknown error') + '</span>';
+            document.getElementById('outputBadge').textContent = 'error';
+            document.getElementById('outputBadge').style.cssText = 'background:#fdedec; color:#c0392b';
+            setStatus('Error', 'error');
+        }
     }
 
     function escapeHtml(text) {

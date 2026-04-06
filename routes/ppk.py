@@ -9,6 +9,9 @@ import json
 import subprocess
 import shutil
 import threading
+import time
+import uuid
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 
@@ -16,6 +19,7 @@ from flask import (
     Blueprint, render_template, request, jsonify,
     send_file, redirect, url_for
 )
+from werkzeug.utils import secure_filename
 
 from modules.ppk_config import PPKConfig as Cfg
 from modules.rinex_parser import RinexObsParser
@@ -32,7 +36,26 @@ from modules.pos_parser import (
 
 bp = Blueprint('ppk', __name__)
 
+# Async job tracking: {job_id: {status, started_at, ...}}
 running_processes = {}
+running_processes_lock = threading.Lock()
+
+# Ring-buffer size for live log tail
+_LOG_RING = 50
+# Completed job TTL in seconds (1 hour)
+_JOB_TTL = 3600
+
+
+# ─── Error handlers ──────────────────────────
+
+@bp.errorhandler(413)
+def handle_too_large(e):
+    return jsonify({'error': 'File too large — maximum size is 2 GB'}), 413
+
+
+@bp.errorhandler(408)
+def handle_timeout(e):
+    return jsonify({'error': 'Request timeout — file upload took too long'}), 408
 
 
 # ─── Utilities ────────────────────────────────
@@ -240,11 +263,17 @@ def upload_file():
         target_dir = Cfg.UPLOAD_DIR
 
     os.makedirs(target_dir, exist_ok=True)
-    filepath = os.path.join(target_dir, f.filename)
+    safe_name = secure_filename(f.filename)
+    if not safe_name:
+        return jsonify({'error': 'Invalid filename'}), 400
+    filepath = os.path.join(target_dir, safe_name)
+    real_filepath = os.path.realpath(filepath)
+    if not real_filepath.startswith(os.path.realpath(target_dir)):
+        return jsonify({'error': 'Access denied'}), 403
     f.save(filepath)
 
     return jsonify({
-        'success': True, 'filename': f.filename,
+        'success': True, 'filename': safe_name,
         'path': filepath, 'size': os.path.getsize(filepath)
     })
 
@@ -292,6 +321,130 @@ def download_file():
 @bp.route('/api/files/download')
 def api_download_file():
     return download_file()
+
+
+# ─── Async Job Helpers ────────────────────────
+
+def _cleanup_old_jobs():
+    """Remove completed job entries older than _JOB_TTL seconds."""
+    now = time.time()
+    with running_processes_lock:
+        to_delete = [
+            jid for jid, j in running_processes.items()
+            if j.get('status') in ('done', 'error') and
+            now - j.get('finished_at', now) > _JOB_TTL
+        ]
+        for jid in to_delete:
+            del running_processes[jid]
+
+
+def _run_convbin_thread(job_id, cmd, output_dir, existing_mtimes, start_ts, cmd_str):
+    """Worker thread for async convbin execution (Gap 9/10)."""
+    ring = running_processes[job_id]['log']
+    try:
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, cwd=output_dir,
+        )
+        stdout_lines = []
+        for line in proc.stdout:
+            stripped = line.rstrip('\n')
+            stdout_lines.append(line)
+            ring.append(stripped)
+            with running_processes_lock:
+                running_processes[job_id]['log_list'] = list(ring)
+        proc.wait()
+        stdout_text = ''.join(stdout_lines)
+
+        new_files = []
+        if os.path.isdir(output_dir):
+            for f in sorted(os.listdir(output_dir)):
+                fp = os.path.join(output_dir, f)
+                if not os.path.isfile(fp):
+                    continue
+                mtime = os.path.getmtime(fp)
+                if f not in existing_mtimes or mtime >= start_ts:
+                    new_files.append({'name': f, 'path': fp, 'size': os.path.getsize(fp)})
+
+        with running_processes_lock:
+            running_processes[job_id].update({
+                'status': 'done' if proc.returncode == 0 else 'error',
+                'returncode': proc.returncode,
+                'stdout': stdout_text,
+                'output_files': new_files,
+                'finished_at': time.time(),
+                'log_list': list(ring),
+            })
+    except Exception as exc:
+        with running_processes_lock:
+            running_processes[job_id].update({
+                'status': 'error', 'returncode': -1,
+                'stdout': '', 'output_files': [],
+                'finished_at': time.time(),
+                'error': str(exc),
+                'log_list': list(ring),
+            })
+    finally:
+        _cleanup_old_jobs()
+
+
+def _run_rnx2rtkp_thread(job_id, cmd, output_file, tmp_conf, cmd_str):
+    """Worker thread for async rnx2rtkp execution (Gap 9/10)."""
+    ring = running_processes[job_id]['log']
+    try:
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True,
+        )
+        stdout_lines = []
+        for line in proc.stdout:
+            stripped = line.rstrip('\n')
+            stdout_lines.append(line)
+            ring.append(stripped)
+            with running_processes_lock:
+                running_processes[job_id]['log_list'] = list(ring)
+        proc.wait()
+        stdout_text = ''.join(stdout_lines)
+
+        try:
+            os.remove(tmp_conf)
+        except OSError:
+            pass
+
+        output_info = None
+        if output_file and os.path.isfile(output_file):
+            output_info = {
+                'name': os.path.basename(output_file),
+                'path': output_file,
+                'size': os.path.getsize(output_file),
+            }
+
+        with running_processes_lock:
+            running_processes[job_id].update({
+                'status': 'done' if proc.returncode == 0 else 'error',
+                'returncode': proc.returncode,
+                'stdout': stdout_text,
+                'stderr': '',
+                'output_file': output_info,
+                'finished_at': time.time(),
+                'log_list': list(ring),
+            })
+    except Exception as exc:
+        try:
+            os.remove(tmp_conf)
+        except OSError:
+            pass
+        with running_processes_lock:
+            running_processes[job_id].update({
+                'status': 'error', 'returncode': -1,
+                'stdout': '', 'stderr': str(exc),
+                'output_file': None,
+                'finished_at': time.time(),
+                'error': str(exc),
+                'log_list': list(ring),
+            })
+    finally:
+        _cleanup_old_jobs()
 
 
 # ─── Convbin ─────────────────────────────────
@@ -362,18 +515,63 @@ def run_convbin():
         'output_dir': output_dir,
     }
 
-    try:
-        result = wrapper.run(input_file, options)
-        return jsonify({
-            'success': result.get('returncode', -1) == 0,
-            'command': result.get('command', ''),
-            'output': result.get('stdout', ''),
-            'errors': result.get('stderr', ''),
-            'output_files': result.get('output_files', []),
-            'returncode': result.get('returncode', 0),
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    # Build command upfront for the job record
+    cmd = wrapper.build_command(input_file, options)
+    cmd_str = wrapper.build_command_string(input_file, options)
+
+    # Snapshot existing files to detect new outputs
+    start_ts = time.time()
+    existing_mtimes = {}
+    if os.path.isdir(output_dir):
+        for f in os.listdir(output_dir):
+            fp = os.path.join(output_dir, f)
+            if os.path.isfile(fp):
+                existing_mtimes[f] = os.path.getmtime(fp)
+
+    job_id = uuid.uuid4().hex
+    with running_processes_lock:
+        running_processes[job_id] = {
+            'type': 'convbin',
+            'status': 'running',
+            'started_at': start_ts,
+            'command': cmd_str,
+            'input_file': input_file,
+            'log': deque(maxlen=_LOG_RING),
+            'log_list': [],
+        }
+
+    t = threading.Thread(
+        target=_run_convbin_thread,
+        args=(job_id, cmd, output_dir, existing_mtimes, start_ts, cmd_str),
+        daemon=True,
+    )
+    t.start()
+
+    return jsonify({'job_id': job_id, 'command': cmd_str})
+
+
+@bp.route('/api/convbin/job/<job_id>')
+def convbin_job_status(job_id):
+    with running_processes_lock:
+        job = running_processes.get(job_id)
+    if job is None:
+        return jsonify({'error': 'Job not found'}), 404
+    status = job.get('status', 'unknown')
+    resp = {
+        'job_id': job_id,
+        'type': job.get('type', 'convbin'),
+        'status': status,
+        'command': job.get('command', ''),
+        'started_at': job.get('started_at'),
+        'log': job.get('log_list', []),
+    }
+    if status != 'running':
+        resp['returncode'] = job.get('returncode', -1)
+        resp['output'] = job.get('stdout', '')
+        resp['output_files'] = job.get('output_files', [])
+        resp['success'] = job.get('returncode', -1) == 0
+        resp['finished_at'] = job.get('finished_at')
+    return jsonify(resp)
 
 
 @bp.route('/api/convbin/formats')
@@ -535,6 +733,40 @@ def api_nav_files():
     return jsonify({'files': _list_nav_files()})
 
 
+@bp.route('/api/rinex/obs_files')
+def api_rinex_obs_files():
+    """Alias for obs_files — used by convbin/rinex tabs for cross-tab refresh."""
+    return jsonify({'files': _list_obs_files()})
+
+
+@bp.route('/api/convbin/raw_files')
+def api_convbin_raw_files():
+    """List raw receiver files available for convbin."""
+    raw_files = list_files(Cfg.UPLOAD_DIR,
+                           ('.ubx', '.gps', '.sbp', '.bin', '.stq', '.jps',
+                            '.bnx', '.binex', '.rt17', '.sbf', '.unc',
+                            '.rtcm2', '.rtcm3', '.raw'))
+    return jsonify({'files': raw_files})
+
+
+@bp.route('/api/ppk/file_counts')
+def api_file_counts():
+    """Cheap directory scan — lets other tabs detect new files without full reload."""
+    def _count(d, exts=None):
+        if not os.path.isdir(d):
+            return 0
+        return sum(
+            1 for f in os.listdir(d)
+            if os.path.isfile(os.path.join(d, f)) and
+            (exts is None or os.path.splitext(f)[1].lower() in exts)
+        )
+    return jsonify({
+        'upload_count': _count(Cfg.UPLOAD_DIR),
+        'rinex_count': _count(Cfg.RINEX_DIR),
+        'pos_count': _count(Cfg.POS_DIR, ('.pos',)),
+    })
+
+
 # ─── Conf API ────────────────────────────────
 
 @bp.route('/api/rnx2rtkp/conf/defaults')
@@ -657,12 +889,21 @@ def run_rnx2rtkp():
     if not rover_obs or not os.path.isfile(rover_obs):
         return jsonify({'error': 'Rover observation file not found'}), 400
 
+    # Gap 8: validate nav file existence before launching subprocess
+    if nav_files:
+        missing_nav = [p for p in nav_files if not os.path.isfile(p)]
+        if missing_nav:
+            return jsonify({
+                'error': 'Navigation file(s) not found: ' + ', '.join(
+                    os.path.basename(p) for p in missing_nav)
+            }), 400
+
     base_name = os.path.splitext(os.path.basename(rover_obs))[0]
     timestamp = datetime.now().strftime('%H%M%S')
     output_file = os.path.join(Cfg.POS_DIR, f'{base_name}_{timestamp}.pos')
     os.makedirs(Cfg.POS_DIR, exist_ok=True)
 
-    tmp_conf = os.path.join(Cfg.POS_DIR, f'.tmp_{base_name}.conf')
+    tmp_conf = os.path.join(Cfg.POS_DIR, f'.tmp_{base_name}_{timestamp}.conf')
     try:
         full_conf = get_defaults()
         full_conf = merge_conf(full_conf, conf_values)
@@ -686,25 +927,72 @@ def run_rnx2rtkp():
     if overrides.get('trace'):
         options['trace'] = overrides['trace']
 
-    try:
-        result = wrapper.run(rover_obs, base_obs, nav_files, options, timeout=7200)
+    # Build command for the job record
+    cmd = wrapper.build_command(rover_obs, base_obs, nav_files, options)
+    cmd_str = wrapper.build_command_string(rover_obs, base_obs, nav_files, options)
 
-        try:
-            os.remove(tmp_conf)
-        except OSError:
-            pass
+    job_id = uuid.uuid4().hex
+    with running_processes_lock:
+        running_processes[job_id] = {
+            'type': 'rnx2rtkp',
+            'status': 'running',
+            'started_at': time.time(),
+            'command': cmd_str,
+            'rover_obs': rover_obs,
+            'log': deque(maxlen=_LOG_RING),
+            'log_list': [],
+        }
 
-        return jsonify({
-            'command': result.get('command', ''),
-            'stdout': result.get('stdout', ''),
-            'stderr': result.get('stderr', ''),
-            'returncode': result.get('returncode', -1),
-            'output_file': result.get('output_file'),
-        })
+    t = threading.Thread(
+        target=_run_rnx2rtkp_thread,
+        args=(job_id, cmd, output_file, tmp_conf, cmd_str),
+        daemon=True,
+    )
+    t.start()
 
-    except Exception as e:
-        import traceback
-        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+    return jsonify({'job_id': job_id, 'command': cmd_str})
+
+
+@bp.route('/api/rnx2rtkp/job/<job_id>')
+def rnx2rtkp_job_status(job_id):
+    with running_processes_lock:
+        job = running_processes.get(job_id)
+    if job is None:
+        return jsonify({'error': 'Job not found'}), 404
+    status = job.get('status', 'unknown')
+    resp = {
+        'job_id': job_id,
+        'type': job.get('type', 'rnx2rtkp'),
+        'status': status,
+        'command': job.get('command', ''),
+        'started_at': job.get('started_at'),
+        'log': job.get('log_list', []),
+    }
+    if status != 'running':
+        resp['returncode'] = job.get('returncode', -1)
+        resp['stdout'] = job.get('stdout', '')
+        resp['stderr'] = job.get('stderr', '')
+        resp['output_file'] = job.get('output_file')
+        resp['finished_at'] = job.get('finished_at')
+    return jsonify(resp)
+
+
+@bp.route('/api/ppk/jobs')
+def list_jobs():
+    """List all running and recently completed jobs (useful for recovery after reconnect)."""
+    with running_processes_lock:
+        jobs = []
+        for jid, j in running_processes.items():
+            jobs.append({
+                'job_id': jid,
+                'type': j.get('type', 'unknown'),
+                'status': j.get('status', 'unknown'),
+                'started_at': j.get('started_at'),
+                'finished_at': j.get('finished_at'),
+                'command': j.get('command', ''),
+            })
+    return jsonify({'jobs': jobs})
+
 
 
 @bp.route('/api/rnx2rtkp/results')
