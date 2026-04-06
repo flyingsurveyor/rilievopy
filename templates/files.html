@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Files — RTKLIB Web PPK{% endblock %}
 
+{% block head %}
+<style>
+.toast { position:fixed; bottom:24px; right:20px; padding:12px 20px; border-radius:8px;
+  color:#fff; font-weight:600; z-index:3000; transform:translateY(60px); opacity:0;
+  transition:transform .3s, opacity .3s; box-shadow:0 4px 12px rgba(0,0,0,.15); }
+.toast.show { transform:translateY(0); opacity:1; }
+.toast-ok  { background:#2ecc71; }
+.toast-err { background:#e74c3c; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <h1>Files</h1>
@@ -22,7 +33,7 @@
 <div class="flex-between mb-2" style="flex-wrap:wrap; gap:8px;">
     <div></div>
     <div style="display:flex; gap:8px; align-items:center;">
-        {% if current_path == 'uploads' %}
+        {% if current_path == '' and rtkino_configured %}
         <button class="btn btn-sm btn-secondary" id="btnRtkinoImport" onclick="openRtkinoModal()">
             📡 Import from RTKino
         </button>
@@ -94,7 +105,7 @@
     {% endif %}
 </div>
 
-{% if current_path == 'uploads' %}
+{% if current_path == '' and rtkino_configured %}
 <!-- RTKino Import Modal -->
 <div id="rtkinoModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
     <div class="card" style="width:min(600px,95vw); max-height:80vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
@@ -113,13 +124,23 @@
 </div>
 {% endif %}
 
+<div id="toast" class="toast"></div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
     // ─── RTKino Import Modal ───
-    {% if current_path == 'uploads' %}
+    {% if current_path == '' and rtkino_configured %}
     var _rtkinoConfigured = {{ 'true' if rtkino_configured else 'false' }};
+
+    function showToast(msg, ok) {
+        var t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err');
+        t.classList.add('show');
+        setTimeout(function() { t.classList.remove('show'); }, 4000);
+    }
 
     function openRtkinoModal() {
         document.getElementById('rtkinoModal').style.display = 'flex';
@@ -154,10 +175,10 @@
             data.files.forEach(function(f) {
                 var sizeStr = formatBytes(f.size || 0);
                 var importedBadge = f.already_imported
-                    ? '<span class="badge" style="background:#27ae60; color:#fff; font-size:10px;">✓ Already imported</span>'
+                    ? '<span class="badge" style="background:#27ae60; color:#fff; font-size:10px;">✓ Già importato</span>'
                     : '';
                 var importBtn = f.already_imported
-                    ? '<button class="btn btn-sm btn-secondary" disabled>✓ Imported</button>'
+                    ? '<button class="btn btn-sm btn-secondary" disabled>✓ Già importato</button>'
                     : '<button class="btn btn-sm btn-secondary" onclick="importRtkinoFile(\'' + escHtml(f.name) + '\', this)">⬇ Import</button>';
                 html += '<li class="file-item" id="rtkino-file-' + escHtml(f.name) + '">'
                       + '<div class="file-icon ubx">UBX</div>'
@@ -177,7 +198,7 @@
 
     async function importRtkinoFile(filename, btn) {
         btn.disabled = true;
-        btn.textContent = '⏳ Importing…';
+        btn.textContent = '⏳ Downloading…';
 
         try {
             var resp = await fetch('/api/ppk/rtkino/import', {
@@ -187,25 +208,27 @@
             });
             var data = await resp.json();
             if (data.ok) {
-                btn.textContent = '✓ Imported';
+                btn.textContent = '✓ Già importato';
                 var item = document.getElementById('rtkino-file-' + escHtml(filename));
                 if (item) {
                     var nameEl = item.querySelector('.file-name');
                     if (nameEl && !nameEl.querySelector('.badge')) {
-                        nameEl.insertAdjacentHTML('beforeend', ' <span class="badge" style="background:#27ae60; color:#fff; font-size:10px;">✓ Already imported</span>');
+                        nameEl.insertAdjacentHTML('beforeend', ' <span class="badge" style="background:#27ae60; color:#fff; font-size:10px;">✓ Già importato</span>');
                     }
                 }
+                var sizeStr = data.size ? ' (' + formatBytes(data.size) + ')' : '';
+                showToast('✅ ' + filename + ' importato' + sizeStr, true);
                 // Refresh the main file list after a short delay
-                setTimeout(function() { window.location.reload(); }, 1200);
+                setTimeout(function() { window.location.reload(); }, 2000);
             } else {
                 btn.disabled = false;
                 btn.textContent = '⬇ Import';
-                alert('Import failed: ' + (data.error || 'unknown error'));
+                showToast('❌ Download fallito: ' + (data.error || 'unknown error'), false);
             }
         } catch (err) {
             btn.disabled = false;
             btn.textContent = '⬇ Import';
-            alert('Import failed: ' + err.message);
+            showToast('❌ Download fallito: ' + err.message, false);
         }
     }
 

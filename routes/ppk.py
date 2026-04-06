@@ -188,9 +188,11 @@ def file_explorer(subpath=''):
                 'name': key, 'is_dir': True,
                 'size': f'{count} files', 'modified': '', 'path': key,
             })
+        s = _settings.load_settings()
+        rtkino_configured = bool(s.get('rtkino_host', ''))
         return render_template('files.html', active='files', entries=entries,
                                current_path='', breadcrumbs=[],
-                               rtkino_configured=False)
+                               rtkino_configured=rtkino_configured)
 
     if not os.path.exists(browse_path):
         return "Not found", 404
@@ -221,10 +223,8 @@ def file_explorer(subpath=''):
             accum = f'{accum}/{part}'.strip('/')
             breadcrumbs.append({'name': part, 'path': accum})
 
-    rtkino_configured = False
-    if base_key == 'uploads' and not rel_path:
-        s = _settings.load_settings()
-        rtkino_configured = bool(s.get('rtkino_host', ''))
+    s = _settings.load_settings()
+    rtkino_configured = bool(s.get('rtkino_host', ''))
 
     return render_template('files.html', active='files', entries=entries,
                            current_path=subpath, breadcrumbs=breadcrumbs,
