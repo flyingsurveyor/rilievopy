@@ -357,14 +357,11 @@
             var reconnectTimer = null;
             var reconnectDelay = 2000;
             var dataTimeout = null;
-            var ageTimer = null;
-            var lastTpvTime = null;
 
             function setNoData() {
                 if (gnssDot) { gnssDot.className = 'gnss-dot nodata'; }
                 if (gnssLbl) { gnssLbl.textContent = '—'; }
                 if (rtcmAge) { rtcmAge.className = 'rtcm-age nodata'; rtcmAge.textContent = '—'; }
-                lastTpvTime = null;
             }
 
             function applyStatus(rtk) {
@@ -381,18 +378,21 @@
                 if (gnssLbl) { gnssLbl.textContent = label; }
             }
 
-            function updateAgeBadge() {
+            function updateAgeBadge(tpv) {
                 if (!rtcmAge) return;
-                if (!lastTpvTime) {
+                var age = tpv ? tpv.rtcmAge : undefined;
+                var diffSoln = tpv ? tpv.diffSoln : undefined;
+                // Show "—" when no differential solution is active or age is unavailable
+                if (age === null || age === undefined || diffSoln === false || diffSoln === null || diffSoln === undefined || diffSoln === 0) {
                     rtcmAge.className = 'rtcm-age nodata';
                     rtcmAge.textContent = '—';
                     return;
                 }
-                var ageSec = Math.max(0, Math.round((Date.now() - new Date(lastTpvTime).getTime()) / 1000));
+                var ageSec = Math.round(age);
                 var cls, label;
-                if (ageSec < 3) {
+                if (ageSec < 5) {
                     cls = 'fresh'; label = ageSec + 's';
-                } else if (ageSec < 8) {
+                } else if (ageSec < 15) {
                     cls = 'warn';  label = ageSec + 's ⚠';
                 } else {
                     cls = 'stale'; label = ageSec + 's ✕';
@@ -413,8 +413,6 @@
                     es.onopen = function() {
                         reconnectDelay = 2000;
                         resetDataTimeout();
-                        clearInterval(ageTimer);
-                        ageTimer = setInterval(updateAgeBadge, 1000);
                     };
                     es.onmessage = function(e) {
                         resetDataTimeout();
@@ -422,9 +420,8 @@
                             var p = JSON.parse(e.data);
                             var tpv = p.TPV || {};
                             var rtk = tpv.rtk || null;
-                            if (tpv.time) { lastTpvTime = tpv.time; }
                             if (rtk) { applyStatus(rtk); } else { setNoData(); }
-                            updateAgeBadge();
+                            updateAgeBadge(tpv);
                             if (p.alerts && window.playAlertSound) {
                                 p.alerts.forEach(function(kind) { playAlertSound(kind); });
                             }
@@ -432,7 +429,6 @@
                     };
                     es.onerror = function() {
                         setNoData();
-                        clearInterval(ageTimer);
                         if (es) { try { es.close(); } catch(_) {} es = null; }
                         clearTimeout(reconnectTimer);
                         reconnectTimer = setTimeout(function() {
@@ -448,7 +444,6 @@
             window.addEventListener('beforeunload', function() {
                 clearTimeout(reconnectTimer);
                 clearTimeout(dataTimeout);
-                clearInterval(ageTimer);
                 if (es) { try { es.close(); } catch(_) {} es = null; }
             });
 
@@ -456,9 +451,9 @@
                 if (document.visibilityState === 'hidden') {
                     clearTimeout(reconnectTimer);
                     clearTimeout(dataTimeout);
-                    clearInterval(ageTimer);
                     if (es) { try { es.close(); } catch(_) {} es = null; }
                 } else {
+                    setNoData();
                     if (!es) connect();
                 }
             });
