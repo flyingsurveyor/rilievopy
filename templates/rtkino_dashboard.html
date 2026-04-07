@@ -300,7 +300,7 @@ function loadUsbStatus() {
       var cs = document.getElementById('usb-conn-status');
       if (d.connected) {
         cs.innerHTML = '<span style="color:#1a7a43;">● Connesso: ' + (d.active_device || d.configured_device) + '</span>';
-        document.getElementById('btnUsbConnect').style.display    = 'none';
+        document.getElementById('btnUsbConnect').style.display    = '';
         document.getElementById('btnUsbDisconnect').style.display = '';
       } else {
         cs.textContent = '';
@@ -376,6 +376,8 @@ function compileReader() {
 function usbConnect() {
   var device = document.getElementById('usb_device').value;
   if (!device) { showToast('Seleziona un device prima', false); return; }
+  var isConnected = document.getElementById('btnUsbDisconnect').style.display !== 'none';
+  if (isConnected) { showToast('⏳ Riconnessione in corso…', true); }
   fetch('/api/usb/connect', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},

@@ -14,3 +14,4 @@ surveys/*.bak
 data/session_log.jsonl
 templates/posview.html.bak
 rilievo_settings.json
+tools/usb_otg_reader
