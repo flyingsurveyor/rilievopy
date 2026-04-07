@@ -24,6 +24,13 @@ def sse():
         while True:
             snap = STATE.snapshot()
             try:
+                try:
+                    from modules.alert_monitor import ALERTS
+                    pending = ALERTS.pop_pending_audio()
+                    if pending:
+                        snap["alerts"] = pending
+                except Exception:
+                    pass
                 yield "data: " + json.dumps(snap) + "\n\n"
             except GeneratorExit:
                 # Client disconnected (browser navigated away, tab closed, etc.)

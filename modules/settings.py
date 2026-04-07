@@ -59,6 +59,24 @@ DEFAULTS: Dict[str, Any] = {
 
     # mDNS hostname (accesso via http://<hostname>.local/)
     "mdns_hostname": "rilievopy",
+
+    # Alert system
+    "alerts_enabled": True,           # master toggle
+    "alerts_vibrate": True,           # enable termux-vibrate
+    "alerts_notify": True,            # enable termux-notification
+    "alerts_audio": True,             # enable browser audio beeps
+    "alerts_cooldown": 60,            # seconds between same alert type
+
+    # Individual alert toggles
+    "alert_fix_lost": True,
+    "alert_fix_recovered": True,
+    "alert_rtcm_stale": True,
+    "alert_rtcm_stale_threshold": 30,  # seconds
+    "alert_hacc_degraded": True,
+    "alert_connection_lost": True,
+    "alert_point_measured": True,
+    "alert_point_vibrate": True,       # vibrate on point measurement
+    "alert_point_audio": True,         # beep on point measurement
 }
 
 # ---------- File path ----------
