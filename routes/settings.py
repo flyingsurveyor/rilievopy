@@ -25,6 +25,80 @@ bp = Blueprint('settings', __name__)
 logger = logging.getLogger(__name__)
 
 
+# ─── Alerts routes ────────────────────────────────────────────────────────────
+
+_ALERT_KEYS = [
+    "alerts_enabled", "alerts_vibrate", "alerts_notify", "alerts_audio",
+    "alerts_cooldown",
+    "alert_fix_lost", "alert_fix_recovered",
+    "alert_rtcm_stale", "alert_rtcm_stale_threshold",
+    "alert_hacc_degraded", "alert_connection_lost",
+    "alert_point_measured", "alert_point_vibrate", "alert_point_audio",
+]
+
+
+@bp.route("/settings/alerts")
+def settings_alerts_page():
+    s = cfg.load_settings()
+    alert_settings = {k: s.get(k, cfg.DEFAULTS.get(k)) for k in _ALERT_KEYS}
+    return render_template('settings_alerts.html', **alert_settings)
+
+
+@bp.route("/api/alerts/settings", methods=["POST"])
+def api_alerts_settings():
+    """Save alert settings and reload the monitor."""
+    data = request.get_json() or {}
+    changes = {}
+    for key in _ALERT_KEYS:
+        if key in data:
+            changes[key] = data[key]
+    if not changes:
+        return jsonify({"ok": False, "error": "No settings provided"}), 400
+    cfg.update(changes)
+    try:
+        from modules.alert_monitor import ALERTS
+        ALERTS.reload_settings()
+    except Exception:
+        pass
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/alerts/status")
+def api_alerts_status():
+    """Return current alert system status (termux available, monitor running, etc.)."""
+    from modules import termux_bridge as termux
+    running = False
+    try:
+        from modules.alert_monitor import ALERTS
+        running = ALERTS.is_running()
+    except Exception:
+        pass
+    return jsonify({
+        "termux_available": termux.is_available(),
+        "monitor_running": running,
+    })
+
+
+@bp.route("/api/alerts/test", methods=["POST"])
+def api_alerts_test():
+    """Fire a test alert (notification + vibrate + audio)."""
+    try:
+        from modules.alert_monitor import ALERTS
+        from modules import termux_bridge as termux
+        s = cfg.load_settings()
+        if s.get("alerts_notify", True):
+            termux.notify(title="🔔 Test avviso", content="Sistema avvisi RilievoPY operativo",
+                          priority="default", vibrate=False)
+        if s.get("alerts_vibrate", True):
+            termux.vibrate(duration_ms=200)
+        if s.get("alerts_audio", True):
+            ALERTS.queue_test_audio("success")
+        return jsonify({"ok": True})
+    except Exception:
+        logger.exception("[alerts] api_alerts_test error")
+        return jsonify({"ok": False, "error": "Errore interno del server"}), 500
+
+
 def _app_version() -> str:
     """Return git commit hash or 'unknown'."""
     try:
@@ -114,6 +188,12 @@ def api_settings():
                 relay_port=saved.get("relay_port", 21100),
                 retry=saved.get("retry_interval", 3.0),
             )
+
+    try:
+        from modules.alert_monitor import ALERTS
+        ALERTS.reload_settings()
+    except Exception:
+        pass
 
     return {"ok": True}
 

@@ -569,6 +569,13 @@ def survey_point(sid):
     except Exception:
         pass
 
+    try:
+        from modules.alert_monitor import ALERTS
+        hacc_mm = hAcc * 1000 if hAcc is not None else None
+        ALERTS.notify_point_measured(name, hacc_mm=hacc_mm)
+    except Exception:
+        pass
+
     return _redirect(f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}")
 
 

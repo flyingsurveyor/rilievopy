@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% set active = "settings" %}
+
+{% block title %}Avvisi — RilievoPY{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 720px; margin: 20px auto; padding: 0 20px; }
+.card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 16px; }
+.card h2 { color: #2c3e50; margin: 0 0 16px; font-size: 18px; border-bottom: 2px solid #3498db; padding-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.card h2 .ico { font-size: 22px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-weight: 600; color: #555; margin-bottom: 4px; font-size: 13px; }
+.field input[type=text], .field input[type=number], .field select {
+    width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 15px; font-family: inherit; background: #fafafa;
+    transition: border 0.2s;
+  }
+.field input:focus, .field select:focus { border-color: #3498db; outline: none; background: white; }
+.field .hint { font-size: 11px; color: #999; margin-top: 2px; }
+.row { display: flex; gap: 12px; }
+.row .field { flex: 1; }
+.toggle-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.toggle-row label { font-weight: 600; color: #555; font-size: 14px; margin: 0; }
+.switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 26px; transition: 0.3s; }
+.slider::before { content: ""; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+.switch input:checked + .slider { background: #2ecc71; }
+.switch input:checked + .slider::before { transform: translateX(22px); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.btn { display: inline-block; padding: 12px 24px; border: none; border-radius: 6px;
+         font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none;
+         text-align: center; transition: background 0.2s, transform 0.1s; }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: #3498db; color: white; }
+.btn-primary:hover { background: #2980b9; }
+.btn-success { background: #2ecc71; color: white; }
+.btn-success:hover { background: #27ae60; }
+.btn-danger { background: #e74c3c; color: white; font-size: 13px; padding: 8px 16px; }
+.btn-danger:hover { background: #c0392b; }
+.btn-outline { background: transparent; color: #555; border: 1px solid #ddd; }
+.btn-outline:hover { background: #f0f0f0; }
+.status-bar { padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.status-bar .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.status-ok { background: #d5f5e3; color: #1e8449; }
+.status-ok .dot { background: #2ecc71; }
+.status-warn { background: #fdebd0; color: #935116; }
+.status-warn .dot { background: #f39c12; }
+.status-nocfg { background: #f2f3f4; color: #666; }
+.status-nocfg .dot { background: #bbb; }
+.toast { position: fixed; top: 20px; right: 20px; padding: 14px 20px; border-radius: 8px;
+           color: white; font-weight: 600; z-index: 999; transform: translateX(120%);
+           transition: transform 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.toast.show { transform: translateX(0); }
+.toast-ok { background: #2ecc71; }
+.toast-err { background: #e74c3c; }
+/* Compact overrides for mobile / small screens */
+.container { padding: 5px; margin: 0; }
+.card { padding: 14px; }
+.row { flex-direction: column; gap: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Status card -->
+  <div class="card">
+    <h2><span class="ico">🔔</span> Avvisi e Feedback</h2>
+
+    <div id="statusBar" class="status-bar status-nocfg">
+      <span class="dot"></span>
+      <span id="statusText">Caricamento...</span>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+      <div style="flex:1;min-width:140px;background:#f8f9fa;border-radius:6px;padding:10px;">
+        <div style="font-size:12px;color:#888;margin-bottom:4px;">Termux:API</div>
+        <div id="termuxStatus" style="font-weight:600;font-size:14px;">—</div>
+      </div>
+      <div style="flex:1;min-width:140px;background:#f8f9fa;border-radius:6px;padding:10px;">
+        <div style="font-size:12px;color:#888;margin-bottom:4px;">Monitor</div>
+        <div id="monitorStatus" style="font-weight:600;font-size:14px;">—</div>
+      </div>
+    </div>
+
+    <div class="actions" style="margin-top:12px;">
+      <button type="button" class="btn btn-outline" onclick="testAlert()">🔔 Test avviso</button>
+    </div>
+  </div>
+
+  <!-- Generale -->
+  <div class="card">
+    <h2><span class="ico">⚙️</span> Generale</h2>
+
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alerts_enabled" {% if alerts_enabled %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Avvisi abilitati (master)</label>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alerts_notify" {% if alerts_notify %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Notifiche push (Termux)</label>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alerts_vibrate" {% if alerts_vibrate %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Vibrazione</label>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alerts_audio" {% if alerts_audio %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Suoni browser</label>
+    </div>
+    <div class="field" style="margin-top:10px;">
+      <label>Cooldown (secondi tra avvisi dello stesso tipo)</label>
+      <input type="number" id="alerts_cooldown" min="5" max="3600" value="{{ alerts_cooldown }}"/>
+    </div>
+  </div>
+
+  <!-- Avvisi GNSS -->
+  <div class="card">
+    <h2><span class="ico">🛰️</span> Avvisi GNSS</h2>
+
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alert_fix_lost" {% if alert_fix_lost %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Fix RTK perso</label>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alert_fix_recovered" {% if alert_fix_recovered %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Fix RTK recuperato</label>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alert_rtcm_stale" {% if alert_rtcm_stale %}checked{% endif %}/><span class="slider"></span></label>
+      <label>RTCM ritardate</label>
+    </div>
+    <div class="field" style="margin-left:58px;">
+      <label>Soglia età RTCM (secondi)</label>
+      <input type="number" id="alert_rtcm_stale_threshold" min="5" max="300" value="{{ alert_rtcm_stale_threshold }}"/>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alert_hacc_degraded" {% if alert_hacc_degraded %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Precisione degradata (hAcc &gt; soglia)</label>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alert_connection_lost" {% if alert_connection_lost %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Connessione persa</label>
+    </div>
+  </div>
+
+  <!-- Feedback misurazione -->
+  <div class="card">
+    <h2><span class="ico">📍</span> Feedback misurazione</h2>
+
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alert_point_measured" {% if alert_point_measured %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Avviso punto misurato</label>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alert_point_vibrate" {% if alert_point_vibrate %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Vibrazione alla misurazione</label>
+    </div>
+    <div class="toggle-row">
+      <label class="switch"><input type="checkbox" id="alert_point_audio" {% if alert_point_audio %}checked{% endif %}/><span class="slider"></span></label>
+      <label>Suono alla misurazione</label>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="card">
+    <div class="actions">
+      <button type="button" class="btn btn-primary" onclick="saveSettings()">💾 Salva impostazioni</button>
+      <a href="/settings" class="btn btn-outline">← Impostazioni generali</a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var _toast = document.getElementById('toast');
+function showToast(msg, ok) {
+  _toast.textContent = msg;
+  _toast.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err') + ' show';
+  setTimeout(function() { _toast.classList.remove('show'); }, 3000);
+}
+
+function getBool(id) {
+  return document.getElementById(id).checked;
+}
+function getInt(id, def) {
+  var v = parseInt(document.getElementById(id).value, 10);
+  return isNaN(v) ? def : v;
+}
+
+function saveSettings() {
+  var payload = {
+    alerts_enabled: getBool('alerts_enabled'),
+    alerts_notify: getBool('alerts_notify'),
+    alerts_vibrate: getBool('alerts_vibrate'),
+    alerts_audio: getBool('alerts_audio'),
+    alerts_cooldown: getInt('alerts_cooldown', 60),
+    alert_fix_lost: getBool('alert_fix_lost'),
+    alert_fix_recovered: getBool('alert_fix_recovered'),
+    alert_rtcm_stale: getBool('alert_rtcm_stale'),
+    alert_rtcm_stale_threshold: getInt('alert_rtcm_stale_threshold', 30),
+    alert_hacc_degraded: getBool('alert_hacc_degraded'),
+    alert_connection_lost: getBool('alert_connection_lost'),
+    alert_point_measured: getBool('alert_point_measured'),
+    alert_point_vibrate: getBool('alert_point_vibrate'),
+    alert_point_audio: getBool('alert_point_audio'),
+  };
+  fetch('/api/alerts/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        showToast('✅ Impostazioni salvate', true);
+      } else {
+        showToast('❌ Errore: ' + (d.error || 'sconosciuto'), false);
+      }
+    })
+    .catch(function(e) { showToast('❌ Errore di rete', false); });
+}
+
+function testAlert() {
+  fetch('/api/alerts/test', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      showToast(d.ok ? '🔔 Test inviato' : '❌ Test fallito', d.ok);
+      if (window.playAlertSound) playAlertSound('success');
+    })
+    .catch(function(e) { showToast('❌ Errore di rete', false); });
+}
+
+function loadStatus() {
+  fetch('/api/alerts/status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var bar = document.getElementById('statusBar');
+      var txt = document.getElementById('statusText');
+      var termux = document.getElementById('termuxStatus');
+      var monitor = document.getElementById('monitorStatus');
+
+      termux.textContent = d.termux_available ? '✅ Disponibile' : '❌ Non disponibile';
+      monitor.textContent = d.monitor_running ? '▶ Attivo' : '⏸ Fermato';
+
+      if (d.termux_available && d.monitor_running) {
+        bar.className = 'status-bar status-ok';
+        txt.textContent = 'Sistema avvisi operativo';
+      } else if (!d.termux_available) {
+        bar.className = 'status-bar status-warn';
+        txt.textContent = 'Termux:API non disponibile — solo suoni browser';
+      } else {
+        bar.className = 'status-bar status-nocfg';
+        txt.textContent = 'Monitor non avviato';
+      }
+    })
+    .catch(function() {});
+}
+
+loadStatus();
+</script>
+{% endblock %}

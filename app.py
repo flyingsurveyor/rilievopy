@@ -142,6 +142,11 @@ def main():
     # Start GNSS connection in background
     start_gnss_if_configured(s)
 
+    # Start alert monitor
+    from modules.alert_monitor import ALERTS
+    ALERTS.start()
+    print(f"# {now_iso()} [alerts] monitor avviato")
+
     # Create Flask app
     app = create_app()
     print(f"# {now_iso()} [web] http://{http_bind}:{http_port}")

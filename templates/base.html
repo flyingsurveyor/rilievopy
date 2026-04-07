@@ -425,6 +425,9 @@
                             if (tpv.time) { lastTpvTime = tpv.time; }
                             if (rtk) { applyStatus(rtk); } else { setNoData(); }
                             updateAgeBadge();
+                            if (p.alerts && window.playAlertSound) {
+                                p.alerts.forEach(function(kind) { playAlertSound(kind); });
+                            }
                         } catch(_) {}
                     };
                     es.onerror = function() {
@@ -473,6 +476,7 @@
             return (bytes / 1073741824).toFixed(1) + ' GB';
         }
     </script>
+    <script src="/static/js/alerts.js"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
