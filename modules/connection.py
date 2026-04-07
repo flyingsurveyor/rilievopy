@@ -88,6 +88,8 @@ class ConnectionManager:
         self._stop_event = threading.Event()
         self.connected_host: Optional[str] = None
         self.connected_port: Optional[int] = None
+        self.source_type: str = "tcp"          # "tcp" | "usb_otg"
+        self.usb_device: Optional[str] = None  # USB OTG device path
 
     @property
     def is_running(self) -> bool:
@@ -102,6 +104,8 @@ class ConnectionManager:
                 "gnss_host": self.connected_host or "",
                 "gnss_port": self.connected_port or 0,
                 "relay_active": self.relay is not None,
+                "source_type": self.source_type,
+                "usb_device": self.usb_device or "",
             }
 
     def start(self, gnss_host: str, gnss_port: int,
@@ -155,8 +159,62 @@ class ConnectionManager:
             )
             self._upstream_thread.start()
 
+            self.source_type = "tcp"
+            self.usb_device = None
             print(f"# {now_iso()} [conn] started: {gnss_host}:{gnss_port}"
                   + (f" (resolved: {resolved_host})" if resolved_host != gnss_host else "")
+                  + f" relay={'on' if relay_enabled else 'off'}")
+
+    def start_usb_otg(self, device: str,
+                      relay_enabled: bool = False, relay_bind: str = "127.0.0.1",
+                      relay_port: int = 21100, retry: float = 3.0):
+        """Start GNSS connection from USB OTG (ZED-F9P via termux-usb + libusb)."""
+        from .usb_otg import usb_otg_upstream_loop
+
+        with self._lock:
+            self._stop_internal()
+
+            if not device:
+                print(f"# {now_iso()} [conn] no USB OTG device configured, skipping")
+                STATE.set("RELAY", {"on": False, "bind": relay_bind,
+                                    "port": relay_port, "clients": 0})
+                return
+
+            self._stop_event.clear()
+            self.pipe = BytePipe()
+            self.source_type = "usb_otg"
+            self.usb_device = device
+            self.connected_host = None
+            self.connected_port = None
+
+            # Start relay if enabled
+            if relay_enabled:
+                try:
+                    self.relay = TCPRelay(relay_bind, relay_port)
+                    self.relay.start()
+                except Exception as e:
+                    print(f"# {now_iso()} [conn] relay start error: {e}")
+                    self.relay = None
+            else:
+                self.relay = None
+                STATE.set("RELAY", {"on": False, "bind": relay_bind,
+                                    "port": relay_port, "clients": 0})
+
+            # Start parser thread (same as TCP)
+            self._parser_thread = threading.Thread(
+                target=ubx_parse_loop, args=(self.pipe,), daemon=True
+            )
+            self._parser_thread.start()
+
+            # Start USB OTG upstream thread (instead of TCP upstream_loop)
+            self._upstream_thread = threading.Thread(
+                target=usb_otg_upstream_loop,
+                args=(device, self.pipe, self.relay, retry, self._stop_event),
+                daemon=True
+            )
+            self._upstream_thread.start()
+
+            print(f"# {now_iso()} [conn] USB OTG started: {device}"
                   + f" relay={'on' if relay_enabled else 'off'}")
 
     def stop(self):
@@ -180,6 +238,8 @@ class ConnectionManager:
         self._stop_event.set()
         self.connected_host = None
         self.connected_port = None
+        self.source_type = "tcp"
+        self.usb_device = None
 
         # Threads are daemon, they'll die with the process
         # but we clear references

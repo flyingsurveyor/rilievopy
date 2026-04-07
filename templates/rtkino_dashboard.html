@@ -113,8 +113,21 @@
     <span id="connText">Non connesso</span>
   </div>
 
+  <!-- ═══ SORGENTE GNSS ═════════════════════════════════════════════════════ -->
+  <div class="card anchor-target" id="source-select">
+    <h2><span class="ico">🔀</span> Sorgente GNSS</h2>
+    <div class="field">
+      <label>Tipo di connessione</label>
+      <select id="gnss_source" onchange="onSourceChange()">
+        <option value="tcp">📡 RTKino TCP (rete WiFi)</option>
+        <option value="usb_otg">🔌 USB OTG — ZED-F9P diretto (Android/Termux)</option>
+      </select>
+      <div class="hint">RTKino TCP: connessione via rete. USB OTG: ZED-F9P collegata via cavo OTG su Android/Termux.</div>
+    </div>
+  </div>
+
   <!-- ═══ HOST + CONNESSIONE ════════════════════════════════════════════════ -->
-  <div class="card anchor-target" id="host">
+  <div class="card anchor-target" id="host" data-source="tcp">
     <h2><span class="ico">📡</span> Host RTKino</h2>
     <div class="field">
       <label>Indirizzo IP di RTKino</label>
@@ -128,6 +141,53 @@
     <div class="actions" style="margin-top:14px;">
       <button class="btn btn-success" onclick="saveAndConnect()">🔌 Salva e Connetti</button>
       <a href="/settings" class="btn btn-outline">⚙ Impostazioni generali</a>
+    </div>
+  </div>
+
+  <!-- ═══ USB OTG — ZED-F9P ════════════════════════════════════════════════ -->
+  <div class="card anchor-target" id="usb-otg-card" data-source="usb_otg" style="display:none;">
+    <h2><span class="ico">🔌</span> USB OTG — ZED-F9P</h2>
+
+    <div id="usb-unavailable" style="display:none;">
+      <div class="info-box" style="background:#fff3cd; border-color:#ffc107; color:#856404;">
+        ⚠️ <strong>termux-usb non disponibile</strong> — questa funzione richiede Android + Termux + Termux:API.<br>
+        Installa con: <code>pkg install termux-api libusb clang</code>
+      </div>
+    </div>
+
+    <div id="usb-available">
+      <!-- Reader compiled status -->
+      <div id="usb-compile-section" style="margin-bottom:12px;">
+        <div id="usb-reader-status" class="info-box" style="margin-bottom:8px;"></div>
+        <button id="btnCompile" class="btn btn-outline btn-sm" onclick="compileReader()">🔨 Compila reader C</button>
+      </div>
+
+      <!-- Device selection -->
+      <div class="field">
+        <label>Device USB disponibili</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select id="usb_device" style="flex:1;">
+            <option value="">— premi Scansiona —</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="scanDevices()">🔍 Scansiona</button>
+        </div>
+        <div class="hint">ZED-F9P: VID 1546 / PID 01a9 — rilevato automaticamente</div>
+      </div>
+
+      <!-- Permission -->
+      <div class="actions" style="margin-bottom:12px;">
+        <button class="btn btn-outline" onclick="requestPermission()">🔑 Richiedi permesso USB</button>
+        <span id="permStatus" style="font-size:12px; color:#888;"></span>
+      </div>
+
+      <!-- Connect / Disconnect -->
+      <div class="actions">
+        <button class="btn btn-success" id="btnUsbConnect" onclick="usbConnect()">🔌 Connetti USB OTG</button>
+        <button class="btn btn-danger" id="btnUsbDisconnect" onclick="usbDisconnect()" style="display:none;">⏹ Disconnetti</button>
+      </div>
+
+      <!-- USB connection status -->
+      <div id="usb-conn-status" style="margin-top:12px; font-size:13px; color:#555;"></div>
     </div>
   </div>
 
@@ -172,6 +232,7 @@
 var _pollTimer = null;
 var AUTO_REFRESH = 3000;
 var RTKINO_TCP_PORT = {{ rtkino_tcp_port }};
+var _currentSource = 'tcp';
 
 function showToast(msg, ok) {
   var t = document.getElementById('toast');
@@ -183,6 +244,15 @@ function showToast(msg, ok) {
 
 function badge(el, text, cls) {
   el.innerHTML = '<span class="badge ' + cls + '">' + text + '</span>';
+}
+
+// ── Source selector ────────────────────────────────────────────────────────────
+function onSourceChange() {
+  var src = document.getElementById('gnss_source').value;
+  _currentSource = src;
+  document.getElementById('host').style.display         = (src === 'tcp')     ? '' : 'none';
+  document.getElementById('usb-otg-card').style.display = (src === 'usb_otg') ? '' : 'none';
+  if (src === 'usb_otg') loadUsbStatus();
 }
 
 // ── Save & connect TCP ────────────────────────────────────────────────────────
@@ -200,6 +270,132 @@ function saveAndConnect() {
     }).catch(function(){ showToast('Errore di rete', false); });
 }
 
+// ── USB OTG helpers ────────────────────────────────────────────────────────────
+function loadUsbStatus() {
+  fetch('/api/usb/status')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.otg_available) {
+        document.getElementById('usb-unavailable').style.display = '';
+        document.getElementById('usb-available').style.display   = 'none';
+        return;
+      }
+      document.getElementById('usb-unavailable').style.display = 'none';
+      document.getElementById('usb-available').style.display   = '';
+
+      // Reader compiled status
+      var rdr = document.getElementById('usb-reader-status');
+      var btn = document.getElementById('btnCompile');
+      if (d.reader_compiled) {
+        rdr.textContent = '✅ Reader C compilato';
+        rdr.style.background = '#d5f5e3'; rdr.style.borderColor = '#a9dfbf'; rdr.style.color = '#1a7a43';
+        btn.style.display = 'none';
+      } else {
+        rdr.textContent = '⚠️ Reader C non compilato — premi "Compila" prima di connettere';
+        rdr.style.background = '#fff3cd'; rdr.style.borderColor = '#ffc107'; rdr.style.color = '#856404';
+        btn.style.display = '';
+      }
+
+      // Connection status
+      var cs = document.getElementById('usb-conn-status');
+      if (d.connected) {
+        cs.innerHTML = '<span style="color:#1a7a43;">● Connesso: ' + (d.active_device || d.configured_device) + '</span>';
+        document.getElementById('btnUsbConnect').style.display    = 'none';
+        document.getElementById('btnUsbDisconnect').style.display = '';
+      } else {
+        cs.textContent = '';
+        document.getElementById('btnUsbConnect').style.display    = '';
+        document.getElementById('btnUsbDisconnect').style.display = 'none';
+      }
+
+      // Pre-select configured device
+      if (d.configured_device) {
+        var sel = document.getElementById('usb_device');
+        var found = false;
+        for (var i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === d.configured_device) { sel.selectedIndex = i; found = true; break; }
+        }
+        if (!found) {
+          var opt = document.createElement('option');
+          opt.value = d.configured_device; opt.text = d.configured_device;
+          sel.appendChild(opt); sel.value = d.configured_device;
+        }
+      }
+    }).catch(function(){});
+}
+
+function scanDevices() {
+  fetch('/api/usb/devices')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var sel = document.getElementById('usb_device');
+      sel.innerHTML = '';
+      if (!d.ok || !d.devices || d.devices.length === 0) {
+        var opt = document.createElement('option'); opt.value = ''; opt.text = '— nessun device trovato —';
+        sel.appendChild(opt);
+        showToast(d.error || 'Nessun device USB trovato', false);
+        return;
+      }
+      d.devices.forEach(function(dev){
+        var opt = document.createElement('option'); opt.value = dev; opt.text = dev;
+        sel.appendChild(opt);
+      });
+      showToast('Trovati ' + d.devices.length + ' device(s) ✓', true);
+    }).catch(function(){ showToast('Errore scansione USB', false); });
+}
+
+function requestPermission() {
+  var device = document.getElementById('usb_device').value;
+  if (!device) { showToast('Seleziona un device prima', false); return; }
+  document.getElementById('permStatus').textContent = '⏳ Richiesta permesso…';
+  fetch('/api/usb/permission', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({device: device})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      var ps = document.getElementById('permStatus');
+      if (d.ok) { ps.textContent = '✅ Permesso concesso'; ps.style.color = '#1a7a43'; }
+      else { ps.textContent = '⚠️ Permesso non concesso'; ps.style.color = '#a93226'; }
+      showToast(d.ok ? 'Permesso USB concesso ✓' : ('Permesso negato: ' + (d.error||'?')), d.ok);
+    }).catch(function(){ showToast('Errore di rete', false); });
+}
+
+function compileReader() {
+  showToast('⏳ Compilazione in corso…', true);
+  document.getElementById('btnCompile').disabled = true;
+  fetch('/api/usb/compile', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      document.getElementById('btnCompile').disabled = false;
+      showToast(d.ok ? 'Reader compilato ✓' : ('Errore: ' + d.message), d.ok);
+      loadUsbStatus();
+    }).catch(function(){ document.getElementById('btnCompile').disabled = false; showToast('Errore di rete', false); });
+}
+
+function usbConnect() {
+  var device = document.getElementById('usb_device').value;
+  if (!device) { showToast('Seleziona un device prima', false); return; }
+  fetch('/api/usb/connect', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({device: device})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) { showToast('Connessione USB OTG avviata → ' + device + ' ✓', true); setTimeout(function(){ loadUsbStatus(); refreshStatus(); }, 1000); }
+      else showToast('Errore: ' + (d.error || '?'), false);
+    }).catch(function(){ showToast('Errore di rete', false); });
+}
+
+function usbDisconnect() {
+  fetch('/api/usb/disconnect', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      showToast(d.ok ? 'Disconnesso ✓' : 'Errore disconnessione', d.ok);
+      setTimeout(function(){ loadUsbStatus(); refreshStatus(); }, 500);
+    }).catch(function(){ showToast('Errore di rete', false); });
+}
+
 // ── Status refresh ────────────────────────────────────────────────────────────
 function refreshStatus() {
   fetch('/api/rtkino/status')
@@ -211,6 +407,23 @@ function refreshStatus() {
       var ind = document.getElementById('connIndicator');
       var ct  = document.getElementById('connText');
       var cb  = document.getElementById('connBadge');
+
+      // Check USB OTG connection too
+      if (_currentSource === 'usb_otg') {
+        fetch('/api/usb/status').then(function(r){ return r.json(); }).then(function(ud){
+          if (ud.connected) {
+            ind.className = 'conn-indicator conn-tcp';
+            ct.textContent = '● USB OTG connesso: ' + (ud.active_device || '');
+            cb.className = 'badge badge-tcp'; cb.textContent = '🟢 USB OTG';
+          } else {
+            ind.className = 'conn-indicator conn-disconnected';
+            ct.textContent = 'USB OTG non connesso';
+            cb.className = 'badge badge-off'; cb.textContent = '⚫ offline';
+          }
+        }).catch(function(){});
+        return;
+      }
+
       if (conn === 'connected') {
         ind.className = 'conn-indicator conn-tcp';
         ct.textContent = '● Configurato — TCP Streamer :' + RTKINO_TCP_PORT + ' | WebUI :80';
@@ -253,6 +466,15 @@ function confirmCmd(cmd, msg) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+// Detect current gnss_source from server and set selector accordingly
+fetch('/api/usb/status').then(function(r){ return r.json(); }).then(function(d){
+  var src = d.gnss_source || 'tcp';
+  document.getElementById('gnss_source').value = src;
+  _currentSource = src;
+  onSourceChange();
+}).catch(function(){
+  onSourceChange();
+});
 refreshStatus();
 _pollTimer = setInterval(refreshStatus, AUTO_REFRESH);
 </script>
