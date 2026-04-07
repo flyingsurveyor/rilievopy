@@ -208,7 +208,7 @@ def usb_otg_upstream_loop(
                 if stop_event is not None and stop_event.is_set():
                     break
 
-                chunk = proc.stdout.read(4096)
+                chunk = proc.stdout.read1(4096)
                 if not chunk:
                     # EOF — subprocess exited
                     rc = proc.wait()
