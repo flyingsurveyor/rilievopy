@@ -277,6 +277,8 @@ install_deps() {
             if [ "${DO_BUILD}" -eq 1 ]; then
                 pkg install -y make clang 2>/dev/null || true
             fi
+            # libusb: required for USB OTG ZED-F9P support (tools/usb_otg_reader.c)
+            pkg install -y libusb clang 2>/dev/null || true
             ;;
         debian|wsl)
             sudo apt-get update -qq

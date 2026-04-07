@@ -57,6 +57,10 @@ DEFAULTS: Dict[str, Any] = {
     # RTKino HTTP integration
     "rtkino_host": "",
 
+    # GNSS source selection
+    "gnss_source": "tcp",       # "tcp" (RTKino) | "usb_otg" (ZED-F9P direct)
+    "usb_otg_device": "",       # e.g. "/dev/bus/usb/001/002"
+
     # mDNS hostname (accesso via http://<hostname>.local/)
     "mdns_hostname": "rilievopy",
 

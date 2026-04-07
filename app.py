@@ -84,12 +84,34 @@ def apply_settings(s: dict):
 
 
 def start_gnss_if_configured(s: dict):
-    """Start GNSS connection using RTKino host and fixed TCP port 7856.
+    """Start GNSS connection based on gnss_source setting.
 
-    RTKino-first: connection is always derived from rtkino_host + RTKINO_TCP_PORT.
-    The legacy gnss_host/gnss_port fields are ignored when rtkino_host is set.
+    - "usb_otg": direct ZED-F9P connection via USB OTG (Android/Termux)
+    - "tcp" (default): RTKino-first TCP connection
     """
     from modules.settings import RTKINO_TCP_PORT
+
+    gnss_source = s.get("gnss_source", "tcp")
+
+    if gnss_source == "usb_otg":
+        usb_device = s.get("usb_otg_device", "").strip()
+        if usb_device and s.get("gnss_autoconnect", True):
+            CONN.start_usb_otg(
+                device=usb_device,
+                relay_enabled=s.get("relay_enabled", False),
+                relay_bind=s.get("relay_bind", "127.0.0.1"),
+                relay_port=s.get("relay_port", 21100),
+                retry=s.get("retry_interval", 3.0),
+            )
+            print(f"# {now_iso()} [app] USB OTG → {usb_device}")
+        else:
+            if not usb_device:
+                print(f"# {now_iso()} [app] USB OTG: nessun device configurato — vai su /rtkino")
+            else:
+                print(f"# {now_iso()} [app] autoconnect disabilitato — connetti manualmente da /rtkino")
+        return
+
+    # Default: RTKino TCP
     rtkino_host = s.get("rtkino_host", "")
     if rtkino_host and s.get("gnss_autoconnect", True):
         CONN.start(

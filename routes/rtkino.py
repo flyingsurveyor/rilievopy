@@ -16,6 +16,14 @@ API:
   GET  /api/rtkino/survey/<sid>/points
   POST /api/rtkino/measure
   GET  /api/rtkino/measure/status
+
+  USB OTG (ZED-F9P direct via termux-usb + libusb):
+  GET  /api/usb/devices     — list available USB devices
+  POST /api/usb/connect     — connect to USB OTG device
+  POST /api/usb/disconnect  — disconnect USB OTG
+  GET  /api/usb/status      — USB OTG connection status
+  POST /api/usb/permission  — request Android USB permission
+  POST /api/usb/compile     — compile the C helper binary
 """
 
 import logging
@@ -244,3 +252,103 @@ def api_rtkino_measure_status():
     if data is None:
         return jsonify({"ok": False, "error": "Impossibile contattare RTKino"}), 502
     return jsonify({"ok": True, "status": data})
+
+
+# ── API: USB OTG (ZED-F9P direct) ────────────────────────────────────────────
+
+@bp.route("/api/usb/devices")
+def api_usb_devices():
+    """List available USB devices via termux-usb -l."""
+    from modules.usb_otg import is_usb_otg_available, list_usb_devices
+    if not is_usb_otg_available():
+        return jsonify({"ok": False, "error": "termux-usb non disponibile (solo Android/Termux)",
+                        "available": False, "devices": []})
+    devices = list_usb_devices()
+    if devices is None:
+        return jsonify({"ok": False, "error": "Impossibile ottenere la lista dei device USB",
+                        "available": True, "devices": []})
+    return jsonify({"ok": True, "available": True, "devices": devices})
+
+
+@bp.route("/api/usb/status")
+def api_usb_status():
+    """USB OTG connection status."""
+    from modules.connection import CONN
+    from modules.usb_otg import is_usb_otg_available, usb_reader_compiled
+    s = cfg.load_settings()
+    conn_status = CONN.status()
+    return jsonify({
+        "ok": True,
+        "otg_available": is_usb_otg_available(),
+        "reader_compiled": usb_reader_compiled(),
+        "gnss_source": s.get("gnss_source", "tcp"),
+        "configured_device": s.get("usb_otg_device", ""),
+        "connected": conn_status["gnss_connected"] and conn_status["source_type"] == "usb_otg",
+        "active_device": conn_status.get("usb_device", ""),
+    })
+
+
+@bp.route("/api/usb/permission", methods=["POST"])
+def api_usb_permission():
+    """Request Android USB permission for a device (shows system dialog)."""
+    from modules.usb_otg import is_usb_otg_available, request_usb_permission
+    if not is_usb_otg_available():
+        return jsonify({"ok": False, "error": "termux-usb non disponibile"}), 400
+    data = request.get_json() or {}
+    device = (data.get("device") or "").strip()
+    if not device:
+        return jsonify({"ok": False, "error": "device richiesto"}), 400
+    ok = request_usb_permission(device)
+    return jsonify({"ok": ok, "device": device})
+
+
+@bp.route("/api/usb/compile", methods=["POST"])
+def api_usb_compile():
+    """Compile the C USB OTG reader helper (tools/usb_otg_reader.c)."""
+    from modules.usb_otg import compile_usb_reader, usb_reader_compiled
+    if usb_reader_compiled():
+        return jsonify({"ok": True, "message": "Già compilato", "compiled": True})
+    ok, message = compile_usb_reader()
+    return jsonify({"ok": ok, "message": message, "compiled": ok})
+
+
+@bp.route("/api/usb/connect", methods=["POST"])
+def api_usb_connect():
+    """Connect to a USB OTG device (ZED-F9P)."""
+    from modules.connection import CONN
+    from modules.usb_otg import is_usb_otg_available, usb_reader_compiled
+    if not is_usb_otg_available():
+        return jsonify({"ok": False, "error": "termux-usb non disponibile (solo Android/Termux)"}), 400
+
+    data = request.get_json() or {}
+    device = (data.get("device") or "").strip()
+    if not device:
+        return jsonify({"ok": False, "error": "device richiesto"}), 400
+
+    if not usb_reader_compiled():
+        from modules.usb_otg import compile_usb_reader as _compile
+        ok, msg = _compile()
+        if not ok:
+            return jsonify({"ok": False, "error": f"Compilazione fallita: {msg}"}), 500
+
+    # Save settings
+    s = cfg.update({"gnss_source": "usb_otg", "usb_otg_device": device})
+
+    # Start connection
+    CONN.start_usb_otg(
+        device=device,
+        relay_enabled=s.get("relay_enabled", False),
+        relay_bind=s.get("relay_bind", "127.0.0.1"),
+        relay_port=s.get("relay_port", 21100),
+        retry=s.get("retry_interval", 3.0),
+    )
+    return jsonify({"ok": True, "device": device})
+
+
+@bp.route("/api/usb/disconnect", methods=["POST"])
+def api_usb_disconnect():
+    """Disconnect USB OTG and reset gnss_source to tcp."""
+    from modules.connection import CONN
+    CONN.stop()
+    cfg.update({"gnss_source": "tcp"})
+    return jsonify({"ok": True})
