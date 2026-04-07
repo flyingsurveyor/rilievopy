@@ -30,6 +30,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 from typing import Optional
 
@@ -41,6 +42,10 @@ _MODULE_DIR  = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_MODULE_DIR)
 _READER_SRC  = os.path.join(_PROJECT_DIR, "tools", "usb_otg_reader.c")
 _READER_BIN  = os.path.join(_PROJECT_DIR, "tools", "usb_otg_reader")
+
+# If True, the binary is deleted and recompiled at every startup of the loop.
+# Set to False once the reader is stable to skip recompilation on each run.
+ALWAYS_RECOMPILE = True
 
 
 # ── Availability checks ────────────────────────────────────────────────────────
@@ -158,7 +163,16 @@ def usb_otg_upstream_loop(
             return
 
         proc = None
+        stderr_thread = None
         try:
+            # If ALWAYS_RECOMPILE is set, force a fresh compilation every startup
+            if ALWAYS_RECOMPILE and os.path.isfile(_READER_BIN):
+                print(f"# {now_iso()} [usb_otg] ALWAYS_RECOMPILE: removing old binary")
+                try:
+                    os.remove(_READER_BIN)
+                except OSError as e:
+                    print(f"# {now_iso()} [usb_otg] could not remove old binary: {e}")
+
             if not usb_reader_compiled():
                 print(f"# {now_iso()} [usb_otg] reader binary not found, attempting compile")
                 ok, msg = compile_usb_reader()
@@ -180,6 +194,16 @@ def usb_otg_upstream_loop(
             )
             print(f"# {now_iso()} [usb_otg] reader started (pid={proc.pid})")
 
+            # Background thread: forward reader stderr to Python log in real time
+            def _stderr_reader(p):
+                for line in p.stderr:
+                    text = line.decode("utf-8", errors="replace").rstrip()
+                    if text:
+                        print(f"# [usb_otg reader] {text}")
+
+            stderr_thread = threading.Thread(target=_stderr_reader, args=(proc,), daemon=True)
+            stderr_thread.start()
+
             while True:
                 if stop_event is not None and stop_event.is_set():
                     break
@@ -188,9 +212,6 @@ def usb_otg_upstream_loop(
                 if not chunk:
                     # EOF — subprocess exited
                     rc = proc.wait()
-                    stderr_out = proc.stderr.read().decode("utf-8", errors="replace").strip()
-                    if stderr_out:
-                        print(f"# {now_iso()} [usb_otg] reader stderr: {stderr_out}")
                     raise ConnectionError(f"reader exited (rc={rc})")
 
                 pipe.feed(chunk)
@@ -210,6 +231,8 @@ def usb_otg_upstream_loop(
                         proc.kill()
                     except Exception:
                         pass
+            if stderr_thread is not None:
+                stderr_thread.join(timeout=2)
 
         if stop_event is not None and stop_event.is_set():
             return
