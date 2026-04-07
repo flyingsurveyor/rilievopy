@@ -79,6 +79,15 @@ class AlertMonitor:
             self._pending_audio.clear()
         return items
 
+    def is_running(self) -> bool:
+        """Return True if the monitor thread is alive."""
+        return bool(self._thread and self._thread.is_alive())
+
+    def queue_test_audio(self, kind: str = "success"):
+        """Queue a test audio event for browser pickup."""
+        with self._audio_lock:
+            self._pending_audio.append(kind)
+
     # ------------------------------------------------------------------ #
     # Internal helpers                                                     #
     # ------------------------------------------------------------------ #

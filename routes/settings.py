@@ -70,7 +70,7 @@ def api_alerts_status():
     running = False
     try:
         from modules.alert_monitor import ALERTS
-        running = bool(ALERTS._thread and ALERTS._thread.is_alive())
+        running = ALERTS.is_running()
     except Exception:
         pass
     return jsonify({
@@ -84,7 +84,6 @@ def api_alerts_test():
     """Fire a test alert (notification + vibrate + audio)."""
     try:
         from modules.alert_monitor import ALERTS
-        # Bypass cooldown by calling fire components directly
         from modules import termux_bridge as termux
         s = cfg.load_settings()
         if s.get("alerts_notify", True):
@@ -93,11 +92,11 @@ def api_alerts_test():
         if s.get("alerts_vibrate", True):
             termux.vibrate(duration_ms=200)
         if s.get("alerts_audio", True):
-            with ALERTS._audio_lock:
-                ALERTS._pending_audio.append("success")
+            ALERTS.queue_test_audio("success")
         return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+    except Exception:
+        logger.exception("[alerts] api_alerts_test error")
+        return jsonify({"ok": False, "error": "Errore interno del server"}), 500
 
 
 def _app_version() -> str:
