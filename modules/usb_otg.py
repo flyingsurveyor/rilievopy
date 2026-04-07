@@ -129,7 +129,8 @@ def compile_usb_reader() -> tuple:
     except subprocess.TimeoutExpired:
         return False, "Compilation timed out"
     except Exception as e:
-        return False, str(e)
+        print(f"# [usb_otg] compile error: {e}")
+        return False, "Compilation error (check logs)"
 
 
 # ── USB OTG upstream loop ──────────────────────────────────────────────────────

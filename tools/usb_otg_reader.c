@@ -66,14 +66,16 @@ int main(int argc, char **argv) {
     signal(SIGTERM, handle_signal);
     signal(SIGINT,  handle_signal);
 
-    /* libusb: disable device discovery (we have an FD, not a bus address) */
-    libusb_set_option(NULL, LIBUSB_OPTION_NO_DEVICE_DISCOVERY);
-
+    /* libusb: init first, then disable device discovery before doing anything else.
+     * LIBUSB_OPTION_NO_DEVICE_DISCOVERY must be set before any enumeration attempt.
+     * Passing the context (not NULL) is the preferred approach when context is available. */
     r = libusb_init(&ctx);
     if (r != 0) {
         fprintf(stderr, "usb_otg_reader: libusb_init failed: %s\n", libusb_error_name(r));
         return 1;
     }
+
+    libusb_set_option(ctx, LIBUSB_OPTION_NO_DEVICE_DISCOVERY);
 
     r = libusb_wrap_sys_device(ctx, (intptr_t)fd, &handle);
     if (r != 0) {

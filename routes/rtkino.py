@@ -326,7 +326,8 @@ def api_usb_connect():
         return jsonify({"ok": False, "error": "device richiesto"}), 400
 
     if not usb_reader_compiled():
-        ok, msg = __import__("modules.usb_otg", fromlist=["compile_usb_reader"]).compile_usb_reader()
+        from modules.usb_otg import compile_usb_reader as _compile
+        ok, msg = _compile()
         if not ok:
             return jsonify({"ok": False, "error": f"Compilazione fallita: {msg}"}), 500
 
