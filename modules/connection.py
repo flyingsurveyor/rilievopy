@@ -168,7 +168,7 @@ class ConnectionManager:
     def start_usb_otg(self, device: str,
                       relay_enabled: bool = False, relay_bind: str = "127.0.0.1",
                       relay_port: int = 21100, retry: float = 3.0):
-        """Start GNSS connection from USB OTG (ZED-F9P via termux-usb + libusb)."""
+        """Start GNSS connection from USB OTG (ZED-F9P via termux-usb + ioctl USBDEVFS_BULK)."""
         from .usb_otg import usb_otg_upstream_loop
 
         with self._lock:

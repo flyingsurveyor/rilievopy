@@ -17,7 +17,7 @@ API:
   POST /api/rtkino/measure
   GET  /api/rtkino/measure/status
 
-  USB OTG (ZED-F9P direct via termux-usb + libusb):
+  USB OTG (ZED-F9P direct via termux-usb + ioctl USBDEVFS_BULK):
   GET  /api/usb/devices     — list available USB devices
   POST /api/usb/connect     — connect to USB OTG device
   POST /api/usb/disconnect  — disconnect USB OTG
