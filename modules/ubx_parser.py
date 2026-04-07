@@ -12,6 +12,19 @@ from pyubx2 import UBXReader, UBX_PROTOCOL, VALCKSUM
 from .utils import now_iso, m_from_mm, m_from_01mm, rel_from_cm_01mm, hp_posecef, rtk_from_pvt, mode_from_fixtype
 from .state import STATE, BytePipe, TCPRelay
 
+# Map NAV-PVT flags3.lastCorrectionAge bucket (0-12) to upper-bound seconds.
+# See ZED-F9P interface description for bucket definitions.
+_CORR_AGE_MAP = [None, 1, 2, 5, 10, 15, 20, 30, 45, 60, 90, 120, 121]
+
+
+def _corr_age_seconds(bucket):
+    """Convert lastCorrectionAge bucket index to approximate seconds (upper bound)."""
+    if not isinstance(bucket, int):
+        return None
+    if 0 <= bucket < len(_CORR_AGE_MAP):
+        return _CORR_AGE_MAP[bucket]
+    return None
+
 
 def ubx_parse_loop(pipe: BytePipe):
     """Continuously parse UBX messages from pipe and update STATE."""
@@ -33,6 +46,8 @@ def ubx_parse_loop(pipe: BytePipe):
                         rtk = rtk_from_pvt(msg)
                         if rtk == "none" and (hacc is not None and hacc < 0.05) and (nsat and nsat >= 18):
                             rtk = "likely fixed"
+                        diff_soln = getattr(msg, "diffSoln", None)
+                        diff_age = _corr_age_seconds(getattr(msg, "lastCorrectionAge", None))
                         STATE.set("TPV", {
                             "time": now_iso(),
                             "mode": mode_from_fixtype(fx),
@@ -44,6 +59,8 @@ def ubx_parse_loop(pipe: BytePipe):
                             "hAcc": hacc, "vAcc": vacc,
                             "flags": getattr(msg, "flags", None),
                             "flags2": getattr(msg, "flags2", None),
+                            "rtcmAge": diff_age,
+                            "diffSoln": bool(diff_soln) if diff_soln is not None else None,
                         })
 
                     elif mid == "NAV-DOP":
