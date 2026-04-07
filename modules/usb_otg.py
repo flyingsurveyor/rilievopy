@@ -7,7 +7,7 @@ Architecture
 ────────────
 This module mirrors the TCP upstream_loop() pattern in ubx_parser.py, but
 instead of a TCP socket, data comes from a C helper program that reads from
-the ZED-F9P USB bulk endpoint via libusb.
+the ZED-F9P USB bulk endpoint via ioctl(USBDEVFS_BULK) — no libusb required.
 
 The C helper (tools/usb_otg_reader) is invoked via:
   termux-usb -e ./tools/usb_otg_reader <device_path>
@@ -117,7 +117,7 @@ def compile_usb_reader() -> tuple:
 
     try:
         result = subprocess.run(
-            ["clang", _READER_SRC, "-lusb-1.0", "-o", _READER_BIN],
+            ["clang", _READER_SRC, "-o", _READER_BIN],
             capture_output=True, text=True, timeout=60
         )
         if result.returncode == 0:
