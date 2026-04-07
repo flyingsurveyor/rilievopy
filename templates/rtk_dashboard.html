@@ -551,12 +551,45 @@ function updateUI(p) {
 
 // Dashboard has its OWN EventSource (separate from the sidebar dot in base.html).
 // Both must be closed on unload, otherwise Werkzeug runs out of threads.
-const es = new EventSource('/events');
-es.onmessage = e => { try { const p = JSON.parse(e.data); updateUI(p); if(window._dashMapUpdate) window._dashMapUpdate(p); } catch(_) {} };
-es.onerror   = () => {};
-window.addEventListener('beforeunload', () => { try { es.close(); } catch(_) {} });
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { try { es.close(); } catch(_) {} }
+let dashES = null;
+let dashReconnectTimer = null;
+let dashReconnectDelay = 1000;
+
+function connectDashSSE() {
+    if (dashES) { try { dashES.close(); } catch(_) {} dashES = null; }
+    clearTimeout(dashReconnectTimer);
+    dashES = new EventSource('/events');
+    dashES.onmessage = function(e) {
+        dashReconnectDelay = 1000;
+        try {
+            const p = JSON.parse(e.data);
+            updateUI(p);
+            if (window._dashMapUpdate) window._dashMapUpdate(p);
+        } catch(_) {}
+    };
+    dashES.onerror = function() {
+        if (dashES) { try { dashES.close(); } catch(_) {} dashES = null; }
+        clearTimeout(dashReconnectTimer);
+        dashReconnectTimer = setTimeout(function() {
+            if (document.visibilityState !== 'hidden') connectDashSSE();
+        }, dashReconnectDelay);
+        dashReconnectDelay = Math.min(dashReconnectDelay * 2, 15000);
+    };
+}
+
+connectDashSSE();
+
+window.addEventListener('beforeunload', function() {
+    clearTimeout(dashReconnectTimer);
+    if (dashES) { try { dashES.close(); } catch(_) {} dashES = null; }
+});
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'hidden') {
+        clearTimeout(dashReconnectTimer);
+        if (dashES) { try { dashES.close(); } catch(_) {} dashES = null; }
+    } else {
+        if (!dashES) connectDashSSE();
+    }
 });
 </script>
 {% endblock %}
