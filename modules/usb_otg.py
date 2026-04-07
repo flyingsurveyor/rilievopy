@@ -233,6 +233,8 @@ def usb_otg_upstream_loop(
                         pass
             if stderr_thread is not None:
                 stderr_thread.join(timeout=2)
+                if stderr_thread.is_alive():
+                    print(f"# {now_iso()} [usb_otg] stderr reader thread did not terminate within timeout")
 
         if stop_event is not None and stop_event.is_set():
             return
