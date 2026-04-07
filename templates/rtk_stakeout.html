@@ -95,6 +95,9 @@
 <script>
 const $=id=>document.getElementById(id);
 let es = null;
+let stakeoutActive = false;
+let stakeoutReconnectTimer = null;
+let stakeoutReconnectDelay = 1000;
 
 // ── IMU / compass state ──────────────────────────────────────────────────────
 let deviceHeading = null;   // degrees, 0=North clockwise (raw)
@@ -379,23 +382,57 @@ $('start-btn').addEventListener('click', async () => {
     initIMU();
     if (!animFrameId) drawCompass();
 
-    es = new EventSource('/stakeout/events');
-    es.onmessage = (e) => {
-      const data = JSON.parse(e.data);
-      updateStakeout(data);
-    };
+    stakeoutActive = true;
+    connectStakeoutSSE();
   } else {
     alert("Errore nell'impostare il target");
   }
 });
 
 $('stop-btn').addEventListener('click', () => {
+  stakeoutActive = false;
+  clearTimeout(stakeoutReconnectTimer);
   if (es) { es.close(); es = null; }
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   $('start-btn').style.display = 'inline-block';
   $('stop-btn').style.display = 'none';
   $('stakeout-data').style.display = 'none';
   latestBearing = null; latestDist2d = null; prevDist2d = null;
+});
+
+function connectStakeoutSSE() {
+  if (es) { try { es.close(); } catch(_) {} es = null; }
+  clearTimeout(stakeoutReconnectTimer);
+  es = new EventSource('/stakeout/events');
+  es.onmessage = function(e) {
+    stakeoutReconnectDelay = 1000;
+    try {
+      const data = JSON.parse(e.data);
+      updateStakeout(data);
+    } catch(_) {}
+  };
+  es.onerror = function() {
+    if (es) { try { es.close(); } catch(_) {} es = null; }
+    clearTimeout(stakeoutReconnectTimer);
+    stakeoutReconnectTimer = setTimeout(function() {
+      if (stakeoutActive && document.visibilityState !== 'hidden') connectStakeoutSSE();
+    }, stakeoutReconnectDelay);
+    stakeoutReconnectDelay = Math.min(stakeoutReconnectDelay * 2, 15000);
+  };
+}
+
+window.addEventListener('beforeunload', function() {
+  clearTimeout(stakeoutReconnectTimer);
+  if (es) { try { es.close(); } catch(_) {} es = null; }
+});
+
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden') {
+    clearTimeout(stakeoutReconnectTimer);
+    if (es) { try { es.close(); } catch(_) {} es = null; }
+  } else {
+    if (stakeoutActive && !es) connectStakeoutSSE();
+  }
 });
 
 function cardinalArrow(deltaN, deltaE) {
