@@ -84,11 +84,16 @@ DEFAULTS: Dict[str, Any] = {
 
     # IMU / digital level
     "imu_enabled": True,
+    "imu_sensor_name": "",             # exact sensor name from termux-sensor -l; "" = autodetect
     "imu_tilt_warn_deg": 1.0,          # yellow threshold
     "imu_tilt_error_deg": 3.0,         # red threshold
     "imu_stability_threshold_deg": 0.8,  # instability during averaging
     "imu_sampling_hz": 10,
     "alert_imu_unstable": True,
+
+    # Device setup (written once by install.sh)
+    "device_setup_done": False,
+    "device_setup_version": 0,
 }
 
 # ---------- File path ----------

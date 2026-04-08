@@ -39,6 +39,7 @@ _ALERT_KEYS = [
 
 _IMU_KEYS = [
     "imu_enabled",
+    "imu_sensor_name",
     "imu_tilt_warn_deg",
     "imu_tilt_error_deg",
     "imu_stability_threshold_deg",
@@ -170,6 +171,7 @@ def settings_page():
         workspace_dir=ws,
         workspace_default=workspace.default_workspace(),
         imu_enabled_checked="checked" if s.get("imu_enabled", True) else "",
+        imu_sensor_name=s.get("imu_sensor_name", ""),
         imu_tilt_warn_deg=str(s.get("imu_tilt_warn_deg", 1.0)),
         imu_tilt_error_deg=str(s.get("imu_tilt_error_deg", 3.0)),
         imu_stability_threshold_deg=str(s.get("imu_stability_threshold_deg", 0.8)),
