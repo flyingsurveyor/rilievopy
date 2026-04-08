@@ -16,7 +16,14 @@ class State:
         self.data: Dict[str, Dict[str, Any]] = {
             "TPV": {}, "DOP": {}, "COV": {}, "RELPOS": {},
             "HPPOSECEF": {}, "HPPOSLLH": {},
-            "RELAY": {"on": False, "bind": "127.0.0.1", "port": 21100, "clients": 0}
+            "RELAY": {"on": False, "bind": "127.0.0.1", "port": 21100, "clients": 0},
+            "IMU": {
+                "available": False,
+                "calibrated": False,
+                "tilt_deg": None,
+                "stable": True,
+                "sampling_active": False,
+            },
         }
 
     def set(self, key: str, val: Dict[str, Any]):

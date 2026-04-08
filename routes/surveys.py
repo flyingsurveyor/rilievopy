@@ -366,6 +366,7 @@ def survey_point(sid):
         saved = request.args.get("saved", "")
         savedname = request.args.get("savedname", "")
         savedcodice = request.args.get("savedcodice", "")
+        s = _settings.load_settings()
         return render_template('rtk_survey_point_form.html',
                                sid=sid,
                                next_pid=next_pid,
@@ -375,7 +376,9 @@ def survey_point(sid):
                                saved=saved,
                                savedname=savedname,
                                savedcodice=savedcodice,
-                               gnss_now=_current_gnss_snapshot())
+                               gnss_now=_current_gnss_snapshot(),
+                               imu_tilt_warn_deg=s.get("imu_tilt_warn_deg", 1.0),
+                               imu_tilt_error_deg=s.get("imu_tilt_error_deg", 3.0))
 
     name = sanitize_point_name(request.form.get("name", ""))
     desc = (request.form.get("desc", "") or "").strip()[:300]
@@ -455,10 +458,28 @@ def survey_point(sid):
     start_ts = datetime.now()
     samples = []
     n_iters = max(1, int(duration / interval))
+
+    # Attiva il monitoraggio IMU durante la media (fail silenzioso su Raspberry Pi)
+    _imu = None
+    try:
+        from modules.imu_monitor import IMU as _imu
+        _imu.set_sampling_active(True)
+    except Exception:
+        _imu = None
+
     for _ in range(n_iters):
         samples.append(STATE.snapshot())
         time.sleep(interval)
     end_ts = datetime.now()
+
+    # Disattiva il monitoraggio IMU e raccoglie i dati
+    imu_status: dict = {}
+    if _imu is not None:
+        try:
+            _imu.set_sampling_active(False)
+            imu_status = _imu.get_status()
+        except Exception:
+            pass
 
     def collect_key(group, key):
         vals = []
@@ -557,7 +578,9 @@ def survey_point(sid):
         pid, lat, lon, altHAE, altMSL, X, Y, Z, stats,
         {"name": name, "codice": codice, "desc": desc, "duration": duration,
          "interval": interval, "n_samples": len(samples),
-         "start": start_iso, "end": end_iso}
+         "start": start_iso, "end": end_iso,
+         "imu_unstable": imu_status.get("was_unstable", False),
+         "imu_tilt_max_deg": imu_status.get("tilt_max_during_sampling")}
     )
     move_pending_notes_to_feature(svy, feat, name, codice)
     svy.setdefault("features", []).append(feat)

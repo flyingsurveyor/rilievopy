@@ -298,6 +298,9 @@ def point_feature(pid: str,
             "interval_s":  meta.get("interval", 0.5),
             "start_time":  meta.get("start"),
             "end_time":    meta.get("end"),
+            # IMU stability (optional — None when IMU not available)
+            "imu_unstable":     meta.get("imu_unstable", False),
+            "imu_tilt_max_deg": meta.get("imu_tilt_max_deg"),
         }
     }
 
