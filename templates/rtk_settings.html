@@ -749,8 +749,8 @@ function saveImuSettings() {
 }
 
 function imuAutodetect() {
-  var display = document.getElementById('imu-sensor-name-display');
-  var result = document.getElementById('imu-save-result');
+  const display = document.getElementById('imu-sensor-name-display');
+  const result = document.getElementById('imu-save-result');
   display.textContent = '…rilevamento in corso…';
   fetch('/api/imu/autodetect', {
     method: 'POST',

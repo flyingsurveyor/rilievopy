@@ -10,6 +10,8 @@ import shutil
 import subprocess
 from typing import Optional
 
+from modules import settings as cfg
+
 logger = logging.getLogger(__name__)
 
 
@@ -116,7 +118,6 @@ def read_game_rotation_vector() -> Optional[list]:
             return None
 
         # Determine sensor name: prefer settings, fallback to autodetect
-        from modules import settings as cfg
         sensor_name: Optional[str] = cfg.load_settings().get("imu_sensor_name", "") or None
         if not sensor_name:
             available = list_sensors()

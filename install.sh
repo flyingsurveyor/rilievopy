@@ -581,23 +581,23 @@ if [ "${PLATFORM}" = "termux" ]; then
     # ── 9b-bis. IMU sensor autodetect + settings (idempotente) ──────
     echo ""
     SETTINGS_FILE="${SCRIPT_DIR}/rilievo_settings.json"
+    export _RILIEVOPY_SETTINGS_FILE="${SETTINGS_FILE}"
     _setup_done=0
     _setup_version=0
     if [ -f "${SETTINGS_FILE}" ]; then
-        _setup_done=$(python3 - <<'PY'
-import json, sys
+        _setup_done=$(python3 - <<'PY' 2>/dev/null || echo 0
+import json, os
 try:
-    import os
-    d = json.load(open(os.environ.get("SETTINGS_FILE","rilievo_settings.json")))
+    d = json.load(open(os.environ['_RILIEVOPY_SETTINGS_FILE']))
     print(1 if d.get("device_setup_done") else 0)
 except Exception:
     print(0)
 PY
         )
-        _setup_version=$(python3 - <<'PY'
-import json, sys, os
+        _setup_version=$(python3 - <<'PY' 2>/dev/null || echo 0
+import json, os
 try:
-    d = json.load(open(os.environ.get("SETTINGS_FILE","rilievo_settings.json")))
+    d = json.load(open(os.environ['_RILIEVOPY_SETTINGS_FILE']))
     print(int(d.get("device_setup_version", 0)))
 except Exception:
     print(0)
@@ -617,14 +617,16 @@ PY
             echo ""
             info "Rilevamento sensori IMU disponibili..."
             SENSOR_LIST_JSON=$(termux-sensor -l 2>/dev/null || echo '{"sensors":[]}')
-            SENSOR_COUNT=$(python3 -c "
-import json, sys
+            export _RILIEVOPY_SENSOR_JSON="${SENSOR_LIST_JSON}"
+            SENSOR_COUNT=$(python3 - <<'PY' 2>/dev/null || echo 0
+import json, os
 try:
-    d = json.loads('''${SENSOR_LIST_JSON}''')
+    d = json.loads(os.environ.get('_RILIEVOPY_SENSOR_JSON', '{"sensors":[]}'))
     print(len(d.get('sensors', [])))
 except Exception:
     print(0)
-" 2>/dev/null || echo 0)
+PY
+            )
 
             if [ "${SENSOR_COUNT}" -eq 0 ]; then
                 warn "Nessun sensore trovato via termux-sensor -l"
@@ -632,10 +634,10 @@ except Exception:
                 BEST_SENSOR=""
             else
                 log "Trovati ${SENSOR_COUNT} sensori"
-                BEST_SENSOR=$(python3 - <<PY
-import json
+                BEST_SENSOR=$(python3 - <<'PY' 2>/dev/null
+import json, os
 try:
-    sensors = json.loads('''${SENSOR_LIST_JSON}''').get('sensors', [])
+    sensors = json.loads(os.environ.get('_RILIEVOPY_SENSOR_JSON', '{}')).get('sensors', [])
     priority = [
         'Game Rotation Vector',
         'Rotation Vector',
@@ -661,12 +663,13 @@ PY
             # Write / patch rilievo_settings.json (safe, UTF-8, preserve existing keys)
             echo ""
             info "Scrittura impostazioni IMU in ${SETTINGS_FILE}..."
-            BEST_SENSOR_ESCAPED=$(python3 -c "import json; print(json.dumps('${BEST_SENSOR}'))" 2>/dev/null || echo '""')
-            python3 - <<PY
+            export _RILIEVOPY_BEST_SENSOR="${BEST_SENSOR}"
+            export _RILIEVOPY_SETTINGS_FILE="${SETTINGS_FILE}"
+            python3 - <<'PY'
 import json, os, sys
 
-settings_file = '${SETTINGS_FILE}'
-best_sensor   = ${BEST_SENSOR_ESCAPED}
+settings_file = os.environ.get('_RILIEVOPY_SETTINGS_FILE', 'rilievo_settings.json')
+best_sensor   = os.environ.get('_RILIEVOPY_BEST_SENSOR', '')
 
 # Load existing settings or start fresh
 data = {}
