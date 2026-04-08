@@ -230,6 +230,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
           </div>
         </div>
         <div class="imu-sampling-overlay" id="imu-sampling-overlay">📡 Monitoraggio stabilità in corso…</div>
+        <div id="imu-debug" style="display:none;font-size:11px;color:var(--muted);text-align:center;margin-top:4px"></div>
       </div>
     </div>
   </form>
@@ -542,6 +543,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
   const imuStatusText = document.getElementById('imu-status-text');
   const imuCalibrateHint = document.getElementById('imu-calibrate-hint');
   const imuSamplingOverlay = document.getElementById('imu-sampling-overlay');
+  const imuDebug = document.getElementById('imu-debug');
   const btnCalibrate = document.getElementById('btn-imu-calibrate');
 
   // Tilt thresholds injected from backend settings
@@ -553,26 +555,54 @@ details.advanced .advanced-body{padding:0 16px 16px}
   let imuPolling = null;
   let lastStable = true;
 
-  function updateBubble(tiltDeg, calibrated) {
+  // EMA smoothing state for bubble position
+  const EMA_ALPHA = 0.3;
+  let _smoothDx = 0;
+  let _smoothDy = 0;
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function updateBubble(tiltDeg, calibrated, rollDeg, pitchDeg) {
     if (!calibrated || tiltDeg === null || tiltDeg === undefined) {
       // Centre bubble, grey colour
       imuDot.style.top = '50%';
       imuDot.style.left = '50%';
       imuDot.style.background = '#95a5a6';
       imuTiltLabel.textContent = '— °';
+      _smoothDx = 0;
+      _smoothDy = 0;
+      if (imuDebug) imuDebug.style.display = 'none';
       return;
     }
-    // Map tilt angle to radial bubble offset (capped at ring boundary)
-    // TILT_ERROR + 2 provides a small over-range margin so the dot
-    // visually reaches the edge only when clearly out-of-level.
+
     const maxVisualTilt = TILT_ERROR + 2;
-    const offset = Math.min(RING_RADIUS, (Math.min(tiltDeg, maxVisualTilt) / maxVisualTilt) * RING_RADIUS);
-    // Direction is fixed bottom-right (45°): without true X/Y tilt components
-    // from the sensor endpoint, we show radial displacement only as a
-    // visual indicator that the level has changed from baseline.
-    const angle = Math.PI / 4;
-    const dx = Math.round(offset * Math.cos(angle));
-    const dy = Math.round(offset * Math.sin(angle));
+    let rawDx, rawDy;
+
+    if (rollDeg !== null && rollDeg !== undefined &&
+        pitchDeg !== null && pitchDeg !== undefined) {
+      // Use real roll/pitch axes for accurate bubble position
+      rawDx = clamp((rollDeg  / maxVisualTilt) * RING_RADIUS, -RING_RADIUS, RING_RADIUS);
+      rawDy = clamp((pitchDeg / maxVisualTilt) * RING_RADIUS, -RING_RADIUS, RING_RADIUS);
+      // Show debug text
+      if (imuDebug) {
+        imuDebug.textContent = 'roll: ' + rollDeg.toFixed(1) + '°  pitch: ' + pitchDeg.toFixed(1) + '°';
+        imuDebug.style.display = 'block';
+      }
+    } else {
+      // Fallback: radial displacement at 45° (legacy behaviour without roll/pitch)
+      const offset = Math.min(RING_RADIUS, (Math.min(tiltDeg, maxVisualTilt) / maxVisualTilt) * RING_RADIUS);
+      const angle = Math.PI / 4;
+      rawDx = Math.round(offset * Math.cos(angle));
+      rawDy = Math.round(offset * Math.sin(angle));
+      if (imuDebug) imuDebug.style.display = 'none';
+    }
+
+    // Exponential moving average for smooth bubble motion
+    _smoothDx = EMA_ALPHA * rawDx + (1 - EMA_ALPHA) * _smoothDx;
+    _smoothDy = EMA_ALPHA * rawDy + (1 - EMA_ALPHA) * _smoothDy;
+    const dx = Math.round(_smoothDx);
+    const dy = Math.round(_smoothDy);
+
     imuDot.style.left = 'calc(50% + ' + dx + 'px)';
     imuDot.style.top = 'calc(50% + ' + dy + 'px)';
     imuDot.style.transform = 'translate(-50%, -50%)';
@@ -597,7 +627,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
     if (!data.calibrated) {
       imuStatusText.textContent = 'Non calibrata';
       imuCalibrateHint.style.display = 'none';
-      updateBubble(null, false);
+      updateBubble(null, false, null, null);
     } else {
       const t = data.tilt_deg;
       let statusMsg;
@@ -612,7 +642,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
       }
       imuStatusText.textContent = statusMsg;
       imuCalibrateHint.style.display = 'block';
-      updateBubble(t, true);
+      updateBubble(t, true, data.roll_deg ?? null, data.pitch_deg ?? null);
     }
 
     // Sampling overlay
@@ -639,7 +669,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
         const data = await resp.json();
         applyStatus(data);
       } catch (_) {}
-    }, 500);
+    }, 200);
   }
 
   function stopPolling() {
