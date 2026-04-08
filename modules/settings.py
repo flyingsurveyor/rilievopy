@@ -87,7 +87,6 @@ DEFAULTS: Dict[str, Any] = {
     "imu_tilt_warn_deg": 1.0,          # yellow threshold
     "imu_tilt_error_deg": 3.0,         # red threshold
     "imu_stability_threshold_deg": 0.8,  # instability during averaging
-    "imu_sampling_hz": 10,             # kept for compatibility
     "alert_imu_unstable": True,
 }
 

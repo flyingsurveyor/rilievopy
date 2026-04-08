@@ -206,12 +206,6 @@
                min="0.1" max="5" step="0.1" value="{{ imu_stability_threshold_deg }}"/>
         <div class="hint">Se il tilt varia oltre questa soglia durante la misura → vibrazione + flag sul punto</div>
       </div>
-      <div class="field">
-        <label for="imu_sampling_hz">Frequenza campionamento (Hz)</label>
-        <input type="number" id="imu_sampling_hz" name="imu_sampling_hz"
-               min="1" max="20" step="1" value="{{ imu_sampling_hz }}"/>
-        <div class="hint">Campioni al secondo del sensore di rotazione</div>
-      </div>
     </div>
 
     <div class="toggle-row" style="margin-top:8px;">
@@ -709,7 +703,6 @@ function saveImuSettings() {
     imu_tilt_warn_deg: warn,
     imu_tilt_error_deg: error,
     imu_stability_threshold_deg: parseFloat(document.getElementById('imu_stability_threshold_deg').value) || 0.8,
-    imu_sampling_hz: parseInt(document.getElementById('imu_sampling_hz').value) || 10,
     alert_imu_unstable: document.getElementById('alert_imu_unstable').checked,
   };
   fetch('/api/imu/settings', {

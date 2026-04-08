@@ -42,7 +42,6 @@ _IMU_KEYS = [
     "imu_tilt_warn_deg",
     "imu_tilt_error_deg",
     "imu_stability_threshold_deg",
-    "imu_sampling_hz",
     "alert_imu_unstable",
 ]
 
@@ -167,7 +166,6 @@ def settings_page():
         imu_tilt_warn_deg=str(s.get("imu_tilt_warn_deg", 1.0)),
         imu_tilt_error_deg=str(s.get("imu_tilt_error_deg", 3.0)),
         imu_stability_threshold_deg=str(s.get("imu_stability_threshold_deg", 0.8)),
-        imu_sampling_hz=str(s.get("imu_sampling_hz", 10)),
         alert_imu_unstable_checked="checked" if s.get("alert_imu_unstable", True) else "",
     )
 
