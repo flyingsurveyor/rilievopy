@@ -442,7 +442,7 @@ if [ "${DO_BUILD}" -eq 1 ]; then
             MF="${MAKE_DIR}/makefile"
             [ -f "${MF}" ] || MF="${MAKE_DIR}/Makefile"
             if [ -f "${MF}" ]; then
-                sed -i 's/-lgfortran\s*//g' "${MF}"
+                sed -i 's/-lgfortran[[:space:]]*//g' "${MF}"
                 log "  Termux: rimosso -lgfortran da ${MF}"
             fi
             MAKE_CC="CC=clang"
