@@ -580,7 +580,9 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
     if (rollDeg !== null && rollDeg !== undefined &&
         pitchDeg !== null && pitchDeg !== undefined) {
-      // Use real roll/pitch axes for accurate bubble position
+      // Use real roll/pitch axes for accurate bubble position.
+      // Roll (left/right tilt) drives horizontal displacement (dx).
+      // Pitch (forward/back tilt) drives vertical displacement (dy).
       rawDx = clamp((rollDeg  / maxVisualTilt) * RING_RADIUS, -RING_RADIUS, RING_RADIUS);
       rawDy = clamp((pitchDeg / maxVisualTilt) * RING_RADIUS, -RING_RADIUS, RING_RADIUS);
       // Show debug text

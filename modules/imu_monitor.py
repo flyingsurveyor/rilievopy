@@ -59,11 +59,19 @@ def _quat_roll_pitch_deg(q_baseline: list, q_current: list) -> tuple:
     xb, yb, zb, wb = q_baseline
     xc, yc, zc, wc = q_current
 
-    # q_rel = q_current * conj(q_baseline)  (conj = [-x, -y, -z, w] per quaternione unitario)
-    rx = -wc * xb + xc * wb - yc * zb + zc * yb
-    ry = -wc * yb + xc * zb + yc * wb - zc * xb
-    rz = -wc * zb - xc * yb + yc * xb + zc * wb
-    rw =  wc * wb + xc * xb + yc * yb + zc * zb
+    # q_rel = q_current * conj(q_baseline)
+    # Conjugate of a unit quaternion q=[x,y,z,w] is [-x,-y,-z,w]
+    # Standard quaternion product (a * b) with components [x,y,z,w]:
+    #   result.x = wa*xb + xa*wb + ya*zb - za*yb
+    #   result.y = wa*yb - xa*zb + ya*wb + za*xb
+    #   result.z = wa*zb + xa*yb - ya*xb + za*wb
+    #   result.w = wa*wb - xa*xb - ya*yb - za*zb
+    # Substituting conj(q_baseline): xb→-xb, yb→-yb, zb→-zb, wb→wb
+    xbi, ybi, zbi, wbi = -xb, -yb, -zb, wb  # conjugate of baseline
+    rx = wc * xbi + xc * wbi + yc * zbi - zc * ybi
+    ry = wc * ybi - xc * zbi + yc * wbi + zc * xbi
+    rz = wc * zbi + xc * ybi - yc * xbi + zc * wbi
+    rw = wc * wbi - xc * xbi - yc * ybi - zc * zbi
 
     # Normalizza per robustezza numerica
     norm = math.sqrt(rx * rx + ry * ry + rz * rz + rw * rw)
