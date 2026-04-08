@@ -37,12 +37,10 @@ REQUIRED_TOOLS="convbin rnx2rtkp"
 # ─── Parse arguments ───
 SKIP_BUILD=0
 FORCE_BUILD=0
-FORCE_SETUP=0
 for arg in "$@"; do
     case "$arg" in
         --skip-build)    SKIP_BUILD=1 ;;
         --force-build)   FORCE_BUILD=1 ;;
-        --force-setup)   FORCE_SETUP=1 ;;
         --help|-h)
             echo "RilievoPY — Installer"
             echo ""
@@ -51,7 +49,6 @@ for arg in "$@"; do
             echo "Options:"
             echo "  --skip-build    Skip RTKLIB compilation (RTK works without it)"
             echo "  --force-build   Rebuild RTKLIB without asking"
-            echo "  --force-setup   Redo IMU sensor detection and rewrite device settings"
             echo "  --help          Show this help"
             echo ""
             echo "Environment variables:"
@@ -284,7 +281,8 @@ install_deps() {
             fi
             # clang: required for USB OTG ZED-F9P reader compilation (tools/usb_otg_reader.c)
             pkg install -y clang 2>/dev/null || true
-            # termux-api: binaries for termux-notification, termux-sensor, termux-vibrate, termux-usb
+            # termux-api: binaries for termux-notification, termux-vibrate, termux-usb
+            # (termux-sensor is NOT used — the digital level uses DeviceOrientation API in the browser)
             # procps: pgrep/pkill used by widget scripts
             # curl: health-check in widget start script
             pkg install -y termux-api procps curl 2>/dev/null || true
@@ -595,145 +593,13 @@ if [ "${PLATFORM}" = "termux" ]; then
         echo "  • Notifiche push (perdita fix RTK)"
         echo "  • Vibrazione"
         echo "  • Text-to-speech"
-        echo "  • Livella digitale IMU (termux-sensor)"
+        echo ""
+        echo "  Nota: la livella digitale IMU usa DeviceOrientation API del browser"
+        echo "  e non richiede Termux:API — funziona su Android Chrome, iOS Safari"
+        echo "  e anche quando il server è su Raspberry Pi."
         echo ""
         echo "  Puoi installarla in qualsiasi momento da:"
         echo "  https://f-droid.org/packages/com.termux.api/"
-    fi
-
-    # ── 9b-bis. IMU sensor autodetect + settings (idempotente) ──────
-    echo ""
-    SETTINGS_FILE="${SCRIPT_DIR}/rilievo_settings.json"
-    export _RILIEVOPY_SETTINGS_FILE="${SETTINGS_FILE}"
-    _setup_done=0
-    _setup_version=0
-    if [ -f "${SETTINGS_FILE}" ]; then
-        _setup_done=$(python3 - <<'PY' 2>/dev/null || echo 0
-import json, os
-try:
-    d = json.load(open(os.environ['_RILIEVOPY_SETTINGS_FILE']))
-    print(1 if d.get("device_setup_done") else 0)
-except Exception:
-    print(0)
-PY
-        )
-        _setup_version=$(python3 - <<'PY' 2>/dev/null || echo 0
-import json, os
-try:
-    d = json.load(open(os.environ['_RILIEVOPY_SETTINGS_FILE']))
-    print(int(d.get("device_setup_version", 0)))
-except Exception:
-    print(0)
-PY
-        )
-    fi
-
-    if [ "${_setup_done}" = "1" ] && [ "${_setup_version}" = "1" ] && [ "${FORCE_SETUP}" -eq 0 ]; then
-        info "Setup IMU già completato (device_setup_version=1). Usa --force-setup per rifarlo."
-    else
-        # Check termux-sensor binary
-        if ! command -v termux-sensor &>/dev/null; then
-            warn "termux-sensor non disponibile — Termux:API non installata o non nel PATH"
-            warn "Livella digitale IMU non configurata. Installare Termux:API da F-Droid e rieseguire install.sh"
-        else
-            log "termux-sensor disponibile"
-            echo ""
-            info "Rilevamento sensori IMU disponibili..."
-            SENSOR_LIST_JSON=$(timeout 10 termux-sensor -l 2>/dev/null || echo '{"sensors":[]}')
-            if [ "${SENSOR_LIST_JSON}" = '{"sensors":[]}' ]; then
-                warn "termux-sensor -l non ha risposto entro 10s."
-                warn "Verifica che i permessi sensori siano stati concessi a Termux:API:"
-                warn "  Impostazioni Android → App → Termux:API → Autorizzazioni → Sensori fisici"
-                warn "Riesegui ./install.sh --force-setup dopo aver concesso i permessi."
-            fi
-            export _RILIEVOPY_SENSOR_JSON="${SENSOR_LIST_JSON}"
-            SENSOR_COUNT=$(python3 - <<'PY' 2>/dev/null || echo 0
-import json, os
-try:
-    d = json.loads(os.environ.get('_RILIEVOPY_SENSOR_JSON', '{"sensors":[]}'))
-    print(len(d.get('sensors', [])))
-except Exception:
-    print(0)
-PY
-            )
-
-            if [ "${SENSOR_COUNT}" -eq 0 ]; then
-                warn "Nessun sensore trovato via termux-sensor -l"
-                warn "Verifica permessi Termux:API (Impostazioni → App → Termux:API → Sensori)"
-                BEST_SENSOR=""
-            else
-                log "Trovati ${SENSOR_COUNT} sensori"
-                BEST_SENSOR=$(python3 - <<'PY' 2>/dev/null
-import json, os
-try:
-    sensors = json.loads(os.environ.get('_RILIEVOPY_SENSOR_JSON', '{}')).get('sensors', [])
-    priority = [
-        'Game Rotation Vector',
-        'Rotation Vector',
-        'Game Rotation Vector -Wakeup Secondary',
-        'Rotation Vector -Wakeup Secondary',
-    ]
-    sensor_set = set(sensors)
-    for name in priority:
-        if name in sensor_set:
-            print(name)
-            break
-except Exception:
-    pass
-PY
-                )
-                if [ -n "${BEST_SENSOR}" ]; then
-                    log "Sensore IMU selezionato: ${BOLD}${BEST_SENSOR}${NC}"
-                else
-                    warn "Nessun sensore di rotazione trovato. IMU non sarà disponibile."
-                fi
-            fi
-
-            # Write / patch rilievo_settings.json (safe, UTF-8, preserve existing keys)
-            echo ""
-            info "Scrittura impostazioni IMU in ${SETTINGS_FILE}..."
-            export _RILIEVOPY_BEST_SENSOR="${BEST_SENSOR}"
-            export _RILIEVOPY_SETTINGS_FILE="${SETTINGS_FILE}"
-            python3 - <<'PY'
-import json, os, sys
-
-settings_file = os.environ.get('_RILIEVOPY_SETTINGS_FILE', 'rilievo_settings.json')
-best_sensor   = os.environ.get('_RILIEVOPY_BEST_SENSOR', '')
-
-# Load existing settings or start fresh
-data = {}
-if os.path.isfile(settings_file):
-    try:
-        with open(settings_file, 'r', encoding='utf-8') as fh:
-            data = json.load(fh)
-    except Exception:
-        data = {}
-
-# Patch IMU keys
-data['imu_enabled']                = True
-data['imu_sampling_hz']            = data.get('imu_sampling_hz', 10)
-data['imu_tilt_warn_deg']          = data.get('imu_tilt_warn_deg', 1.0)
-data['imu_tilt_error_deg']         = data.get('imu_tilt_error_deg', 3.0)
-data['imu_stability_threshold_deg']= data.get('imu_stability_threshold_deg', 0.8)
-data['alert_imu_unstable']         = data.get('alert_imu_unstable', True)
-data['device_setup_done']          = True
-data['device_setup_version']       = 1
-
-if best_sensor:
-    data['imu_sensor_name'] = best_sensor
-
-tmp = settings_file + '.tmp'
-with open(tmp, 'w', encoding='utf-8') as fh:
-    json.dump(data, fh, ensure_ascii=False, indent=2)
-os.replace(tmp, settings_file)
-print('OK')
-PY
-            if [ $? -eq 0 ]; then
-                log "rilievo_settings.json aggiornato"
-            else
-                warn "Errore scrittura rilievo_settings.json — le impostazioni verranno create al primo avvio"
-            fi
-        fi
     fi
 
     # ── 9c. Termux:Widget (opzionale) ───────────────────────────────
@@ -781,7 +647,6 @@ PY
 
     echo ""
     info "⚠️  Se installi RilievoPY su un altro dispositivo, esegui di nuovo ./install.sh"
-    info "   oppure usa --force-setup per rilevare nuovamente i sensori IMU."
 
 fi
 

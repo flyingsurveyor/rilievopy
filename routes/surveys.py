@@ -378,7 +378,8 @@ def survey_point(sid):
                                savedcodice=savedcodice,
                                gnss_now=_current_gnss_snapshot(),
                                imu_tilt_warn_deg=s.get("imu_tilt_warn_deg", 1.0),
-                               imu_tilt_error_deg=s.get("imu_tilt_error_deg", 3.0))
+                               imu_tilt_error_deg=s.get("imu_tilt_error_deg", 3.0),
+                               imu_stability_threshold_deg=s.get("imu_stability_threshold_deg", 0.8))
 
     name = sanitize_point_name(request.form.get("name", ""))
     desc = (request.form.get("desc", "") or "").strip()[:300]
@@ -459,26 +460,19 @@ def survey_point(sid):
     samples = []
     n_iters = max(1, int(duration / interval))
 
-    # Attiva il monitoraggio IMU durante la media (fail silenzioso su Raspberry Pi)
-    _imu = None
-    try:
-        from modules.imu_monitor import IMU as _imu
-        _imu.set_sampling_active(True)
-    except Exception:
-        _imu = None
-
     for _ in range(n_iters):
         samples.append(STATE.snapshot())
         time.sleep(interval)
     end_ts = datetime.now()
 
-    # Disattiva il monitoraggio IMU e raccoglie i dati
-    imu_status: dict = {}
-    if _imu is not None:
+    # Read IMU stability data submitted by the browser (DeviceOrientation API)
+    imu_unstable = request.form.get("imu_unstable", "false").lower() == "true"
+    imu_tilt_max_form = request.form.get("imu_tilt_max_deg")
+    imu_tilt_max_deg = None
+    if imu_tilt_max_form:
         try:
-            _imu.set_sampling_active(False)
-            imu_status = _imu.get_status()
-        except Exception:
+            imu_tilt_max_deg = float(imu_tilt_max_form)
+        except (ValueError, TypeError):
             pass
 
     def collect_key(group, key):
@@ -579,8 +573,8 @@ def survey_point(sid):
         {"name": name, "codice": codice, "desc": desc, "duration": duration,
          "interval": interval, "n_samples": len(samples),
          "start": start_iso, "end": end_iso,
-         "imu_unstable": imu_status.get("was_unstable", False),
-         "imu_tilt_max_deg": imu_status.get("tilt_max_during_sampling")}
+         "imu_unstable": imu_unstable,
+         "imu_tilt_max_deg": imu_tilt_max_deg}
     )
     move_pending_notes_to_feature(svy, feat, name, codice)
     svy.setdefault("features", []).append(feat)

@@ -39,7 +39,6 @@ _ALERT_KEYS = [
 
 _IMU_KEYS = [
     "imu_enabled",
-    "imu_sensor_name",
     "imu_tilt_warn_deg",
     "imu_tilt_error_deg",
     "imu_stability_threshold_deg",
@@ -50,7 +49,7 @@ _IMU_KEYS = [
 
 @bp.route("/api/imu/settings", methods=["POST"])
 def api_imu_settings():
-    """Save IMU settings and reload the IMU monitor."""
+    """Save IMU settings and reload the alert monitor."""
     data = request.get_json() or {}
     changes = {}
     for key in _IMU_KEYS:
@@ -59,13 +58,7 @@ def api_imu_settings():
     if not changes:
         return jsonify({"ok": False, "error": "No settings provided"}), 400
     cfg.update(changes)
-    # Reload IMU monitor settings if running
-    try:
-        from modules.imu_monitor import IMU
-        IMU.reload_settings()
-    except Exception:
-        logger.warning("[imu] api_imu_settings: could not reload IMU monitor", exc_info=True)
-    # Also reload alert monitor since alert_imu_unstable may have changed
+    # Reload alert monitor since alert_imu_unstable may have changed
     try:
         from modules.alert_monitor import ALERTS
         ALERTS.reload_settings()
@@ -171,7 +164,6 @@ def settings_page():
         workspace_dir=ws,
         workspace_default=workspace.default_workspace(),
         imu_enabled_checked="checked" if s.get("imu_enabled", True) else "",
-        imu_sensor_name=s.get("imu_sensor_name", ""),
         imu_tilt_warn_deg=str(s.get("imu_tilt_warn_deg", 1.0)),
         imu_tilt_error_deg=str(s.get("imu_tilt_error_deg", 3.0)),
         imu_stability_threshold_deg=str(s.get("imu_stability_threshold_deg", 0.8)),
