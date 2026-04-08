@@ -730,6 +730,9 @@ function saveImuSettings() {
       }
       setTimeout(function() { result.style.display = 'none'; }, 3000);
     }).catch(function(e) {
+      result.style.display = 'block';
+      result.style.color = '#c0392b';
+      result.textContent = '❌ Errore di rete';
       showToast('Errore di rete', false);
     });
 }

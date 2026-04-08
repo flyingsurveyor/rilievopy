@@ -63,13 +63,13 @@ def api_imu_settings():
         from modules.imu_monitor import IMU
         IMU.reload_settings()
     except Exception:
-        pass
+        logger.warning("[imu] api_imu_settings: could not reload IMU monitor", exc_info=True)
     # Also reload alert monitor since alert_imu_unstable may have changed
     try:
         from modules.alert_monitor import ALERTS
         ALERTS.reload_settings()
     except Exception:
-        pass
+        logger.warning("[imu] api_imu_settings: could not reload alert monitor", exc_info=True)
     return jsonify({"ok": True})
 
 
