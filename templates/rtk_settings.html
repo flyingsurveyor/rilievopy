@@ -172,8 +172,8 @@
     <h2><span class="ico">📐</span> Livella digitale (IMU)</h2>
     <p style="margin:0 0 12px;font-size:14px;color:#555;">
       Assistente di verticalità e monitor stabilità palina durante la media RTK.<br>
-      Richiede Termux:API con <code>termux-sensor</code> disponibile (solo Android).
-      Su Raspberry Pi il widget viene nascosto automaticamente.
+      La livella usa i sensori del browser (<strong>DeviceOrientation API</strong>) — funziona su Android Chrome, iOS Safari,
+      e anche quando il server è su Raspberry Pi. Non richiede Termux:API per il sensore.
     </p>
 
     <div class="toggle-row">
@@ -211,17 +211,6 @@
         <input type="number" id="imu_sampling_hz" name="imu_sampling_hz"
                min="1" max="20" step="1" value="{{ imu_sampling_hz }}"/>
         <div class="hint">Campioni al secondo del sensore di rotazione</div>
-      </div>
-    </div>
-
-    <div class="row" style="margin-top:4px;">
-      <div class="field" style="flex:1;">
-        <label>Sensore selezionato</label>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <code id="imu-sensor-name-display" style="background:#f0f0f0;padding:4px 8px;border-radius:4px;font-size:13px;flex:1;">{{ imu_sensor_name if imu_sensor_name else "(auto)" }}</code>
-          <button type="button" class="btn btn-outline" style="white-space:nowrap;" onclick="imuAutodetect()">🔍 Rileva automaticamente</button>
-        </div>
-        <div class="hint">Nome esatto del sensore letto da <code>termux-sensor</code>. Vuoto = autodetect a runtime.</div>
       </div>
     </div>
 
@@ -745,32 +734,6 @@ function saveImuSettings() {
       result.style.color = '#c0392b';
       result.textContent = '❌ Errore di rete';
       showToast('Errore di rete', false);
-    });
-}
-
-function imuAutodetect() {
-  const display = document.getElementById('imu-sensor-name-display');
-  const result = document.getElementById('imu-save-result');
-  display.textContent = '…rilevamento in corso…';
-  fetch('/api/imu/autodetect', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-  }).then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.ok) {
-        display.textContent = d.imu_sensor_name;
-        showToast('Sensore rilevato: ' + d.imu_sensor_name, true);
-      } else {
-        display.textContent = '(nessun sensore trovato)';
-        result.style.display = 'block';
-        result.style.color = '#c0392b';
-        result.textContent = '❌ ' + (d.error || 'Autodetect fallito');
-        showToast('Autodetect IMU fallito', false);
-        setTimeout(function() { result.style.display = 'none'; }, 4000);
-      }
-    }).catch(function(e) {
-      display.textContent = '(auto)';
-      showToast('Errore di rete durante autodetect', false);
     });
 }
 
