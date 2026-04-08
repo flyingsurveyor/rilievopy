@@ -146,6 +146,18 @@ class ImuMonitor:
         angles = [_quat_angle_deg(last_n[i], last_n[i + 1]) for i in range(len(last_n) - 1)]
         return max(angles) <= threshold
 
+    def reload_settings(self):
+        """Ricarica le soglie da settings senza riavviare il thread."""
+        try:
+            s = cfg.load_settings()
+            self._tilt_warn = s.get("imu_tilt_warn_deg", 1.0)
+            self._tilt_error = s.get("imu_tilt_error_deg", 3.0)
+            self._stability_threshold = s.get("imu_stability_threshold_deg", 0.8)
+            logger.info("[imu] settings ricaricati: warn=%.1f° error=%.1f° stability=%.1f°",
+                        self._tilt_warn, self._tilt_error, self._stability_threshold)
+        except Exception as e:
+            logger.warning("[imu] reload_settings error: %s", e)
+
     def set_sampling_active(self, active: bool):
         """
         Attivato dalla route survey prima/dopo il loop di sampling GNSS.

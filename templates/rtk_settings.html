@@ -167,6 +167,67 @@
 
   </form>
 
+  <!-- IMU / Digital Level section (outside settingsForm) -->
+  <div class="card">
+    <h2><span class="ico">📐</span> Livella digitale (IMU)</h2>
+    <p style="margin:0 0 12px;font-size:14px;color:#555;">
+      Assistente di verticalità e monitor stabilità palina durante la media RTK.<br>
+      Richiede Termux:API con <code>termux-sensor</code> disponibile (solo Android).
+      Su Raspberry Pi il widget viene nascosto automaticamente.
+    </p>
+
+    <div class="toggle-row">
+      <label class="switch">
+        <input type="checkbox" id="imu_enabled" name="imu_enabled" {{ imu_enabled_checked }} />
+        <span class="slider"></span>
+      </label>
+      <label for="imu_enabled">Abilita livella digitale IMU</label>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <div class="field">
+        <label for="imu_tilt_warn_deg">Soglia tilt ⚠️ giallo (gradi)</label>
+        <input type="number" id="imu_tilt_warn_deg" name="imu_tilt_warn_deg"
+               min="0.1" max="10" step="0.1" value="{{ imu_tilt_warn_deg }}"/>
+        <div class="hint">Sotto questa soglia: bolla verde ✅ In bolla</div>
+      </div>
+      <div class="field">
+        <label for="imu_tilt_error_deg">Soglia tilt 🔴 rosso (gradi)</label>
+        <input type="number" id="imu_tilt_error_deg" name="imu_tilt_error_deg"
+               min="0.5" max="20" step="0.1" value="{{ imu_tilt_error_deg }}"/>
+        <div class="hint">Oltre questa soglia: bolla rossa 🔴 Fuori bolla</div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:4px;">
+      <div class="field">
+        <label for="imu_stability_threshold_deg">Soglia instabilità durante media (gradi)</label>
+        <input type="number" id="imu_stability_threshold_deg" name="imu_stability_threshold_deg"
+               min="0.1" max="5" step="0.1" value="{{ imu_stability_threshold_deg }}"/>
+        <div class="hint">Se il tilt varia oltre questa soglia durante la misura → vibrazione + flag sul punto</div>
+      </div>
+      <div class="field">
+        <label for="imu_sampling_hz">Frequenza campionamento (Hz)</label>
+        <input type="number" id="imu_sampling_hz" name="imu_sampling_hz"
+               min="1" max="20" step="1" value="{{ imu_sampling_hz }}"/>
+        <div class="hint">Campioni al secondo del sensore game_rotation_vector</div>
+      </div>
+    </div>
+
+    <div class="toggle-row" style="margin-top:8px;">
+      <label class="switch">
+        <input type="checkbox" id="alert_imu_unstable" name="alert_imu_unstable" {{ alert_imu_unstable_checked }} />
+        <span class="slider"></span>
+      </label>
+      <label for="alert_imu_unstable">Avviso instabilità palina durante la media (vibrazione)</label>
+    </div>
+
+    <div class="actions" style="margin-top:14px;">
+      <button type="button" class="btn btn-primary" onclick="saveImuSettings()">💾 Salva impostazioni IMU</button>
+    </div>
+    <div id="imu-save-result" style="margin-top:8px;font-size:13px;display:none;"></div>
+  </div>
+
   <!-- Alerts link card (outside settingsForm) -->
   <div class="card">
     <h2><span class="ico">🔔</span> Avvisi e Feedback</h2>
@@ -629,6 +690,51 @@ function runUpdate() {
       }, 3000);
     }
   };
+}
+
+// ── IMU settings ──────────────────────────────────────────────────────────
+function saveImuSettings() {
+  var result = document.getElementById('imu-save-result');
+  var warn = parseFloat(document.getElementById('imu_tilt_warn_deg').value) || 1.0;
+  var error = parseFloat(document.getElementById('imu_tilt_error_deg').value) || 3.0;
+  if (warn >= error) {
+    result.style.display = 'block';
+    result.style.color = '#c0392b';
+    result.textContent = '❌ La soglia giallo deve essere minore della soglia rosso';
+    showToast('Soglia giallo deve essere < soglia rosso', false);
+    return;
+  }
+  var payload = {
+    imu_enabled: document.getElementById('imu_enabled').checked,
+    imu_tilt_warn_deg: warn,
+    imu_tilt_error_deg: error,
+    imu_stability_threshold_deg: parseFloat(document.getElementById('imu_stability_threshold_deg').value) || 0.8,
+    imu_sampling_hz: parseInt(document.getElementById('imu_sampling_hz').value) || 10,
+    alert_imu_unstable: document.getElementById('alert_imu_unstable').checked,
+  };
+  fetch('/api/imu/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      result.style.display = 'block';
+      if (d.ok) {
+        result.style.color = '#27ae60';
+        result.textContent = '✅ Impostazioni IMU salvate';
+        showToast('Impostazioni IMU salvate ✓', true);
+      } else {
+        result.style.color = '#c0392b';
+        result.textContent = '❌ Errore: ' + (d.error || '?');
+        showToast('Errore salvataggio IMU', false);
+      }
+      setTimeout(function() { result.style.display = 'none'; }, 3000);
+    }).catch(function(e) {
+      result.style.display = 'block';
+      result.style.color = '#c0392b';
+      result.textContent = '❌ Errore di rete';
+      showToast('Errore di rete', false);
+    });
 }
 
 </script>
