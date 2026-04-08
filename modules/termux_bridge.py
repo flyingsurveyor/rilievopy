@@ -4,9 +4,11 @@ Termux:API wrapper — thin Python bridge to termux-notification and termux-vibr
 All functions fail silently (return False) when Termux:API is not installed.
 """
 
+import json
 import logging
 import shutil
 import subprocess
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,37 @@ def notify(
     except Exception as e:
         logger.debug("[termux] notify error: %s", e)
         return False
+
+
+def is_sensor_available() -> bool:
+    """Check if termux-sensor binary exists on PATH."""
+    return shutil.which("termux-sensor") is not None
+
+
+def read_game_rotation_vector() -> Optional[list]:
+    """
+    Read one sample from game_rotation_vector via termux-sensor.
+    Returns [x, y, z, w] quaternion or None if not available.
+    """
+    try:
+        if not is_sensor_available():
+            return None
+        result = subprocess.run(
+            ["termux-sensor", "-s", "game_rotation_vector", "-n", "1"],
+            timeout=3,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return None
+        data = json.loads(result.stdout)
+        values = data.get("game_rotation_vector", {}).get("values")
+        if isinstance(values, list) and len(values) >= 4:
+            return [float(v) for v in values[:4]]
+        return None
+    except Exception as e:
+        logger.debug("[termux] sensor error: %s", e)
+        return None
 
 
 def vibrate(duration_ms: int = 200) -> bool:

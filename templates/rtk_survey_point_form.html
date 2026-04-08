@@ -69,6 +69,18 @@ details.advanced .advanced-body{padding:0 16px 16px}
 .confirm-title{margin:0 0 6px;color:var(--text)}
 .confirm-text{color:var(--muted);font-size:14px}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:10000}.modal-content{background:#fff;padding:20px;border-radius:14px;max-width:360px;width:90%}.modal-buttons{display:flex;gap:10px;margin-top:16px}
+
+/* ── IMU / Livella digitale ───────────────────────────────── */
+.imu-bubble-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.imu-bubble-ring{width:100px;height:100px;border-radius:50%;background:#e8edf1;border:3px solid #c0cdd5;position:relative;overflow:hidden}
+.imu-bubble-dot{width:22px;height:22px;border-radius:50%;background:var(--ok);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);transition:top .2s ease,left .2s ease,background .2s ease;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.imu-tilt-label{font-size:18px;font-weight:900;color:var(--text)}
+.imu-status-text{font-size:13px;color:var(--muted);text-align:center}
+.imu-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.imu-sampling-overlay{display:none;margin-top:8px;padding:8px 12px;border-radius:10px;background:#fff4df;color:#7a4d00;font-size:13px;font-weight:800;text-align:center}
+.imu-flash-unstable{animation:imuFlash .4s ease}
+@keyframes imuFlash{0%,100%{background:var(--card)}50%{background:#fde8e8}}
+@media (max-width:768px){.imu-bubble-ring{width:80px;height:80px}}
 @media (max-width:768px){
   .svy-shell{padding:8px 8px 98px}
   .active-strip,.status-card,.card{border-radius:18px}
@@ -197,6 +209,28 @@ details.advanced .advanced-body{padding:0 16px 16px}
       <div class="rec-status" id="rec-status">Registrazione in corso… <span id="rec-timer">0.0 s</span></div>
       <div class="helper">Le note punto si agganciano automaticamente al punto quando salvi la misura. Le note di sessione stanno nella pagina principale del rilievo.</div>
       <div class="note-list" id="recent-notes"></div>
+    </div>
+
+    <div class="card" id="imu-card" style="display:none">
+      <div class="card-head">
+        <div class="card-title">📐 Livella digitale</div>
+        <button class="btn btn-soft" id="btn-imu-calibrate" type="button">Calibra livella</button>
+      </div>
+      <div id="imu-indicator">
+        <div class="imu-row">
+          <div class="imu-bubble-wrap">
+            <div class="imu-bubble-ring">
+              <div class="imu-bubble-dot" id="imu-dot"></div>
+            </div>
+            <div class="imu-tilt-label" id="imu-tilt-label">— °</div>
+          </div>
+          <div>
+            <div class="imu-status-text" id="imu-status-text">Non calibrata</div>
+            <div class="helper" id="imu-calibrate-hint" style="display:none">Palina calibrata in questa posizione.<br>Non smontare il telefono dalla palina durante la sessione.</div>
+          </div>
+        </div>
+        <div class="imu-sampling-overlay" id="imu-sampling-overlay">📡 Monitoraggio stabilità in corso…</div>
+      </div>
     </div>
   </form>
 
@@ -496,6 +530,154 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
   ['btn-record-point','btn-record-point-mobile'].forEach(id => document.getElementById(id)?.addEventListener('click', () => startRecording('point')));
   nameInput?.addEventListener('input', () => { if (activeNextName) activeNextName.textContent = nameInput.value || '—'; });
+})();
+</script>
+
+<script>
+/* ── IMU Livella digitale ─────────────────────────────────────────── */
+(function() {
+  const imuCard = document.getElementById('imu-card');
+  const imuDot = document.getElementById('imu-dot');
+  const imuTiltLabel = document.getElementById('imu-tilt-label');
+  const imuStatusText = document.getElementById('imu-status-text');
+  const imuCalibrateHint = document.getElementById('imu-calibrate-hint');
+  const imuSamplingOverlay = document.getElementById('imu-sampling-overlay');
+  const btnCalibrate = document.getElementById('btn-imu-calibrate');
+
+  // Tilt thresholds injected from backend settings
+  const TILT_WARN = {{ imu_tilt_warn_deg | tojson }};
+  const TILT_ERROR = {{ imu_tilt_error_deg | tojson }};
+  // Maximum bubble displacement in px from ring centre (ring is 100px diameter, dot is 22px)
+  const RING_RADIUS = 28;  // (50px half-ring) - (11px dot-radius) - 11px margin
+
+  let imuPolling = null;
+  let lastStable = true;
+
+  function updateBubble(tiltDeg, calibrated) {
+    if (!calibrated || tiltDeg === null || tiltDeg === undefined) {
+      // Centre bubble, grey colour
+      imuDot.style.top = '50%';
+      imuDot.style.left = '50%';
+      imuDot.style.background = '#95a5a6';
+      imuTiltLabel.textContent = '— °';
+      return;
+    }
+    // Map tilt angle to radial bubble offset (capped at ring boundary)
+    // TILT_ERROR + 2 provides a small over-range margin so the dot
+    // visually reaches the edge only when clearly out-of-level.
+    const maxVisualTilt = TILT_ERROR + 2;
+    const offset = Math.min(RING_RADIUS, (Math.min(tiltDeg, maxVisualTilt) / maxVisualTilt) * RING_RADIUS);
+    // Direction is fixed bottom-right (45°): without true X/Y tilt components
+    // from the sensor endpoint, we show radial displacement only as a
+    // visual indicator that the level has changed from baseline.
+    const angle = Math.PI / 4;
+    const dx = Math.round(offset * Math.cos(angle));
+    const dy = Math.round(offset * Math.sin(angle));
+    imuDot.style.left = 'calc(50% + ' + dx + 'px)';
+    imuDot.style.top = 'calc(50% + ' + dy + 'px)';
+    imuDot.style.transform = 'translate(-50%, -50%)';
+
+    // Colour: green / yellow / red
+    let color;
+    if (tiltDeg <= TILT_WARN) color = '#27ae60';
+    else if (tiltDeg <= TILT_ERROR) color = '#d68910';
+    else color = '#c0392b';
+    imuDot.style.background = color;
+    imuTiltLabel.textContent = tiltDeg.toFixed(1) + ' °';
+    imuTiltLabel.style.color = color;
+  }
+
+  function applyStatus(data) {
+    if (!data.available) {
+      imuCard.style.display = 'none';
+      return;
+    }
+    imuCard.style.display = 'block';
+
+    if (!data.calibrated) {
+      imuStatusText.textContent = 'Non calibrata';
+      imuCalibrateHint.style.display = 'none';
+      updateBubble(null, false);
+    } else {
+      const t = data.tilt_deg;
+      let statusMsg;
+      if (t === null || t === undefined) {
+        statusMsg = 'Calibrata — attendere dati…';
+      } else if (t <= TILT_WARN) {
+        statusMsg = '✅ In bolla (' + t.toFixed(1) + '°)';
+      } else if (t <= TILT_ERROR) {
+        statusMsg = '⚠️ Tilt moderato (' + t.toFixed(1) + '°)';
+      } else {
+        statusMsg = '🔴 Fuori bolla (' + t.toFixed(1) + '°)';
+      }
+      imuStatusText.textContent = statusMsg;
+      imuCalibrateHint.style.display = 'block';
+      updateBubble(t, true);
+    }
+
+    // Sampling overlay
+    if (data.sampling_active) {
+      imuSamplingOverlay.style.display = 'block';
+    } else {
+      imuSamplingOverlay.style.display = 'none';
+    }
+
+    // Flash card if instability detected during sampling
+    if (data.sampling_active && data.stable === false && lastStable !== false) {
+      imuCard.classList.add('imu-flash-unstable');
+      setTimeout(() => imuCard.classList.remove('imu-flash-unstable'), 500);
+    }
+    lastStable = data.stable;
+  }
+
+  function startPolling() {
+    if (imuPolling) return;
+    imuPolling = setInterval(async () => {
+      try {
+        const resp = await fetch('/api/imu/status');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        applyStatus(data);
+      } catch (_) {}
+    }, 500);
+  }
+
+  function stopPolling() {
+    if (imuPolling) { clearInterval(imuPolling); imuPolling = null; }
+  }
+
+  // Start polling only when card is (or becomes) visible
+  const observer = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) startPolling(); else stopPolling();
+  });
+  if (imuCard) observer.observe(imuCard);
+
+  // Initial status check to decide whether to show card at all
+  fetch('/api/imu/status').then(r => r.json()).then(data => {
+    if (data.available) { imuCard.style.display = 'block'; applyStatus(data); startPolling(); }
+  }).catch(() => {});
+
+  // Calibrate button
+  btnCalibrate?.addEventListener('click', async () => {
+    btnCalibrate.disabled = true;
+    btnCalibrate.textContent = 'Calibrazione…';
+    try {
+      const resp = await fetch('/api/imu/calibrate', {method: 'POST'});
+      const data = await resp.json();
+      if (data.ok) {
+        btnCalibrate.textContent = '✅ Calibrata';
+        imuStatusText.textContent = 'Calibrata — palina in bolla';
+        imuCalibrateHint.style.display = 'block';
+        setTimeout(() => { btnCalibrate.textContent = 'Calibra livella'; btnCalibrate.disabled = false; }, 3000);
+      } else {
+        btnCalibrate.textContent = '❌ Riprova';
+        setTimeout(() => { btnCalibrate.textContent = 'Calibra livella'; btnCalibrate.disabled = false; }, 2000);
+      }
+    } catch (_) {
+      btnCalibrate.textContent = '❌ Errore';
+      setTimeout(() => { btnCalibrate.textContent = 'Calibra livella'; btnCalibrate.disabled = false; }, 2000);
+    }
+  });
 })();
 </script>
 {% endblock %}

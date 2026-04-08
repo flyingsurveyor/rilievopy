@@ -81,6 +81,14 @@ DEFAULTS: Dict[str, Any] = {
     "alert_point_measured": True,
     "alert_point_vibrate": True,       # vibrate on point measurement
     "alert_point_audio": True,         # beep on point measurement
+
+    # IMU / digital level
+    "imu_enabled": True,
+    "imu_tilt_warn_deg": 1.0,          # yellow threshold
+    "imu_tilt_error_deg": 3.0,         # red threshold
+    "imu_stability_threshold_deg": 0.8,  # instability during averaging
+    "imu_sampling_hz": 10,
+    "alert_imu_unstable": True,
 }
 
 # ---------- File path ----------

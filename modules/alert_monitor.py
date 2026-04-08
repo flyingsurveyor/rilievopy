@@ -208,6 +208,19 @@ class AlertMonitor:
                     audio_kind="warning",
                 )
 
+        # ── IMU stability (solo durante media attiva) ─────────────────
+        if self._s("alert_imu_unstable", True):
+            imu = snap.get("IMU", {})
+            if imu.get("available") and imu.get("sampling_active") and not imu.get("stable", True):
+                self._fire(
+                    alert_key="imu_unstable",
+                    title="⚠️ Palina instabile",
+                    content="Movimento rilevato durante la media — verificare stabilità",
+                    priority="high",
+                    vibrate_ms=400,
+                    audio_kind="warning",
+                )
+
     def _fire(
         self,
         alert_key: str,

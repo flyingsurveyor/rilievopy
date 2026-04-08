@@ -73,6 +73,10 @@ def create_app():
     from routes.rtkino import bp as rtkino_bp
     app.register_blueprint(rtkino_bp)
 
+    # Register IMU blueprint
+    from routes.imu import bp as imu_bp
+    app.register_blueprint(imu_bp)
+
     return app
 
 
@@ -168,6 +172,11 @@ def main():
     from modules.alert_monitor import ALERTS
     ALERTS.start()
     print(f"# {now_iso()} [alerts] monitor avviato")
+
+    # Start IMU monitor
+    from modules.imu_monitor import IMU
+    IMU.start()
+    print(f"# {now_iso()} [imu] monitor IMU avviato")
 
     # Create Flask app
     app = create_app()
