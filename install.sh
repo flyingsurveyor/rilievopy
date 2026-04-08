@@ -124,7 +124,7 @@ PIP_EXTRA_FLAGS=""
 if [ -n "${TERMUX_VERSION}" ] || [ -d "/data/data/com.termux" ]; then
     PLATFORM="termux"
     PKG_MANAGER="pkg"
-    PIP_EXTRA_FLAGS="--break-system-packages"
+    PIP_EXTRA_FLAGS=""
 elif [ "$(uname -s)" = "Darwin" ]; then
     PLATFORM="macos"
     PKG_MANAGER="brew"
@@ -275,12 +275,19 @@ info "Checking system dependencies..."
 install_deps() {
     case "${PLATFORM}" in
         termux)
+            info "Aggiornamento repository Termux (necessario su installazione fresca)..."
+            pkg update -y
+            pkg upgrade -y
             pkg install -y python git 2>/dev/null || true
             if [ "${DO_BUILD}" -eq 1 ]; then
                 pkg install -y make clang 2>/dev/null || true
             fi
             # clang: required for USB OTG ZED-F9P reader compilation (tools/usb_otg_reader.c)
             pkg install -y clang 2>/dev/null || true
+            # termux-api: binaries for termux-notification, termux-sensor, termux-vibrate, termux-usb
+            # procps: pgrep/pkill used by widget scripts
+            # curl: health-check in widget start script
+            pkg install -y termux-api procps curl 2>/dev/null || true
             ;;
         debian|wsl)
             sudo apt-get update -qq
@@ -523,8 +530,10 @@ VENV_DIR=""
 
 if [ "${PLATFORM}" = "termux" ]; then
     # Termux: install directly (no venv)
+    info "Aggiornamento pip..."
+    pip install --upgrade pip
     info "Installing: flask, pyubx2, waitress, openpyxl, zeroconf..."
-    pip install ${PIP_EXTRA_FLAGS} flask pyubx2 waitress openpyxl zeroconf 2>&1 | tail -5
+    pip install flask pyubx2 waitress openpyxl zeroconf
     PIP_CMD="pip"
 else
     VENV_DIR="${SCRIPT_DIR}/venv"
@@ -538,7 +547,7 @@ else
 
     # Install required dependencies
     info "Installing: flask, pyubx2, waitress, openpyxl, zeroconf..."
-    pip install flask pyubx2 waitress openpyxl zeroconf 2>&1 | tail -5
+    pip install flask pyubx2 waitress openpyxl zeroconf
 fi
 
 # Verify core deps installed correctly
