@@ -41,6 +41,52 @@ def _quat_angle_deg(q1: list, q2: list) -> float:
     return math.degrees(2.0 * math.acos(dot))
 
 
+def _quat_roll_pitch_deg(q_baseline: list, q_current: list) -> tuple:
+    """
+    Calcola roll e pitch in gradi dell'orientamento corrente relativo alla baseline.
+
+    Calcola q_rel = q_current * inverse(q_baseline) e ne estrae roll/pitch.
+    Roll = rotazione attorno all'asse X (sinistra/destra).
+    Pitch = rotazione attorno all'asse Y (avanti/indietro).
+
+    Args:
+        q_baseline: Quaternione unitario [x, y, z, w] della baseline calibrata.
+        q_current:  Quaternione unitario [x, y, z, w] dell'orientamento attuale.
+
+    Returns:
+        (roll_deg, pitch_deg) come float.
+    """
+    xb, yb, zb, wb = q_baseline
+    xc, yc, zc, wc = q_current
+
+    # q_rel = q_current * conj(q_baseline)
+    # Conjugate of a unit quaternion q=[x,y,z,w] is [-x,-y,-z,w]
+    # Standard quaternion product (a * b) with components [x,y,z,w]:
+    #   result.x = wa*xb + xa*wb + ya*zb - za*yb
+    #   result.y = wa*yb - xa*zb + ya*wb + za*xb
+    #   result.z = wa*zb + xa*yb - ya*xb + za*wb
+    #   result.w = wa*wb - xa*xb - ya*yb - za*zb
+    # Substituting conj(q_baseline): xb→-xb, yb→-yb, zb→-zb, wb→wb
+    xbi, ybi, zbi, wbi = -xb, -yb, -zb, wb  # conjugate of baseline
+    rx = wc * xbi + xc * wbi + yc * zbi - zc * ybi
+    ry = wc * ybi - xc * zbi + yc * wbi + zc * xbi
+    rz = wc * zbi + xc * ybi - yc * xbi + zc * wbi
+    rw = wc * wbi - xc * xbi - yc * ybi - zc * zbi
+
+    # Normalizza per robustezza numerica
+    norm = math.sqrt(rx * rx + ry * ry + rz * rz + rw * rw)
+    if norm > 0:
+        rx, ry, rz, rw = rx / norm, ry / norm, rz / norm, rw / norm
+
+    # Roll attorno asse X
+    roll_rad = math.atan2(2.0 * (rw * rx + ry * rz), 1.0 - 2.0 * (rx * rx + ry * ry))
+    # Pitch attorno asse Y (con clamp per evitare domain error in asin)
+    pitch_sin = max(-1.0, min(1.0, 2.0 * (rw * ry - rz * rx)))
+    pitch_rad = math.asin(pitch_sin)
+
+    return math.degrees(roll_rad), math.degrees(pitch_rad)
+
+
 class ImuMonitor:
     """
     Monitor IMU basato su game_rotation_vector.
@@ -103,8 +149,8 @@ class ImuMonitor:
             if self._last_quat is None:
                 logger.warning("[imu] calibrate() senza campioni disponibili")
                 return False
-            # Media degli ultimi campioni disponibili in finestra
-            if len(self._window) >= 3:
+            # Media degli ultimi campioni disponibili in finestra (minimo 8 per stabilità)
+            if len(self._window) >= 8:
                 n = len(self._window)
                 avg = [sum(q[i] for q in self._window) / n for i in range(4)]
                 # Normalizza il quaternione medio
@@ -179,10 +225,19 @@ class ImuMonitor:
                 if self._baseline is not None and self._last_quat is not None
                 else None
             )
+            if self._baseline is not None and self._last_quat is not None:
+                roll, pitch = _quat_roll_pitch_deg(self._baseline, self._last_quat)
+                roll_deg: Optional[float] = round(roll, 2)
+                pitch_deg: Optional[float] = round(pitch, 2)
+            else:
+                roll_deg = None
+                pitch_deg = None
             return {
                 "available": termux.is_sensor_available(),
                 "calibrated": self._baseline is not None,
                 "tilt_deg": round(tilt, 2) if tilt is not None else None,
+                "roll_deg": roll_deg,
+                "pitch_deg": pitch_deg,
                 "stable": self._is_stable_unlocked(),
                 "sampling_active": self._sampling_active,
                 "was_unstable": self._was_unstable,
