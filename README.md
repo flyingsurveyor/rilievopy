@@ -133,6 +133,21 @@ Prima di installare RilievoPY su Android, installa le seguenti app **da [F-Droid
 Dopo aver installato Termux e Termux:API, concedi i permessi richiesti:
 - Impostazioni Android → App → **Termux:API** → Autorizzazioni → **Sensori fisici** / Attività fisica
 
+> ⚠️ **Permessi sensori Termux:API — passaggio obbligatorio per la livella IMU**
+>
+> Dopo aver installato **Termux:API** da F-Droid, devi concedere manualmente i permessi sensori:
+>
+> **Impostazioni Android → App → Termux:API → Autorizzazioni → Sensori fisici** (e/o Attività fisica)
+>
+> Se non concedi questi permessi:
+> - La livella digitale IMU **non funzionerà**
+> - L'installer potrebbe **bloccarsi** sul rilevamento sensori (il comando `termux-sensor -l` rimane in attesa indefinitamente senza autorizzazione)
+>
+> Se hai già eseguito `install.sh` prima di concedere i permessi, riesegui:
+> ```bash
+> ./install.sh --force-setup
+> ```
+
 ### Android (Termux) — Installazione
 
 ```bash

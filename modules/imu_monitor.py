@@ -261,7 +261,38 @@ class ImuMonitor:
         angles = [_quat_angle_deg(samples[i], samples[i + 1]) for i in range(len(samples) - 1)]
         return max(angles) <= threshold
     def _loop(self):
-        """Main loop: sample game_rotation_vector at ~10Hz."""
+        """Main loop: usa SensorStream per lettura continua ad alta frequenza."""
+        sensor_name: Optional[str] = cfg.load_settings().get("imu_sensor_name", "") or None
+        if not sensor_name:
+            available = termux.list_sensors()
+            sensor_name = termux.pick_best_rotation_sensor(available)
+        if not sensor_name:
+            logger.warning("[imu] nessun sensore disponibile")
+            return
+
+        hz = cfg.load_settings().get("imu_sampling_hz", 20)
+        delay_ms = max(10, int(1000 / max(1, hz)))
+        stream = termux.SensorStream(sensor_name, delay_ms=delay_ms)
+        if not stream.start():
+            logger.warning("[imu] impossibile avviare SensorStream, fallback a polling")
+            self._loop_polling()
+            return
+
+        logger.info("[imu] streaming avviato: %s @%dms", sensor_name, delay_ms)
+        try:
+            while not self._stop.is_set():
+                sample = stream.read(timeout=0.5)
+                if sample is not None:
+                    with self._lock:
+                        self._window.append(sample)
+                        self._last_quat = sample
+                        self._update_state_unlocked()
+        finally:
+            stream.close()
+            logger.info("[imu] streaming fermato")
+
+    def _loop_polling(self):
+        """Fallback loop: sample game_rotation_vector at ~10Hz (one subprocess per sample)."""
         hz = cfg.load_settings().get("imu_sampling_hz", 10)
         interval = 1.0 / max(1, hz)
         while not self._stop.is_set():
