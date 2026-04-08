@@ -5,16 +5,18 @@ USB OTG GNSS source for Android/Termux + u-blox ZED-F9P.
 
 Architecture
 ────────────
-This module mirrors the TCP upstream_loop() pattern in ubx_parser.py, but
-instead of a TCP socket, data comes from a C helper program that reads from
-the ZED-F9P USB bulk endpoint via ioctl(USBDEVFS_BULK) — no libusb required.
+Data flow:
+  ZED-F9P (USB bulk endpoint 0x82)
+    → ioctl(USBDEVFS_BULK) in C reader
+    → FIFO /tmp/rilievopy_gnss.fifo  (binario puro, nessun bash in mezzo)
+    → open(fifo, "rb") in Python
+    → pipe.feed(chunk) → ubx_parse_loop()
 
-The C helper (tools/usb_otg_reader) is invoked via:
-  termux-usb -e ./tools/usb_otg_reader <device_path>
+Il C helper (tools/usb_otg_reader) è invocato via:
+  GNSS_OUT=/tmp/rilievopy_gnss.fifo termux-usb -e ./tools/usb_otg_reader <device_path>
 
-termux-usb passes the Android USB file descriptor as argv[1] to the helper.
-The helper writes raw bytes to stdout; we read subprocess stdout and feed
-the BytePipe — exactly like upstream_loop() feeds it from a TCP socket.
+La FIFO bypassa il NUL-stripping di bash (che affligge stdout quando
+termux-usb usa command substitution $(...) internamente).
 
 Public API
 ──────────
@@ -30,6 +32,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 from typing import Optional
@@ -43,6 +46,12 @@ _PROJECT_DIR = os.path.dirname(_MODULE_DIR)
 _READER_SRC  = os.path.join(_PROJECT_DIR, "tools", "usb_otg_reader.c")
 _READER_BIN  = os.path.join(_PROJECT_DIR, "tools", "usb_otg_reader")
 
+# Named FIFO path for binary-clean IPC between C reader and Python
+_FIFO_PATH = os.path.join(tempfile.gettempdir(), "rilievopy_gnss.fifo")
+
+# Read buffer size used in both the Python FIFO reader and C reader (READ_BUF_SIZE)
+_READ_BUF_SIZE = 4096
+
 # If True, the binary is deleted and recompiled at every startup of the loop.
 # Set to False once the reader is stable to skip recompilation on each run.
 ALWAYS_RECOMPILE = True
@@ -53,6 +62,30 @@ ALWAYS_RECOMPILE = True
 def is_usb_otg_available() -> bool:
     """Return True if termux-usb is available (i.e. we're on Android/Termux)."""
     return shutil.which("termux-usb") is not None
+
+
+# ── FIFO helpers ───────────────────────────────────────────────────────────────
+
+def _ensure_fifo(path: str) -> bool:
+    """Create or recreate the named FIFO. Returns True on success."""
+    try:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        os.mkfifo(path)
+        return True
+    except OSError as e:
+        print(f"# [usb_otg] cannot create FIFO {path}: {e}")
+        return False
+
+
+def _cleanup_fifo(path: str):
+    """Remove the named FIFO if it exists, ignoring errors."""
+    try:
+        os.remove(path)
+    except OSError:
+        pass
 
 
 def usb_reader_compiled() -> bool:
@@ -150,19 +183,26 @@ def usb_otg_upstream_loop(
     """
     Read raw GNSS bytes from ZED-F9P via USB OTG, feed BytePipe and relay.
 
+    Uses a named FIFO to bypass bash NUL-stripping: termux-usb is a bash
+    script that uses command substitution $(...) internally, which strips
+    all NUL bytes from binary UBX/NMEA streams passing through stdout.
+    The C reader writes to a FIFO (via GNSS_OUT env var) instead of stdout,
+    providing a pure binary channel with no bash in between.
+
     Mirrors the pattern of upstream_loop() in ubx_parser.py:
       - Runs forever (or until stop_event is set)
       - On error/exit of subprocess, waits `retry` seconds and restarts
       - Feeds pipe.feed(chunk) and relay.broadcast(chunk) for each chunk
 
-    Invokes: termux-usb -e <reader_bin> <device>
-    The reader writes raw bytes to stdout; we read subprocess stdout.
+    Invokes: GNSS_OUT=<fifo> termux-usb -e <reader_bin> <device>
+    Python opens the FIFO directly with open(fifo_path, "rb").
     """
     while True:
         if stop_event is not None and stop_event.is_set():
             return
 
         proc = None
+        fifo_fd = None
         stderr_thread = None
         try:
             # If ALWAYS_RECOMPILE is set, force a fresh compilation every startup
@@ -186,10 +226,20 @@ def usb_otg_upstream_loop(
                 time.sleep(retry)
                 continue
 
-            print(f"# {now_iso()} [usb_otg] starting reader: {device}")
+            # Create FIFO for binary-clean IPC (bypasses bash NUL-stripping)
+            if not _ensure_fifo(_FIFO_PATH):
+                time.sleep(retry)
+                continue
+
+            # Build env with GNSS_OUT pointing to FIFO
+            env = os.environ.copy()
+            env["GNSS_OUT"] = _FIFO_PATH
+
+            print(f"# {now_iso()} [usb_otg] starting reader: {device} → FIFO {_FIFO_PATH}")
             proc = subprocess.Popen(
                 ["termux-usb", "-e", _READER_BIN, device],
-                stdout=subprocess.PIPE,
+                env=env,
+                stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
             )
             print(f"# {now_iso()} [usb_otg] reader started (pid={proc.pid})")
@@ -204,13 +254,22 @@ def usb_otg_upstream_loop(
             stderr_thread = threading.Thread(target=_stderr_reader, args=(proc,), daemon=True)
             stderr_thread.start()
 
+            # Open FIFO for reading (blocks until C reader opens it for writing)
+            print(f"# {now_iso()} [usb_otg] opening FIFO for reading…")
+            try:
+                fifo_fd = open(_FIFO_PATH, "rb")
+            except OSError as e:
+                raise ConnectionError(f"cannot open FIFO {_FIFO_PATH}: {e} "
+                                      "(reader may have failed to start)") from e
+            print(f"# {now_iso()} [usb_otg] FIFO open — stream avviato")
+
             while True:
                 if stop_event is not None and stop_event.is_set():
                     break
 
-                chunk = proc.stdout.read1(4096)
+                chunk = fifo_fd.read(_READ_BUF_SIZE)
                 if not chunk:
-                    # EOF — subprocess exited
+                    # EOF — subprocess exited or FIFO closed
                     rc = proc.wait()
                     raise ConnectionError(f"reader exited (rc={rc})")
 
@@ -222,6 +281,12 @@ def usb_otg_upstream_loop(
             print(f"# {now_iso()} [usb_otg] disconnected: {e}. Retry in {retry}s")
             time.sleep(retry)
         finally:
+            if fifo_fd is not None:
+                try:
+                    fifo_fd.close()
+                except Exception:
+                    pass
+            _cleanup_fifo(_FIFO_PATH)
             if proc is not None:
                 try:
                     proc.terminate()

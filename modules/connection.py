@@ -241,6 +241,13 @@ class ConnectionManager:
         self.source_type = "tcp"
         self.usb_device = None
 
+        # Cleanup FIFO if it exists (USB OTG mode)
+        try:
+            from .usb_otg import _FIFO_PATH, _cleanup_fifo
+            _cleanup_fifo(_FIFO_PATH)
+        except Exception:
+            pass
+
         # Threads are daemon, they'll die with the process
         # but we clear references
         self._upstream_thread = None
