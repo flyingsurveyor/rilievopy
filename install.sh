@@ -530,8 +530,8 @@ VENV_DIR=""
 
 if [ "${PLATFORM}" = "termux" ]; then
     # Termux: install directly (no venv)
-    info "Aggiornamento pip..."
-    pip install --upgrade pip
+    info "Aggiornamento python e pip via pkg..."
+    pkg upgrade -y python python-pip 2>/dev/null || true
     info "Installing: flask, pyubx2, waitress, openpyxl, zeroconf..."
     pip install flask pyubx2 waitress openpyxl zeroconf
     PIP_CMD="pip"
@@ -639,7 +639,13 @@ PY
             log "termux-sensor disponibile"
             echo ""
             info "Rilevamento sensori IMU disponibili..."
-            SENSOR_LIST_JSON=$(termux-sensor -l 2>/dev/null || echo '{"sensors":[]}')
+            SENSOR_LIST_JSON=$(timeout 10 termux-sensor -l 2>/dev/null || echo '{"sensors":[]}')
+            if [ "${SENSOR_LIST_JSON}" = '{"sensors":[]}' ]; then
+                warn "termux-sensor -l non ha risposto entro 10s."
+                warn "Verifica che i permessi sensori siano stati concessi a Termux:API:"
+                warn "  Impostazioni Android → App → Termux:API → Autorizzazioni → Sensori fisici"
+                warn "Riesegui ./install.sh --force-setup dopo aver concesso i permessi."
+            fi
             export _RILIEVOPY_SENSOR_JSON="${SENSOR_LIST_JSON}"
             SENSOR_COUNT=$(python3 - <<'PY' 2>/dev/null || echo 0
 import json, os

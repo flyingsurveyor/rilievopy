@@ -6,8 +6,10 @@ All functions fail silently (return False) when Termux:API is not installed.
 
 import json
 import logging
+import select
 import shutil
 import subprocess
+import threading
 from typing import Optional
 
 from modules import settings as cfg
@@ -147,6 +149,86 @@ def read_game_rotation_vector() -> Optional[list]:
     except Exception as e:
         logger.debug("[termux] sensor error: %s", e)
         return None
+
+
+class SensorStream:
+    """
+    Processo termux-sensor persistente in modalità streaming (-d flag).
+    Molto più efficiente di lanciare un subprocess per ogni campione (-n 1).
+    Latenza reale: ~50ms invece di ~300ms per campione.
+    """
+
+    def __init__(self, sensor_name: str, delay_ms: int = 50):
+        self._sensor_name = sensor_name
+        self._delay_ms = delay_ms
+        self._proc: Optional[subprocess.Popen] = None
+        self._lock = threading.Lock()
+
+    def start(self) -> bool:
+        """Avvia il processo streaming. Ritorna True se avviato con successo."""
+        with self._lock:
+            if self._proc is not None and self._proc.poll() is None:
+                return True  # già in esecuzione
+            try:
+                self._proc = subprocess.Popen(
+                    ["termux-sensor", "-s", self._sensor_name, "-d", str(self._delay_ms)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                )
+                return True
+            except Exception as e:
+                logger.debug("[SensorStream] start error: %s", e)
+                self._proc = None
+                return False
+
+    def read(self, timeout: float = 0.5) -> Optional[list]:
+        """
+        Legge il prossimo campione dallo stream.
+        Ritorna [x, y, z, w] quaternion o None se timeout/errore.
+        """
+        with self._lock:
+            proc = self._proc
+
+        if proc is None or proc.poll() is not None:
+            return None
+
+        try:
+            ready, _, _ = select.select([proc.stdout], [], [], timeout)
+            if not ready:
+                return None
+            line = proc.stdout.readline()
+            if not line:
+                return None
+            data = json.loads(line.strip())
+            sensor_data = data.get(self._sensor_name, {})
+            values = sensor_data.get("values")
+            if isinstance(values, list) and len(values) >= 4:
+                return [float(v) for v in values[:4]]
+            return None
+        except Exception as e:
+            logger.debug("[SensorStream] read error: %s", e)
+            return None
+
+    def close(self):
+        """Termina il processo streaming."""
+        with self._lock:
+            proc = self._proc
+            self._proc = None
+        if proc is not None:
+            try:
+                proc.terminate()
+                proc.wait(timeout=2)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+
+    def is_alive(self) -> bool:
+        """Ritorna True se il processo è in esecuzione."""
+        with self._lock:
+            return self._proc is not None and self._proc.poll() is None
 
 
 def vibrate(duration_ms: int = 200) -> bool:
