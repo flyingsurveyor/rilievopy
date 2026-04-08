@@ -744,10 +744,9 @@ details.advanced .advanced-body{padding:0 16px 16px}
       _imuSamplingActive = false;
       if (imuUnstableField) imuUnstableField.value = _imuWasUnstable ? 'true' : 'false';
       if (imuTiltMaxField) imuTiltMaxField.value = _imuTiltMaxDuringSampling !== null ? _imuTiltMaxDuringSampling.toFixed(2) : '';
-    }, true);  // capture phase — before the main submit handler
+    }, true);  // capture phase — runs before bubbling-phase handlers
 
     // When measure starts, reset sampling state
-    const origSubmitPoint = window._submitPoint;
     btnMeasure.addEventListener('click', () => {
       _imuSamplingActive = true;
       _imuWasUnstable = false;
