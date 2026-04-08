@@ -118,11 +118,50 @@ Together, RTKino + RilievoPY form a complete, low-cost, open-source RTK surveyin
 
 ## Installation
 
-### Android (Termux) — one command
+### Android (Termux) — Prerequisiti
+
+Prima di installare RilievoPY su Android, installa le seguenti app **da [F-Droid](https://f-droid.org/)** (non da Google Play — le versioni Play sono obsolete):
+
+| App | F-Droid link | Note |
+|-----|-------------|------|
+| **Termux** | [com.termux](https://f-droid.org/packages/com.termux/) | Shell Linux su Android — **obbligatorio** |
+| **Termux:API** | [com.termux.api](https://f-droid.org/packages/com.termux.api/) | Notifiche push, vibrazione, **livella digitale IMU** — consigliato |
+| **Termux:Widget** | [com.termux.widget](https://f-droid.org/packages/com.termux.widget/) | Avvio con un tap dalla home screen — opzionale |
+
+> ⚠️ **Installa sempre da F-Droid**, non dal Play Store. Le versioni Play Store di Termux sono vecchie e incompatibili.
+
+Dopo aver installato Termux e Termux:API, concedi i permessi richiesti:
+- Impostazioni Android → App → **Termux:API** → Autorizzazioni → **Sensori fisici** / Attività fisica
+
+### Android (Termux) — Installazione
 
 ```bash
 pkg install -y git && git clone https://github.com/flyingsurveyor/rilievopy.git && cd rilievopy && bash install.sh
 ```
+
+Lo script `install.sh` si occupa di tutto in modo interattivo:
+- installa le dipendenze Python
+- rileva automaticamente il miglior sensore IMU disponibile (`termux-sensor -l`)
+- scrive la configurazione dispositivo in `rilievo_settings.json` **una volta sola**
+- installa gli script widget (se Termux:Widget è presente)
+
+> ℹ️ Se installi RilievoPY su un **nuovo dispositivo**, riesegui `./install.sh` per rilevare i sensori corretti.
+> Per forzare il rilevamento anche su un dispositivo già configurato: `./install.sh --force-setup`
+
+### Verifica sensori (opzionale)
+
+Prima o dopo l'installazione puoi verificare i sensori disponibili dal terminale Termux:
+
+```bash
+# Elenca tutti i sensori disponibili
+termux-sensor -l
+
+# Testa la lettura del sensore selezionato (deve restituire JSON con "values")
+termux-sensor -s "Game Rotation Vector" -n 1
+termux-sensor -s "Rotation Vector" -n 1
+```
+
+Se `termux-sensor -l` restituisce una lista vuota, verifica i permessi Termux:API in Impostazioni Android.
 
 ### Raspberry Pi
 
@@ -141,13 +180,14 @@ The installer is interactive and handles everything:
 | RTKLIB tools | Optionally clones and compiles `convbin` + `rnx2rtkp` from RTKLIBExplorer demo5 |
 | Python dependencies | Installs Flask, pyubx2, waitress, openpyxl, zeroconf (+ optional geopandas) |
 | Data directories | Creates `surveys/`, `data/uploads/`, `data/rinex/`, `data/results/`, etc. |
-| Termux extras | Installs bleak (BLE); Termux:API and Termux:Widget are **optional** — the app works without them |
+| Termux extras | Installs bleak (BLE); detects best IMU sensor and writes `rilievo_settings.json` (once per device) |
 | systemd service | (Linux only) Optionally installs auto-start on boot |
 
 ```
 ./install.sh                # Interactive (recommended)
 ./install.sh --skip-build   # Skip RTKLIB compilation
 ./install.sh --force-build  # Rebuild RTKLIB without asking
+./install.sh --force-setup  # Redo IMU sensor detection (useful after installing Termux:API later)
 ```
 
 ### Termux:Widget (Android) — optional
@@ -188,12 +228,23 @@ journalctl -u rilievo -f
 
 ### Android (Termux) — step by step
 
-1. **Install Termux from F-Droid** (not Google Play — the Play Store version is outdated):
-   `https://f-droid.org/packages/com.termux/`
+1. **Install from F-Droid** (not Google Play — the Play Store versions are outdated):
+   - [Termux](https://f-droid.org/packages/com.termux/) — required
+   - [Termux:API](https://f-droid.org/packages/com.termux.api/) — recommended (enables IMU digital level, notifications, vibration)
+   - [Termux:Widget](https://f-droid.org/packages/com.termux.widget/) — optional (one-tap start from home screen)
 
-2. **Paste the one-liner** above in Termux. The installer will guide you through the setup.
+2. **Grant permissions** in Android Settings → Apps → Termux:API → Permissions → Physical sensors / Physical activity.
 
-3. **During installation:**
+3. **Install RilievoPY** — paste in Termux:
+   ```bash
+   pkg install -y git && git clone https://github.com/flyingsurveyor/rilievopy.git && cd rilievopy && bash install.sh
+   ```
+   `install.sh` will:
+   - install Python dependencies
+   - detect the best IMU sensor (if Termux:API is installed) and write device settings **once**
+   - install widget scripts (if Termux:Widget is present)
+
+4. **During installation:**
    - **RTKLIB tools**: needed only for PPK. Choose **Skip** for RTK-only field use.
    - **geopandas**: optional, skip on low-RAM devices.
 
