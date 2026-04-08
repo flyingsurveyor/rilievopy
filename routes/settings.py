@@ -34,7 +34,43 @@ _ALERT_KEYS = [
     "alert_rtcm_stale", "alert_rtcm_stale_threshold",
     "alert_hacc_degraded", "alert_connection_lost",
     "alert_point_measured", "alert_point_vibrate", "alert_point_audio",
+    "alert_imu_unstable",
 ]
+
+_IMU_KEYS = [
+    "imu_enabled",
+    "imu_tilt_warn_deg",
+    "imu_tilt_error_deg",
+    "imu_stability_threshold_deg",
+    "imu_sampling_hz",
+    "alert_imu_unstable",
+]
+
+
+@bp.route("/api/imu/settings", methods=["POST"])
+def api_imu_settings():
+    """Save IMU settings and reload the IMU monitor."""
+    data = request.get_json() or {}
+    changes = {}
+    for key in _IMU_KEYS:
+        if key in data:
+            changes[key] = data[key]
+    if not changes:
+        return jsonify({"ok": False, "error": "No settings provided"}), 400
+    cfg.update(changes)
+    # Reload IMU monitor settings if running
+    try:
+        from modules.imu_monitor import IMU
+        IMU.reload_settings()
+    except Exception:
+        pass
+    # Also reload alert monitor since alert_imu_unstable may have changed
+    try:
+        from modules.alert_monitor import ALERTS
+        ALERTS.reload_settings()
+    except Exception:
+        pass
+    return jsonify({"ok": True})
 
 
 @bp.route("/settings/alerts")
@@ -132,7 +168,14 @@ def settings_page():
         sel_trim="selected" if s.get("robust_mode") == "trim" else "",
         sel_median="selected" if s.get("robust_mode") == "median" else "",
         workspace_dir=ws,
-        workspace_default=workspace.default_workspace())
+        workspace_default=workspace.default_workspace(),
+        imu_enabled_checked="checked" if s.get("imu_enabled", True) else "",
+        imu_tilt_warn_deg=str(s.get("imu_tilt_warn_deg", 1.0)),
+        imu_tilt_error_deg=str(s.get("imu_tilt_error_deg", 3.0)),
+        imu_stability_threshold_deg=str(s.get("imu_stability_threshold_deg", 0.8)),
+        imu_sampling_hz=str(s.get("imu_sampling_hz", 10)),
+        alert_imu_unstable_checked="checked" if s.get("alert_imu_unstable", True) else "",
+    )
 
 
 @bp.route("/api/settings", methods=["POST"])
