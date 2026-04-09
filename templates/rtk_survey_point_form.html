@@ -7,87 +7,97 @@
 <style>
 :root{--bg:#f3f6f9;--card:#fff;--line:#d6dde3;--text:#20303c;--muted:#60707d;--ok:#27ae60;--warn:#d68910;--soft:#eef5fb;--accent:#1d5f8f;--danger:#c0392b}
 body{background:var(--bg)}
-.svy-shell{max-width:960px;margin:0 auto;padding:10px 10px 92px}
-.card,.status-card,.action-bar,.active-strip{background:var(--card);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
-.active-strip{position:sticky;top:8px;z-index:70;padding:12px 14px;margin-bottom:12px;border:1px solid #dbe5ec}
-.active-strip-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.active-title-wrap{display:flex;flex-direction:column;gap:4px}
-.active-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:900;color:var(--accent)}
-.survey-title{font-size:20px;font-weight:900;color:var(--text);line-height:1.1}
-.subtle{font-size:13px;color:var(--muted)}
-.top-links{display:flex;gap:8px;flex-wrap:wrap}
-.top-links a{text-decoration:none;color:var(--accent);font-weight:800;background:var(--soft);padding:8px 10px;border-radius:999px}
-.active-strip-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
-.active-meta{background:#f7fafc;border:1px solid #e3eaf0;border-radius:12px;padding:10px}
-.active-meta .k{font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:800;color:var(--muted)}
-.active-meta .v{font-size:16px;font-weight:900;color:var(--text);margin-top:4px}
-.status-card{padding:14px 16px;margin-bottom:12px}
-.status-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr 1fr;gap:10px;align-items:stretch}
-.status-main{padding:12px;border-radius:14px;background:#f7fafc;border:1px solid #e3eaf0}
-.fix-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;font-size:14px;font-weight:900;background:#eef5fb;color:var(--accent)}
-.fix-dot{width:10px;height:10px;border-radius:50%;background:#95a5a6;display:inline-block}
-.fix-fix .fix-dot{background:var(--ok)}
-.fix-float .fix-dot{background:#f39c12}
-.fix-none .fix-dot{background:#c0392b}
-.status-big{font-size:30px;font-weight:900;line-height:1;margin:10px 0 4px;color:var(--text)}
-.mini-stat{padding:12px;border-radius:14px;background:#f7fafc;border:1px solid #e3eaf0}
-.mini-stat .label{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-.mini-stat .value{font-size:24px;font-weight:900;color:var(--text);margin-top:6px}
-.card{padding:16px;margin-bottom:12px}
-.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
-.card-title{font-size:18px;font-weight:900;color:var(--text)}
-.quick-strip{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;margin-bottom:12px}
-.quick-tile{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fbfdff}
-.quick-tile .label{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase}
-.quick-tile .value{font-size:22px;font-weight:900;color:var(--text);margin-top:4px}
-.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-label{display:block;font-size:13px;font-weight:800;color:#2c3e50;margin:0 0 6px}
-input,select,textarea{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;font-size:16px;box-sizing:border-box;background:#fff;color:var(--text)}
-textarea{min-height:90px;resize:vertical}
-.helper{font-size:12px;color:var(--muted);margin-top:6px}
-details.advanced{border:1px solid #dfe7ec;border-radius:14px;background:#fafcfd;margin-top:10px}
-details.advanced summary{list-style:none;cursor:pointer;padding:14px 16px;font-weight:900;color:var(--text)}
-details.advanced summary::-webkit-details-marker{display:none}
-details.advanced .advanced-body{padding:0 16px 16px}
-.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:var(--soft);color:var(--accent);padding:8px 10px;border-radius:999px;font-size:13px;font-weight:800}
-.flash-ok,.flash-error{padding:12px 14px;border-radius:14px;margin-bottom:10px;font-weight:800}.flash-ok{background:#dff6e8;color:#17643b}.flash-error{background:#fde8e8;color:#8e2727}
-.progress-bar{height:16px;background:#e8edf1;border-radius:999px;overflow:hidden}.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#27ae60,#2ecc71);transition:width .2s ease}.progress-text{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:4px}
-.voice-buttons{display:grid;grid-template-columns:1fr;gap:10px}
-.btn{border:none;border-radius:14px;padding:13px 16px;font-size:15px;font-weight:900;cursor:pointer}
-.btn-soft{background:var(--soft);color:var(--accent)}
-.btn-danger{background:var(--danger);color:#fff}
-.btn-main{background:var(--ok);color:#fff;width:100%;padding:18px;font-size:22px;letter-spacing:.02em}
-.btn-main[disabled]{opacity:.6;cursor:not-allowed}
-.rec-status{display:none;margin-top:10px;padding:12px;border-radius:12px;background:#fff4df;color:#7a4d00;font-weight:800}
-.note-list{display:grid;gap:10px;margin-top:12px}.note-item{border:1px solid #dbe4ea;border-radius:12px;padding:10px;background:#fafcfd}.note-meta{font-size:12px;color:#60707d;margin-bottom:6px}.note-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.note-actions .btn{padding:10px 12px;font-size:13px;border-radius:10px}
-.action-bar{position:fixed;left:10px;right:10px;bottom:10px;padding:10px;display:flex;flex-direction:column;gap:8px;z-index:80}
-.action-bar-status{display:none;padding:6px 4px 0}
-.action-bar-status.visible{display:block}
-.action-bar-btns{display:grid;grid-template-columns:72px 1fr 72px;gap:10px}
-.action-icon,.action-link{display:flex;align-items:center;justify-content:center;font-size:24px;padding:12px;background:var(--soft);color:var(--accent);border:none;border-radius:14px;font-weight:900;text-decoration:none;cursor:pointer}
-.saved-msg{font-size:14px;font-weight:900;color:var(--ok);padding:4px 0 2px}
-.confirm-title{margin:0 0 6px;color:var(--text)}
-.confirm-text{color:var(--muted);font-size:14px}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:10000}.modal-content{background:#fff;padding:20px;border-radius:14px;max-width:360px;width:90%}.modal-buttons{display:flex;gap:10px;margin-top:16px}
+.svy-shell{max-width:960px;margin:0 auto;padding:6px 6px 84px}
+.active-strip{background:var(--card);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);position:sticky;top:6px;z-index:70;padding:8px 10px;margin-bottom:7px;border:1px solid #dbe5ec}
+.active-strip-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.active-title-wrap{display:flex;flex-direction:column;gap:2px}
+.active-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:900;color:var(--accent)}
+.survey-title{font-size:15px;font-weight:900;color:var(--text);line-height:1.1}
+.top-links{display:flex;gap:6px;flex-wrap:wrap}
+.top-links a{text-decoration:none;color:var(--accent);font-weight:800;background:var(--soft);padding:4px 8px;border-radius:999px;font-size:12px}
+.active-strip-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}
+.active-meta{background:#f7fafc;border:1px solid #e3eaf0;border-radius:9px;padding:6px 8px}
+.active-meta .k{font-size:10px;letter-spacing:.05em;text-transform:uppercase;font-weight:800;color:var(--muted)}
+.active-meta .v{font-size:13px;font-weight:900;color:var(--text);margin-top:2px}
 
-/* ── IMU / Livella digitale ───────────────────────────────── */
-.imu-bubble-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
-.imu-bubble-ring{width:100px;height:100px;border-radius:50%;background:#e8edf1;border:3px solid #c0cdd5;position:relative;overflow:hidden}
-.imu-bubble-dot{width:22px;height:22px;border-radius:50%;background:var(--ok);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);transition:top .2s ease,left .2s ease,background .2s ease;box-shadow:0 2px 6px rgba(0,0,0,.25)}
-.imu-tilt-label{font-size:18px;font-weight:900;color:var(--text)}
-.imu-status-text{font-size:13px;color:var(--muted);text-align:center}
-.imu-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.imu-sampling-overlay{display:none;margin-top:8px;padding:8px 12px;border-radius:10px;background:#fff4df;color:#7a4d00;font-size:13px;font-weight:800;text-align:center}
+/* ── IMU + RTK row ─────────────────────────────────────────── */
+.imu-rtk-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}
+.imu-panel,.rtk-panel{background:var(--card);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);padding:8px 10px}
+.imu-row-inner{display:flex;align-items:flex-start;gap:8px}
+.imu-bubble-ring{width:70px;height:70px;border-radius:50%;background:#e8edf1;border:2px solid #c0cdd5;position:relative;overflow:hidden;flex-shrink:0}
+.imu-bubble-dot{width:15px;height:15px;border-radius:50%;background:var(--ok);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);transition:top .2s ease,left .2s ease,background .2s ease;box-shadow:0 2px 5px rgba(0,0,0,.25)}
+.imu-tilt-label{font-size:12px;font-weight:900;color:var(--text);margin-top:3px;text-align:center}
+.imu-status-text{font-size:10px;color:var(--muted);margin-bottom:4px}
+.imu-sampling-overlay{display:none;margin-top:4px;padding:4px 6px;border-radius:7px;background:#fff4df;color:#7a4d00;font-size:10px;font-weight:800;text-align:center}
 .imu-flash-unstable{animation:imuFlash .4s ease}
 @keyframes imuFlash{0%,100%{background:var(--card)}50%{background:#fde8e8}}
-@media (max-width:768px){.imu-bubble-ring{width:80px;height:80px}}
+.btn-imu-sm{font-size:10px;padding:3px 7px;border-radius:6px;background:var(--soft);color:var(--accent);border:none;cursor:pointer;font-weight:800}
+.imu-panel-placeholder{font-size:11px;color:var(--muted);text-align:center;padding:8px 0}
+
+/* RTK panel */
+.rtk-item{margin-bottom:5px}
+.rtk-item .k{font-size:10px;text-transform:uppercase;font-weight:800;color:var(--muted);letter-spacing:.03em}
+.rtk-item .v{font-size:14px;font-weight:900;color:var(--text);margin-top:1px}
+.fix-dot{width:8px;height:8px;border-radius:50%;background:#95a5a6;display:inline-block;margin-right:3px;vertical-align:middle}
+#rtk-status-wrap.fix-fix .fix-dot{background:#27ae60}
+#rtk-status-wrap.fix-float .fix-dot{background:#f39c12}
+#rtk-status-wrap.fix-none .fix-dot{background:#c0392b}
+#rtk-status-wrap.fix-fix .v{color:#27ae60}
+#rtk-status-wrap.fix-float .v{color:#f39c12}
+#rtk-status-wrap.fix-none .v{color:#c0392b}
+
+/* ── Form card ─────────────────────────────────────────────── */
+.card{background:var(--card);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);padding:10px;margin-bottom:7px}
+.card-title{font-size:13px;font-weight:900;color:var(--text);margin-bottom:8px}
+label{display:block;font-size:11px;font-weight:800;color:#2c3e50;margin:0 0 3px}
+input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:9px;font-size:13px;box-sizing:border-box;background:#fff;color:var(--text)}
+textarea{min-height:46px;resize:vertical}
+.helper{font-size:10px;color:var(--muted);margin-top:3px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:7px}
+.field-full{margin-bottom:7px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{background:var(--soft);color:var(--accent);padding:4px 7px;border-radius:999px;font-size:10px;font-weight:800}
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.btn{border:none;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:900;cursor:pointer}
+.btn-soft{background:var(--soft);color:var(--accent)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-main{background:var(--ok);color:#fff;width:100%;padding:13px;font-size:18px;letter-spacing:.02em}
+.btn-main[disabled]{opacity:.6;cursor:not-allowed}
+.btn-save-tmp{font-size:11px;padding:4px 9px;border-radius:7px;background:#f0f5ff;color:var(--accent);border:1px solid #c5d5ec;cursor:pointer;font-weight:800}
+.saved-tmp-ok{display:none;color:var(--ok);font-size:11px;font-weight:800;margin-left:5px}
+.audio-link{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--muted);text-decoration:none;padding:3px 7px;background:#f7fafc;border:1px solid #e3eaf0;border-radius:7px;margin-left:auto}
+
+/* ── Flash messages ────────────────────────────────────────── */
+.flash-ok,.flash-error{padding:7px 9px;border-radius:9px;margin-bottom:7px;font-weight:800;font-size:12px}
+.flash-ok{background:#dff6e8;color:#17643b}.flash-error{background:#fde8e8;color:#8e2727}
+
+/* ── Progress bar ──────────────────────────────────────────── */
+.progress-bar{height:9px;background:#e8edf1;border-radius:999px;overflow:hidden}
+.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#27ae60,#2ecc71);transition:width .2s ease}
+.progress-text{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px}
+
+/* ── Action bar ────────────────────────────────────────────── */
+.action-bar{position:fixed;left:8px;right:8px;bottom:8px;padding:8px;background:var(--card);border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:5px;z-index:80}
+.action-bar-btns{display:grid;grid-template-columns:48px 1fr 48px;gap:8px}
+.action-bar-status{display:none;padding:4px 2px 0}
+.action-bar-status.visible{display:block}
+.action-icon,.action-link{display:flex;align-items:center;justify-content:center;font-size:20px;padding:7px;background:var(--soft);color:var(--accent);border:none;border-radius:10px;font-weight:900;text-decoration:none;cursor:pointer}
+.action-icon.recording{border:2px solid #c0392b;background:#fff0f0}
+.saved-msg{font-size:11px;font-weight:900;color:var(--ok);padding:2px 0 0}
+
+/* ── Modals ────────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:10000}
+.modal-content{background:#fff;padding:16px;border-radius:12px;max-width:360px;width:90%}
+.modal-buttons{display:flex;gap:8px;margin-top:12px}
+.confirm-title{margin:0 0 5px;color:var(--text)}
+.confirm-text{color:var(--muted);font-size:12px}
+
 @media (max-width:768px){
-  .svy-shell{padding:8px 8px 98px}
-  .active-strip,.status-card,.card{border-radius:18px}
-  .status-grid,.quick-strip,.field-grid,.voice-buttons,.active-strip-meta{grid-template-columns:1fr}
-  .survey-title{font-size:18px}
-  .status-big{font-size:34px}
-  .action-bar-btns{grid-template-columns:64px 1fr 64px}
+  .svy-shell{padding:5px 5px 82px}
+  .survey-title{font-size:14px}
+  .imu-rtk-row{grid-template-columns:1fr 1fr}
+  .field-row{grid-template-columns:1fr 1fr}
   .desktop-only{display:none !important}
 }
 @media (min-width:769px){.mobile-only{display:none !important}.action-bar{max-width:960px;margin:0 auto}}
@@ -96,151 +106,141 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
 {% block content %}
 <div class="svy-shell">
+
+  <!-- A) Active strip -->
   <div class="active-strip">
     <div class="active-strip-head">
       <div class="active-title-wrap">
         <div class="active-label">Rilievo attivo</div>
         <div class="survey-title">📍 {{ active_title }}</div>
-        <div class="subtle">Modalità campo rapida per smartphone</div>
       </div>
       <div class="top-links">
         <a href="/survey/{{ sid }}">← Rilievo</a>
-        <a href="/surveys">Lista</a>
       </div>
     </div>
     <div class="active-strip-meta">
       <div class="active-meta"><div class="k">Punti nel rilievo</div><div class="v">{{ num_points }}</div></div>
-      <div class="active-meta"><div class="k">Prossimo nome</div><div class="v" id="active-next-name">{{ next_pid }}</div></div>
-      <div class="active-meta"><div class="k">Azione rapida</div><div class="v">Misura + nota punto</div></div>
+      <div class="active-meta"><div class="k">Prossimo nome punto</div><div class="v" id="active-next-name">{{ next_pid }}</div></div>
     </div>
   </div>
 
-  {% set rtk = (gnss_now.rtk or 'none') %}
-  {% set fix_class = 'fix-none' %}
-  {% if rtk|string|lower == 'fix' %}{% set fix_class = 'fix-fix' %}{% elif rtk|string|lower == 'float' %}{% set fix_class = 'fix-float' %}{% endif %}
-  <div class="status-card {{ fix_class }}">
-    <div class="status-grid">
-      <div class="status-main">
-        <div class="fix-pill"><span class="fix-dot"></span> RTK {{ rtk|upper }}</div>
-        <div class="status-big">{% if gnss_now.hAcc is not none %}{{ '%.1f cm'|format(gnss_now.hAcc * 100) }}{% else %}—{% endif %}</div>
-        <div class="subtle">precisione orizzontale stimata</div>
+  <!-- B) IMU livella + RTK real-time -->
+  <div class="imu-rtk-row">
+    <!-- Left: livella digitale -->
+    <div class="imu-panel">
+      <div id="imu-no-sensor">
+        <div class="imu-panel-placeholder">📐 Livella non disponibile</div>
+        <div style="text-align:center">
+          <button class="btn-imu-sm" id="btn-imu-perm" type="button" style="display:none">🔓 Attiva livella</button>
+        </div>
       </div>
-      <div class="mini-stat"><div class="label">Satelliti</div><div class="value">{{ gnss_now.numSV if gnss_now.numSV is not none else '—' }}</div></div>
-      <div class="mini-stat"><div class="label">PDOP</div><div class="value">{% if gnss_now.pdop is not none %}{{ '%.2f'|format(gnss_now.pdop) }}{% else %}—{% endif %}</div></div>
-      <div class="mini-stat"><div class="label">Quota HAE</div><div class="value" style="font-size:20px">{% if gnss_now.altHAE is not none %}{{ '%.3f m'|format(gnss_now.altHAE) }}{% else %}—{% endif %}</div></div>
+      <div id="imu-indicator" style="display:none">
+        <div class="imu-row-inner">
+          <div style="display:flex;flex-direction:column;align-items:center">
+            <div class="imu-bubble-ring">
+              <div class="imu-bubble-dot" id="imu-dot"></div>
+            </div>
+            <div class="imu-tilt-label" id="imu-tilt-label">— °</div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="imu-status-text" id="imu-status-text">Non calibrata</div>
+            <button class="btn-imu-sm" id="btn-imu-calibrate" type="button">Calibra</button>
+            <div class="helper" id="imu-calibrate-hint" style="display:none;font-size:10px;margin-top:3px">✅ Calibrata — non smontare il telefono</div>
+          </div>
+        </div>
+        <div class="imu-sampling-overlay" id="imu-sampling-overlay">📡 Misura in corso…</div>
+        <div id="imu-debug" style="display:none;font-size:10px;color:var(--muted);text-align:center;margin-top:3px"></div>
+      </div>
+    </div>
+
+    <!-- Right: dati RTK real-time -->
+    <div class="rtk-panel">
+      {% set rtk = (gnss_now.rtk or 'none') %}
+      {% set fix_cls = 'fix-none' %}
+      {% if rtk|string|lower == 'fix' %}{% set fix_cls = 'fix-fix' %}{% elif rtk|string|lower == 'float' %}{% set fix_cls = 'fix-float' %}{% endif %}
+      <div class="rtk-item {{ fix_cls }}" id="rtk-status-wrap">
+        <div class="k">Stato RTK</div>
+        <div class="v"><span class="fix-dot" id="rtk-dot"></span><span id="rtk-status-text">{{ rtk|upper }}</span></div>
+      </div>
+      <div class="rtk-item">
+        <div class="k">Precisione orz.</div>
+        <div class="v" id="rtk-hacc">{% if gnss_now.hAcc is not none %}{{ '%.1f cm'|format(gnss_now.hAcc * 100) }}{% else %}—{% endif %}</div>
+      </div>
+      <div class="rtk-item">
+        <div class="k">Ultimo punto</div>
+        <div class="v" id="last-saved-display">{% if saved %}{{ saved }}{% if savedcodice %} ({{ savedcodice }}){% endif %}{% else %}—{% endif %}</div>
+      </div>
     </div>
   </div>
 
   {% if saved %}<div class="flash-ok" id="flash-ok">✅ Punto {{ saved }}{% if savedname %} ({{ savedname }}){% endif %}{% if savedcodice %} — {{ savedcodice }}{% endif %} salvato</div>{% endif %}
   <div id="flash-error" class="flash-error" style="display:none"></div>
 
+  <!-- C) Form dati punto -->
   <form method="POST" action="/survey/{{ sid }}/point" id="point-form">
     <div class="card">
-      <div class="card-head">
-        <div class="card-title">Punto corrente</div>
-        <div class="chips desktop-only">
-          <div class="chip" id="pill-cat">Categoria: —</div>
-          <div class="chip" id="pill-cod">Codice: —</div>
-          <div class="chip" id="pill-dur">Durata: 10 s</div>
-        </div>
+      <div class="card-title">
+        Punto corrente
+        <span class="chips desktop-only" style="display:inline-flex;margin-left:6px">
+          <span class="chip" id="pill-cat">—</span>
+          <span class="chip" id="pill-cod">—</span>
+        </span>
       </div>
 
-      <div class="quick-strip">
-        <div class="quick-tile">
-          <div class="label">Nome punto</div>
+      <div class="field-row">
+        <div>
+          <label for="name-input">Nome punto</label>
           <input type="text" id="name-input" name="name" maxlength="20" required value="{{ next_pid }}" placeholder="es. P001">
         </div>
-        <div class="quick-tile">
-          <div class="label">Codice attivo</div>
-          <div class="value" id="quick-cod">—</div>
-        </div>
-        <div class="quick-tile">
-          <div class="label">Durata</div>
-          <div class="value" id="quick-dur">10 s</div>
+        <div>
+          <label for="cat-select">Categoria</label>
+          <select id="cat-select"><option value="">— categoria —</option></select>
         </div>
       </div>
 
-      <details class="advanced" open>
-        <summary>Dettagli punto</summary>
-        <div class="advanced-body">
-          <div class="field-grid">
-            <div>
-              <label for="cat-select">Categoria</label>
-              <select id="cat-select"><option value="">— seleziona categoria —</option></select>
-            </div>
-            <div>
-              <label for="codice-select">Codice punto</label>
-              <select id="codice-select"><option value="">— seleziona codice —</option></select>
-              <input type="hidden" name="codice" id="codice-hidden" value="">
-            </div>
-          </div>
-          <div class="field-grid" style="margin-top:12px">
-            <div>
-              <label for="dur-select">Durata misura</label>
-              <select id="dur-select" name="dur">
-                <option value="1">1 secondo</option>
-                <option value="5">5 secondi</option>
-                <option value="10" selected>10 secondi</option>
-                <option value="20">20 secondi</option>
-                <option value="30">30 secondi</option>
-                <option value="60">60 secondi</option>
-              </select>
-            </div>
-            <div>
-              <label for="desc-input">Note punto</label>
-              <textarea id="desc-input" name="desc" maxlength="300" placeholder="Offset, descrizione, dettagli utili..."></textarea>
-            </div>
-          </div>
-          <div class="helper">Categoria, codice e durata restano memorizzati dopo ogni salvataggio.</div>
+      <div class="field-row">
+        <div>
+          <label for="codice-select">Codice</label>
+          <select id="codice-select"><option value="">— codice —</option></select>
+          <input type="hidden" name="codice" id="codice-hidden" value="">
         </div>
-      </details>
+        <div>
+          <label for="dur-select">Durata misura</label>
+          <select id="dur-select" name="dur">
+            <option value="1">1 s</option>
+            <option value="5">5 s</option>
+            <option value="10" selected>10 s</option>
+            <option value="20">20 s</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-full">
+        <label for="desc-input">Note punto</label>
+        <textarea id="desc-input" name="desc" maxlength="300" placeholder="Offset, descrizione, dettagli utili..."></textarea>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <button type="button" class="btn-save-tmp" id="btn-save-tmp">💾 Salva temporaneo</button>
+        <span class="saved-tmp-ok" id="saved-tmp-ok">✅ Salvato</span>
+        <a class="audio-link" href="/survey/{{ sid }}#voice-notes" title="Note audio">🎧 Note audio</a>
+      </div>
 
       <input type="hidden" name="force" id="force-field" value="0">
       <input type="hidden" name="imu_unstable" id="imu-unstable-field" value="false">
       <input type="hidden" name="imu_tilt_max_deg" id="imu-tilt-max-field" value="">
     </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-title">🎙️ Nota punto</div>
-        <div class="subtle">Solo nota collegata al punto corrente</div>
-      </div>
-      <div class="voice-buttons desktop-only">
-        <button class="btn btn-soft" id="btn-record-point" type="button">Registra nota punto</button>
-      </div>
-      <div class="rec-status" id="rec-status">Registrazione in corso… <span id="rec-timer">0.0 s</span></div>
-      <div class="helper">Le note punto si agganciano automaticamente al punto quando salvi la misura. Le note di sessione stanno nella pagina principale del rilievo.</div>
-      <div class="note-list" id="recent-notes"></div>
-    </div>
-
-    <div class="card" id="imu-card" style="display:none">
-      <div class="card-head">
-        <div class="card-title">📐 Livella digitale</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-soft" id="btn-imu-perm" type="button" style="display:none;">🔓 Attiva livella</button>
-          <button class="btn btn-soft" id="btn-imu-calibrate" type="button">Calibra livella</button>
-        </div>
-      </div>
-      <div id="imu-indicator">
-        <div class="imu-row">
-          <div class="imu-bubble-wrap">
-            <div class="imu-bubble-ring">
-              <div class="imu-bubble-dot" id="imu-dot"></div>
-            </div>
-            <div class="imu-tilt-label" id="imu-tilt-label">— °</div>
-          </div>
-          <div>
-            <div class="imu-status-text" id="imu-status-text">Non calibrata</div>
-            <div class="helper" id="imu-calibrate-hint" style="display:none">Palina calibrata in questa posizione.<br>Non smontare il telefono dalla palina durante la sessione.</div>
-          </div>
-        </div>
-        <div class="imu-sampling-overlay" id="imu-sampling-overlay">📡 Monitoraggio stabilità in corso…</div>
-        <div id="imu-debug" style="display:none;font-size:11px;color:var(--muted);text-align:center;margin-top:4px"></div>
-      </div>
-    </div>
   </form>
 
+  <!-- D) Action bar fissa — pulsanti sopra, progress sotto -->
   <div class="action-bar">
+    <div class="action-bar-btns">
+      <button class="action-icon" id="btn-record-point-mobile" type="button" title="Registra nota punto">🎙</button>
+      <button class="btn btn-main" type="submit" form="point-form" id="btn-measure">MISURA PUNTO</button>
+      <a class="action-link" href="/survey/{{ sid }}" title="Torna al rilievo">↩</a>
+    </div>
     <div class="action-bar-status" id="action-bar-status">
       <div class="progress-bar" id="action-progress-bar" style="display:none">
         <div class="progress-fill" id="progress-fill"></div>
@@ -249,11 +249,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
         <span id="progress-label">Misura in corso…</span><span id="progress-seconds">0%</span>
       </div>
       <div class="saved-msg" id="saved-msg" style="display:none"></div>
-    </div>
-    <div class="action-bar-btns">
-      <button class="action-icon" id="btn-record-point-mobile" type="button" title="Nota punto">🎙</button>
-      <button class="btn btn-main" type="submit" form="point-form" id="btn-measure">MISURA PUNTO</button>
-      <a class="action-link" href="/survey/{{ sid }}" title="Rilievo">↩</a>
     </div>
   </div>
 
@@ -278,6 +273,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
       </div>
     </div>
   </div>
+
 </div>
 {% endblock %}
 
@@ -292,6 +288,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
   const codHidden = document.getElementById('codice-hidden');
   const durSel = document.getElementById('dur-select');
   const nameInput = document.getElementById('name-input');
+  const descInput = document.getElementById('desc-input');
   const form = document.getElementById('point-form');
   const forceField = document.getElementById('force-field');
   const flashError = document.getElementById('flash-error');
@@ -307,10 +304,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
   const btnMeasure = document.getElementById('btn-measure');
   const pillCat = document.getElementById('pill-cat');
   const pillCod = document.getElementById('pill-cod');
-  const pillDur = document.getElementById('pill-dur');
-  const quickCod = document.getElementById('quick-cod');
-  const quickDur = document.getElementById('quick-dur');
-  const recentNotes = document.getElementById('recent-notes');
   const activeNextName = document.getElementById('active-next-name');
   const confirmDeleteModal = document.getElementById('confirm-delete-modal');
   const confirmDeleteAccept = document.getElementById('confirm-delete-accept');
@@ -339,15 +332,12 @@ details.advanced .advanced-body{padding:0 16px 16px}
   function updatePills() {
     const cat = categorie.find(c => c.id === catSel.value);
     const codLabel = codSel.options[codSel.selectedIndex]?.textContent || '—';
-    if (pillCat) pillCat.textContent = 'Categoria: ' + (cat ? cat.label : '—');
-    if (pillCod) pillCod.textContent = 'Codice: ' + (codSel.value ? codLabel : '—');
-    if (pillDur) pillDur.textContent = 'Durata: ' + durSel.value + ' s';
-    quickCod.textContent = codSel.value || '—';
-    quickDur.textContent = durSel.value + ' s';
+    if (pillCat) pillCat.textContent = cat ? cat.label : '—';
+    if (pillCod) pillCod.textContent = codSel.value ? codLabel : '—';
   }
 
   function updateCodici(catId) {
-    codSel.innerHTML = '<option value="">— seleziona codice —</option>';
+    codSel.innerHTML = '<option value="">— codice —</option>';
     codHidden.value = '';
     const cat = categorie.find(c => c.id === catId);
     if (!cat) { updatePills(); return; }
@@ -362,19 +352,33 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
   catSel.addEventListener('change', () => { localStorage.setItem('lastCat', catSel.value); updateCodici(catSel.value); });
   codSel.addEventListener('change', () => { codHidden.value = codSel.value; if (catSel.value) localStorage.setItem('lastCodice_' + catSel.value, codSel.value); updatePills(); });
-  durSel.addEventListener('change', () => { localStorage.setItem('lastDur', durSel.value); updatePills(); });
+  durSel.addEventListener('change', () => { localStorage.setItem('lastDur', durSel.value); });
+  descInput?.addEventListener('input', () => { localStorage.setItem('lastDesc', descInput.value); });
 
-  const lastCat = localStorage.getItem('lastCat'); if (lastCat) { catSel.value = lastCat; }
+  // Restore persisted values
+  const lastCat = localStorage.getItem('lastCat'); if (lastCat) catSel.value = lastCat;
   updateCodici(catSel.value);
   const lastDur = localStorage.getItem('lastDur'); if (lastDur) durSel.value = lastDur;
+  const lastDesc = localStorage.getItem('lastDesc'); if (lastDesc && descInput) descInput.value = lastDesc;
   updatePills();
+
+  // "Salva temporaneo" button
+  const btnSaveTmp = document.getElementById('btn-save-tmp');
+  const savedTmpOk = document.getElementById('saved-tmp-ok');
+  btnSaveTmp?.addEventListener('click', () => {
+    localStorage.setItem('lastCat', catSel.value);
+    if (catSel.value) localStorage.setItem('lastCodice_' + catSel.value, codSel.value);
+    localStorage.setItem('lastDur', durSel.value);
+    if (descInput) localStorage.setItem('lastDesc', descInput.value);
+    savedTmpOk.style.display = 'inline';
+    setTimeout(() => { savedTmpOk.style.display = 'none'; }, 1500);
+  });
 
   let progressTimer = null;
   function setFormBusy(busy) {
     [...form.querySelectorAll('input,select,textarea,button')].forEach(el => { if (el.id !== 'force-field') el.disabled = busy; });
-    ['btn-record-point','btn-record-point-mobile'].forEach(id => {
-      const el = document.getElementById(id); if (el) el.disabled = busy;
-    });
+    const rmbtn = document.getElementById('btn-record-point-mobile');
+    if (rmbtn) rmbtn.disabled = busy;
     if (busy) {
       btnMeasure.textContent = 'Misurazione…';
       btnMeasure.disabled = true;
@@ -424,9 +428,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
   async function submitPoint() {
     clearError();
-    // FIX: aggiorna l'hidden field e cattura FormData PRIMA di disabilitare i campi.
-    // I campi disabled vengono esclusi da FormData, quindi la sequenza corretta è:
-    // 1) aggiorna codHidden  2) costruisci FormData  3) poi disabilita i campi UI.
     codHidden.value = codSel.value;
     const fd = new FormData(form);
     setFormBusy(true);
@@ -449,7 +450,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
       }
       if (!data.ok) { setFormBusy(false); stopProgress(); showError('❌ Errore'); return; }
     }
-    // Redirect to the saved page URL which contains saved point info
     window.location.href = resp.redirected ? resp.url : (resp.url || form.action);
   }
 
@@ -457,9 +457,8 @@ details.advanced .advanced-body{padding:0 16px 16px}
   document.getElementById('modal-cancel').addEventListener('click', () => { qualityModal.style.display = 'none'; forceField.value = '0'; });
   document.getElementById('modal-force').addEventListener('click', () => { qualityModal.style.display = 'none'; forceField.value = '1'; submitPoint(); });
 
-  const recStatus = document.getElementById('rec-status');
-  const recTimer = document.getElementById('rec-timer');
   let mediaRecorder = null, chunks = [], recKind = 'point', recStarted = 0, recTick = null;
+  const btnRecMobile = document.getElementById('btn-record-point-mobile');
 
   let pendingDelete = null;
   function openDeleteModal(noteId, element) {
@@ -478,35 +477,49 @@ details.advanced .advanced-body{padding:0 16px 16px}
     pendingDelete = null;
   });
 
-  function renderRecent(note) {
-    const wrap = document.createElement('div');
-    wrap.className = 'note-item';
-    wrap.innerHTML = `<div class="note-meta">Nota punto · ${new Date().toLocaleTimeString()}</div>
-      <audio controls src="${note.audio_url}"></audio>
-      <div class="helper">${note.point_name ? ('Rif. punto: ' + note.point_name) : 'In attesa di aggancio'}</div>
-      <div class="note-actions">
-        <button type="button" class="btn btn-danger recent-delete">Elimina</button>
-      </div>`;
-    wrap.querySelector('.recent-delete')?.addEventListener('click', () => openDeleteModal(note.id, wrap));
-    recentNotes.prepend(wrap);
-  }
-
   async function uploadRecording(blob) {
     const fd = new FormData();
     fd.append('audio', new File([blob], `nota_${Date.now()}.webm`, {type: blob.type || 'audio/webm'}));
     fd.append('kind', recKind);
     fd.append('point_name', nameInput.value || '');
     fd.append('point_code', codHidden.value || '');
-    fd.append('note', document.getElementById('desc-input').value || '');
+    fd.append('note', descInput ? descInput.value : '');
     const resp = await fetch(`/survey/${sid}/voice-note`, { method: 'POST', body: fd });
     const data = await resp.json();
     if (!data.ok) throw new Error(data.error || 'Upload fallito');
-    renderRecent(data.note);
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+  }
+
+  function updateRecordingUI(active) {
+    if (btnRecMobile) {
+      if (active) {
+        btnRecMobile.classList.add('recording');
+        btnRecMobile.title = 'Ferma registrazione';
+      } else {
+        btnRecMobile.classList.remove('recording');
+        btnRecMobile.title = 'Registra nota punto';
+      }
+    }
+    if (active) {
+      progressLabel.textContent = '🔴 Registrazione…';
+      progressSeconds.textContent = '0.0 s';
+      actionProgressBar.style.display = 'none';
+      actionProgressText.style.display = 'flex';
+      actionBarStatus.classList.add('visible');
+    } else {
+      actionProgressText.style.display = 'none';
+      actionBarStatus.classList.remove('visible');
+    }
   }
 
   async function startRecording(kind) {
     if (!navigator.mediaDevices || !window.MediaRecorder) { showError('Browser senza supporto registrazione audio'); return; }
-    if (mediaRecorder && mediaRecorder.state === 'recording') { mediaRecorder.stop(); return; }
+    if (mediaRecorder && mediaRecorder.state === 'recording') { stopRecording(); return; }
     recKind = kind;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({audio:true});
@@ -515,7 +528,7 @@ details.advanced .advanced-body{padding:0 16px 16px}
       mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
       mediaRecorder.onstop = async () => {
         clearInterval(recTick);
-        recStatus.style.display = 'none';
+        updateRecordingUI(false);
         const blob = new Blob(chunks, {type: mediaRecorder.mimeType || 'audio/webm'});
         stream.getTracks().forEach(t => t.stop());
         try { await uploadRecording(blob); }
@@ -523,18 +536,17 @@ details.advanced .advanced-body{padding:0 16px 16px}
       };
       mediaRecorder.start();
       recStarted = Date.now();
-      recStatus.style.display = 'block';
-      recStatus.innerHTML = 'Registrazione nota punto… <span id="rec-timer">0.0 s</span>';
+      updateRecordingUI(true);
       recTick = setInterval(() => {
-        const el = document.getElementById('rec-timer');
-        if (el) el.textContent = (((Date.now()-recStarted)/1000).toFixed(1)) + ' s';
+        const secs = ((Date.now() - recStarted) / 1000).toFixed(1);
+        progressSeconds.textContent = secs + ' s';
       }, 100);
     } catch (e) {
       showError('Microfono non disponibile: ' + e.message);
     }
   }
 
-  ['btn-record-point','btn-record-point-mobile'].forEach(id => document.getElementById(id)?.addEventListener('click', () => startRecording('point')));
+  btnRecMobile?.addEventListener('click', () => startRecording('point'));
   nameInput?.addEventListener('input', () => { if (activeNextName) activeNextName.textContent = nameInput.value || '—'; });
 })();
 </script>
@@ -542,7 +554,8 @@ details.advanced .advanced-body{padding:0 16px 16px}
 <script>
 /* ── IMU Livella digitale (browser DeviceOrientation) ─────────────────── */
 (function() {
-  const imuCard = document.getElementById('imu-card');
+  const imuNoSensor = document.getElementById('imu-no-sensor');
+  const imuIndicator = document.getElementById('imu-indicator');
   const imuDot = document.getElementById('imu-dot');
   const imuTiltLabel = document.getElementById('imu-tilt-label');
   const imuStatusText = document.getElementById('imu-status-text');
@@ -554,15 +567,12 @@ details.advanced .advanced-body{padding:0 16px 16px}
   const imuUnstableField = document.getElementById('imu-unstable-field');
   const imuTiltMaxField = document.getElementById('imu-tilt-max-field');
 
-  // Tilt thresholds injected from backend settings
   const TILT_WARN = {{ imu_tilt_warn_deg | tojson }};
   const TILT_ERROR = {{ imu_tilt_error_deg | tojson }};
   const STABILITY_THRESHOLD = {{ imu_stability_threshold_deg | tojson }};
-  // Maximum bubble displacement in px from ring centre (ring is 100px diameter, dot is 22px)
-  const RING_RADIUS = 28;  // (50px half-ring) - (11px dot-radius) - 11px margin
+  const RING_RADIUS = 22;  // (35px half-ring) - (7.5px dot-radius) - 5.5px margin
 
-  // IMU state
-  let _imuBaseline = null;      // {beta, gamma} calibrated
+  let _imuBaseline = null;
   let _imuAvailable = false;
   let _imuCalibrated = false;
   let _lastBeta = null;
@@ -571,7 +581,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
   let _imuWasUnstable = false;
   let _imuTiltMaxDuringSampling = null;
 
-  // EMA smoothing state for bubble position
   const EMA_ALPHA = 0.3;
   let _smoothDx = 0;
   let _smoothDy = 0;
@@ -580,7 +589,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
   function updateBubble(tiltDeg, calibrated, rollDeg, pitchDeg) {
     if (!calibrated || tiltDeg === null || tiltDeg === undefined) {
-      // Centre bubble, grey colour
       imuDot.style.top = '50%';
       imuDot.style.left = '50%';
       imuDot.style.background = '#95a5a6';
@@ -596,18 +604,14 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
     if (rollDeg !== null && rollDeg !== undefined &&
         pitchDeg !== null && pitchDeg !== undefined) {
-      // Use real roll/pitch axes for accurate bubble position.
-      // Roll (left/right tilt) drives horizontal displacement (dx).
-      // Pitch (forward/back tilt) drives vertical displacement (dy).
-      rawDx = clamp((rollDeg  / maxVisualTilt) * RING_RADIUS, -RING_RADIUS, RING_RADIUS);
-      rawDy = clamp((pitchDeg / maxVisualTilt) * RING_RADIUS, -RING_RADIUS, RING_RADIUS);
-      // Show debug text
+      // Fix: negate signs so bubble moves opposite to tilt (like a real spherical level)
+      rawDx = clamp((-rollDeg  / maxVisualTilt) * RING_RADIUS, -RING_RADIUS, RING_RADIUS);
+      rawDy = clamp((-pitchDeg / maxVisualTilt) * RING_RADIUS, -RING_RADIUS, RING_RADIUS);
       if (imuDebug) {
         imuDebug.textContent = 'roll: ' + rollDeg.toFixed(1) + '°  pitch: ' + pitchDeg.toFixed(1) + '°';
         imuDebug.style.display = 'block';
       }
     } else {
-      // Fallback: radial displacement at 45° (legacy behaviour without roll/pitch)
       const offset = Math.min(RING_RADIUS, (Math.min(tiltDeg, maxVisualTilt) / maxVisualTilt) * RING_RADIUS);
       const angle = Math.PI / 4;
       rawDx = Math.round(offset * Math.cos(angle));
@@ -615,7 +619,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
       if (imuDebug) imuDebug.style.display = 'none';
     }
 
-    // Exponential moving average for smooth bubble motion
     _smoothDx = EMA_ALPHA * rawDx + (1 - EMA_ALPHA) * _smoothDx;
     _smoothDy = EMA_ALPHA * rawDy + (1 - EMA_ALPHA) * _smoothDy;
     const dx = Math.round(_smoothDx);
@@ -625,7 +628,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
     imuDot.style.top = 'calc(50% + ' + dy + 'px)';
     imuDot.style.transform = 'translate(-50%, -50%)';
 
-    // Colour: green / yellow / red
     let color;
     if (tiltDeg <= TILT_WARN) color = '#27ae60';
     else if (tiltDeg <= TILT_ERROR) color = '#d68910';
@@ -637,29 +639,27 @@ details.advanced .advanced-body{padding:0 16px 16px}
 
   function updateIMUStatus(tiltDeg) {
     if (tiltDeg === null || tiltDeg === undefined) {
-      imuStatusText.textContent = 'Calibrata — attendere dati…';
+      imuStatusText.textContent = 'Calibrata — attesa dati…';
     } else if (tiltDeg <= TILT_WARN) {
       imuStatusText.textContent = '✅ In bolla (' + tiltDeg.toFixed(1) + '°)';
     } else if (tiltDeg <= TILT_ERROR) {
-      imuStatusText.textContent = '⚠️ Tilt moderato (' + tiltDeg.toFixed(1) + '°)';
+      imuStatusText.textContent = '⚠️ Tilt (' + tiltDeg.toFixed(1) + '°)';
     } else {
       imuStatusText.textContent = '🔴 Fuori bolla (' + tiltDeg.toFixed(1) + '°)';
     }
   }
 
   function onDeviceOrientation(event) {
-    // beta = tilt avanti/indietro (-180..180), gamma = tilt sinistra/destra (-90..90)
     if (event.beta === null || event.gamma === null) return;
     _lastBeta = event.beta;
     _lastGamma = event.gamma;
 
     if (!_imuAvailable) {
       _imuAvailable = true;
-      if (imuCard) imuCard.style.display = 'block';
-      if (btnPermission) btnPermission.style.display = 'none';
+      if (imuNoSensor) imuNoSensor.style.display = 'none';
+      if (imuIndicator) imuIndicator.style.display = 'block';
     }
 
-    // Calcola tilt relativo alla baseline calibrata
     if (_imuCalibrated && _imuBaseline !== null) {
       const dBeta  = _lastBeta  - _imuBaseline.beta;
       const dGamma = _lastGamma - _imuBaseline.gamma;
@@ -667,7 +667,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
       updateBubble(tiltDeg, true, dGamma, dBeta);  // roll=dGamma, pitch=dBeta
       updateIMUStatus(tiltDeg);
 
-      // Tracking instabilità durante sampling
       if (_imuSamplingActive) {
         if (tiltDeg > STABILITY_THRESHOLD) _imuWasUnstable = true;
         if (_imuTiltMaxDuringSampling === null || tiltDeg > _imuTiltMaxDuringSampling) {
@@ -686,7 +685,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
   function requestIMUPermission() {
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
-      // iOS 13+: must be called from a user gesture
       DeviceOrientationEvent.requestPermission().then(response => {
         if (response === 'granted') {
           startIMU();
@@ -698,7 +696,6 @@ details.advanced .advanced-body{padding:0 16px 16px}
         if (imuStatusText) imuStatusText.textContent = 'Errore permesso';
       });
     } else {
-      // Android — permesso implicito
       startIMU();
     }
   }
@@ -711,10 +708,8 @@ details.advanced .advanced-body{padding:0 16px 16px}
     return true;
   }
 
-  // Calibrate button
   btnCalibrate?.addEventListener('click', () => {
     if (!_imuAvailable) {
-      // If on iOS and not yet started, request permission first
       requestIMUPermission();
       return;
     }
@@ -723,30 +718,26 @@ details.advanced .advanced-body{padding:0 16px 16px}
     const ok = calibrateIMU();
     if (ok) {
       btnCalibrate.textContent = '✅ Calibrata';
-      imuCalibrateHint.style.display = 'block';
-      setTimeout(() => { btnCalibrate.textContent = 'Calibra livella'; btnCalibrate.disabled = false; }, 3000);
+      if (imuCalibrateHint) imuCalibrateHint.style.display = 'block';
+      setTimeout(() => { btnCalibrate.textContent = 'Calibra'; btnCalibrate.disabled = false; }, 3000);
     } else {
       btnCalibrate.textContent = '❌ Nessun dato';
-      setTimeout(() => { btnCalibrate.textContent = 'Calibra livella'; btnCalibrate.disabled = false; }, 2000);
+      setTimeout(() => { btnCalibrate.textContent = 'Calibra'; btnCalibrate.disabled = false; }, 2000);
     }
   });
 
-  // Permission button (iOS)
   btnPermission?.addEventListener('click', requestIMUPermission);
 
-  // Hook into measure button to track sampling state and update hidden fields
   const btnMeasure = document.getElementById('btn-measure');
   const form = document.getElementById('point-form');
 
   if (btnMeasure) {
-    // Intercept form submit to update IMU hidden fields before submission
     form?.addEventListener('submit', () => {
       _imuSamplingActive = false;
       if (imuUnstableField) imuUnstableField.value = _imuWasUnstable ? 'true' : 'false';
       if (imuTiltMaxField) imuTiltMaxField.value = _imuTiltMaxDuringSampling !== null ? _imuTiltMaxDuringSampling.toFixed(2) : '';
-    }, true);  // capture phase — runs before bubbling-phase handlers
+    }, true);
 
-    // When measure starts, reset sampling state
     btnMeasure.addEventListener('click', () => {
       _imuSamplingActive = true;
       _imuWasUnstable = false;
@@ -755,23 +746,20 @@ details.advanced .advanced-body{padding:0 16px 16px}
     }, true);
   }
 
-  // Stop sampling overlay when form is done (page redirect will occur)
-  // (no explicit stop needed since page navigates away after measurement)
-
-  // Initialize — check DeviceOrientationEvent availability
   if (typeof DeviceOrientationEvent === 'undefined') {
-    // Not supported — keep card hidden
+    // Not supported — show placeholder
   } else if (typeof DeviceOrientationEvent.requestPermission === 'function') {
     // iOS 13+: show card with permission button, don't auto-start
-    if (imuCard) imuCard.style.display = 'block';
-    if (btnPermission) btnPermission.style.display = 'inline-flex';
-    imuStatusText.textContent = 'Premi "Attiva livella" per abilitare';
+    if (imuNoSensor) imuNoSensor.style.display = 'block';
+    if (btnPermission) btnPermission.style.display = 'inline-block';
+    if (imuStatusText) imuStatusText.textContent = 'Premi "Attiva" per abilitare';
   } else {
     // Android / non-iOS: start immediately
     startIMU();
-    // Show card after a short delay to check if sensor data arrives
     setTimeout(() => {
-      if (_imuAvailable && imuCard) imuCard.style.display = 'block';
+      if (!_imuAvailable) {
+        // Sensor not responding — keep placeholder visible
+      }
     }, 1500);
   }
 })();
