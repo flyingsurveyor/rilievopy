@@ -351,6 +351,25 @@ def survey_update_notes(sid):
     return _redirect(f"/survey/{sid}")
 
 
+# ---------- Point audio notes ----------
+@bp.route("/survey/<sid>/point/audio")
+def survey_point_audio(sid):
+    try:
+        svy = load_survey(sid)
+    except FileNotFoundError:
+        abort(404)
+    props = svy.get("properties", {})
+    voice_notes_pending = list(props.get("voice_notes_pending", []))
+    for note in voice_notes_pending:
+        if note.get("audio_filename") and not note.get("audio_url"):
+            note["audio_url"] = f"/survey/{sid}/media/audio/{note['audio_filename']}"
+    active_title = props.get("title", sid)
+    return render_template('rtk_survey_point_audio.html',
+                           sid=sid,
+                           active_title=active_title,
+                           voice_notes_pending=voice_notes_pending)
+
+
 # ---------- Add point ----------
 @bp.route("/survey/<sid>/point", methods=["GET", "POST"])
 def survey_point(sid):

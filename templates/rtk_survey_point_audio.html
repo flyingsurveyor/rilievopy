@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% set active = "surveys" %}
+
+{% block title %}Note audio — {{ active_title }}{% endblock %}
+
+{% block head %}
+<style>
+:root{--bg:#f3f6f9;--card:#fff;--line:#d6dde3;--text:#20303c;--muted:#60707d;--ok:#27ae60;--soft:#eef5fb;--accent:#1d5f8f;--danger:#c0392b}
+body{background:var(--bg)}
+.audio-shell{max-width:760px;margin:0 auto;padding:10px 10px 40px}
+.page-header{background:var(--card);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.page-title{font-size:17px;font-weight:900;color:var(--text)}
+.page-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.back-link{text-decoration:none;color:var(--accent);font-weight:800;background:var(--soft);padding:6px 12px;border-radius:999px;font-size:13px;white-space:nowrap}
+.note-list{display:flex;flex-direction:column;gap:10px}
+.note-card{background:var(--card);border:1px solid #dbe4ea;border-radius:12px;padding:12px}
+.note-card audio{width:100%;margin:8px 0 6px}
+.note-meta{font-size:11px;color:var(--muted);margin-bottom:6px}
+.note-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:none;border-radius:9px;padding:7px 12px;font-size:13px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.btn-soft{background:var(--soft);color:var(--accent)}
+.btn-danger{background:var(--danger);color:#fff}
+.empty-state{background:var(--card);border-radius:12px;padding:24px;text-align:center;color:var(--muted);font-size:14px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="audio-shell">
+
+  <div class="page-header">
+    <div>
+      <div class="page-title">🎧 Note audio — punto in attesa</div>
+      <div class="page-sub">{{ active_title }}</div>
+    </div>
+    <a class="back-link" href="/survey/{{ sid }}/point">↩ Torna al punto</a>
+  </div>
+
+  {% if voice_notes_pending %}
+  <div class="note-list" id="notes-list">
+    {% for note in voice_notes_pending %}
+    <div class="note-card" id="note-{{ note.id }}">
+      <div class="note-meta">
+        {% if note.point_name %}Punto: <strong>{{ note.point_name }}</strong>{% endif %}
+        {% if note.point_code %} · Codice: <strong>{{ note.point_code }}</strong>{% endif %}
+        {% if note.note %}<br>{{ note.note }}{% endif %}
+      </div>
+      <audio controls src="{{ note.audio_url }}"></audio>
+      <div class="note-actions">
+        <a class="btn btn-soft" href="{{ note.audio_url }}" download>⬇ Scarica</a>
+        <button class="btn btn-danger" type="button"
+                onclick="deleteNote('{{ note.id }}')">🗑 Elimina</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">Nessuna nota audio in attesa di assegnazione.</div>
+  {% endif %}
+
+</div>
+
+<div id="delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);align-items:center;justify-content:center;z-index:10000">
+  <div style="background:#fff;border-radius:14px;padding:18px;max-width:360px;width:90%;box-shadow:0 8px 24px rgba(0,0,0,.18)">
+    <h3 style="margin:0 0 6px;color:var(--text)">Elimina nota vocale</h3>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Questa operazione rimuove anche il file audio associato.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-soft" id="modal-cancel" type="button">Annulla</button>
+      <button class="btn btn-danger" id="modal-confirm" type="button">Elimina</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SID = {{ sid | tojson }};
+let _pendingDelete = null;
+
+function deleteNote(noteId) {
+  _pendingDelete = { noteId };
+  document.getElementById('delete-modal').style.display = 'flex';
+}
+
+document.getElementById('modal-cancel').addEventListener('click', function() {
+  _pendingDelete = null;
+  document.getElementById('delete-modal').style.display = 'none';
+});
+
+document.getElementById('modal-confirm').addEventListener('click', async function() {
+  if (!_pendingDelete) return;
+  const { noteId } = _pendingDelete;
+  _pendingDelete = null;
+  document.getElementById('delete-modal').style.display = 'none';
+  try {
+    const resp = await fetch(`/survey/${SID}/voice-note/${noteId}/delete`, { method: 'POST' });
+    if (resp.ok) {
+      const el = document.getElementById('note-' + noteId);
+      if (el) el.remove();
+      const list = document.getElementById('notes-list');
+      if (list && list.children.length === 0) {
+        list.outerHTML = '<div class="empty-state">Nessuna nota audio in attesa di assegnazione.</div>';
+      }
+    }
+  } catch (e) {
+    console.error('Errore eliminazione nota', e);
+  }
+});
+</script>
+{% endblock %}

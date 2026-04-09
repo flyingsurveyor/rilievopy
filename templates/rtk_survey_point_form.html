@@ -13,8 +13,6 @@ body{background:var(--bg)}
 .active-title-wrap{display:flex;flex-direction:column;gap:2px}
 .active-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:900;color:var(--accent)}
 .survey-title{font-size:15px;font-weight:900;color:var(--text);line-height:1.1}
-.top-links{display:flex;gap:6px;flex-wrap:wrap}
-.top-links a{text-decoration:none;color:var(--accent);font-weight:800;background:var(--soft);padding:4px 8px;border-radius:999px;font-size:12px}
 .active-strip-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}
 .active-meta{background:#f7fafc;border:1px solid #e3eaf0;border-radius:9px;padding:6px 8px}
 .active-meta .k{font-size:10px;letter-spacing:.05em;text-transform:uppercase;font-weight:800;color:var(--muted)}
@@ -113,9 +111,6 @@ textarea{min-height:46px;resize:vertical}
       <div class="active-title-wrap">
         <div class="active-label">Rilievo attivo</div>
         <div class="survey-title">📍 {{ active_title }}</div>
-      </div>
-      <div class="top-links">
-        <a href="/survey/{{ sid }}">← Rilievo</a>
       </div>
     </div>
     <div class="active-strip-meta">
@@ -225,7 +220,7 @@ textarea{min-height:46px;resize:vertical}
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <button type="button" class="btn-save-tmp" id="btn-save-tmp">💾 Salva temporaneo</button>
         <span class="saved-tmp-ok" id="saved-tmp-ok">✅ Salvato</span>
-        <a class="audio-link" href="/survey/{{ sid }}#voice-notes" title="Note audio">🎧 Note audio</a>
+        <a class="audio-link" href="/survey/{{ sid }}/point/audio" title="Note audio">🎧 Note audio</a>
       </div>
 
       <input type="hidden" name="force" id="force-field" value="0">
