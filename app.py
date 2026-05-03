@@ -73,6 +73,10 @@ def create_app():
     from routes.rtkino import bp as rtkino_bp
     app.register_blueprint(rtkino_bp)
 
+    # Register Track Recorder blueprint
+    from routes.track import track_bp
+    app.register_blueprint(track_bp)
+
     return app
 
 

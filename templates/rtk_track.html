@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% set active = 'track' %}
+
+{% block title %}Track Recorder — RilievoPY{% endblock %}
+
+{% block head %}
+<style>
+.container { max-width: 900px; margin: 20px auto; padding: 0 20px; }
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h1, .card h2 { color: #2c3e50; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
+label { display: block; margin: 12px 0 4px; color: #2c3e50; font-weight: 500; }
+input, select { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #333; font-size: 16px; box-sizing: border-box; }
+.btn-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+button, .btn { background: #3498db; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 4px 2px; transition: background 0.3s; font-size: 14px; }
+button:hover, .btn:hover { background: #2980b9; }
+.btn-start { background: #27ae60; font-size: 16px; padding: 12px 24px; flex: 1; }
+.btn-start:hover { background: #219a52; }
+.btn-stop { background: #e74c3c; font-size: 16px; padding: 12px 24px; flex: 1; }
+.btn-stop:hover { background: #c0392b; }
+.btn-danger { background: #e74c3c; }
+.btn-danger:hover { background: #c0392b; }
+.btn-secondary { background: #7f8c8d; }
+.btn-secondary:hover { background: #636e72; }
+.status-box { background: #ecf0f1; border-radius: 6px; padding: 14px; margin-top: 14px; }
+.status-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; }
+.status-label { color: #555; }
+.status-value { font-weight: 700; color: #2c3e50; font-variant-numeric: tabular-nums; }
+.rec-indicator { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.rec-dot { width: 12px; height: 12px; border-radius: 50%; background: #e74c3c; }
+.rec-dot.active { animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 0%,100%{ opacity:1 } 50%{ opacity:.2 } }
+.error-banner { background: #fdecea; border: 1px solid #e74c3c; color: #c0392b; border-radius: 6px; padding: 10px 14px; margin-top: 10px; display: none; }
+table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+th { background: #f8f9fa; color: #555; font-weight: 600; }
+tr:hover td { background: #f0f4f8; }
+.tbl-actions { white-space: nowrap; }
+.tbl-actions button, .tbl-actions .btn { padding: 5px 10px; font-size: 12px; margin: 2px; }
+.empty-msg { color: #999; font-style: italic; text-align: center; padding: 20px; }
+@media screen and (max-width: 768px) {
+  body { font-size: 14px; padding: 0; margin: 0; }
+  .container { padding: 5px; margin: 0; }
+  .card { padding: 12px; margin-bottom: 10px; }
+  button, .btn { min-height: 44px; padding: 10px 12px; font-size: 14px; }
+  .btn-row { flex-direction: column; }
+  .btn-start, .btn-stop { flex: none; width: 100%; }
+  th, td { padding: 6px 8px; font-size: 13px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- ── Pannello di controllo ── -->
+  <div class="card">
+    <h1>🛰 Track Recorder</h1>
+
+    <label for="track-name">Nome traccia</label>
+    <input type="text" id="track-name" placeholder="track_YYYYMMDD_HHMMSS (auto se vuoto)">
+
+    <label for="track-interval">Intervallo campionamento</label>
+    <select id="track-interval">
+      <option value="0.5">0.5 s</option>
+      <option value="1" selected>1 s</option>
+      <option value="2">2 s</option>
+      <option value="5">5 s</option>
+      <option value="10">10 s</option>
+      <option value="30">30 s</option>
+    </select>
+
+    <label for="track-minfix">Fix minimo</label>
+    <select id="track-minfix">
+      <option value="3" selected>3 — 3D Fix</option>
+      <option value="4">4 — RTK Float</option>
+      <option value="5">5 — RTK Fixed</option>
+    </select>
+
+    <label for="track-maxhacc">Max hAcc (m)</label>
+    <input type="number" id="track-maxhacc" placeholder="nessun filtro" step="0.01" min="0">
+
+    <div class="btn-row">
+      <button class="btn-start" id="btn-start" onclick="startRecording()">▶ AVVIA</button>
+      <button class="btn-stop" id="btn-stop" onclick="stopRecording()" style="display:none">■ FERMA</button>
+    </div>
+
+    <div class="error-banner" id="err-banner"></div>
+
+    <!-- Status live -->
+    <div class="status-box" id="status-box">
+      <div class="status-row">
+        <span class="status-label">Stato</span>
+        <span class="status-value">
+          <span class="rec-indicator">
+            <span class="rec-dot" id="rec-dot"></span>
+            <span id="rec-label">Non attivo</span>
+          </span>
+        </span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Traccia</span>
+        <span class="status-value" id="st-name">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Punti registrati</span>
+        <span class="status-value" id="st-points">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Durata</span>
+        <span class="status-value" id="st-elapsed">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Lista tracce ── -->
+  <div class="card">
+    <h2>📁 Tracce salvate
+      <button class="btn btn-secondary" style="float:right;font-size:12px;padding:5px 10px;margin:0"
+              onclick="loadTrackList()">↺ Aggiorna</button>
+    </h2>
+    <div id="track-table-wrap">
+      <p class="empty-msg">Caricamento…</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var pollTimer = null;
+  var listTimer = null;
+
+  function fmtElapsed(sec) {
+    sec = Math.floor(sec);
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function fmtSize(bytes) {
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return bytes + ' B';
+  }
+
+  function showError(msg) {
+    var el = document.getElementById('err-banner');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(function(){ el.style.display = 'none'; }, 6000);
+  }
+
+  function updateStatusUI(data) {
+    var rec = data.recording;
+    document.getElementById('rec-dot').classList.toggle('active', rec);
+    document.getElementById('rec-label').textContent = rec ? '● REC' : '○ Non attivo';
+    document.getElementById('st-name').textContent = data.track || '—';
+    document.getElementById('st-points').textContent = rec ? data.points : '—';
+    document.getElementById('st-elapsed').textContent = rec ? fmtElapsed(data.elapsed_seconds) : '—';
+
+    document.getElementById('btn-start').style.display = rec ? 'none' : '';
+    document.getElementById('btn-stop').style.display = rec ? '' : 'none';
+    document.getElementById('track-name').disabled = rec;
+    document.getElementById('track-interval').disabled = rec;
+    document.getElementById('track-minfix').disabled = rec;
+    document.getElementById('track-maxhacc').disabled = rec;
+  }
+
+  function pollStatus() {
+    fetch('/track/status')
+      .then(function(r){ return r.json(); })
+      .then(function(data){ updateStatusUI(data); })
+      .catch(function(){});
+    pollTimer = setTimeout(pollStatus, 2000);
+  }
+
+  window.startRecording = function() {
+    var name = document.getElementById('track-name').value.trim();
+    var interval = parseFloat(document.getElementById('track-interval').value);
+    var min_fix = parseInt(document.getElementById('track-minfix').value);
+    var maxHaccVal = document.getElementById('track-maxhacc').value.trim();
+    var max_hacc = maxHaccVal !== '' ? parseFloat(maxHaccVal) : null;
+
+    fetch('/track/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name || null, interval: interval, min_fix: min_fix, max_hacc: max_hacc})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (!data.ok) { showError('Errore avvio: ' + (data.error || 'sconosciuto')); return; }
+      pollStatus();
+    })
+    .catch(function(){ showError('Errore di rete. Verifica la connessione e riprova.'); });
+  };
+
+  window.stopRecording = function() {
+    fetch('/track/stop', {method: 'POST'})
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (!data.ok) { showError('Errore stop: ' + (data.error || 'sconosciuto')); return; }
+        loadTrackList();
+      })
+      .catch(function(){ showError('Errore di rete. Verifica la connessione e riprova.'); });
+  };
+
+  window.loadTrackList = function() {
+    fetch('/track/list')
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        var wrap = document.getElementById('track-table-wrap');
+        if (!data.tracks || data.tracks.length === 0) {
+          wrap.innerHTML = '<p class="empty-msg">Nessuna traccia salvata.</p>';
+          return;
+        }
+        var rows = data.tracks.map(function(t){
+          var gpxBtn = t.gpx
+            ? '<a class="btn" href="/track/download/' + encodeURIComponent(t.name) + '/gpx" title="Scarica GPX">GPX↓</a>'
+            : '<button disabled style="opacity:.4">GPX</button>';
+          var csvBtn = t.csv
+            ? '<a class="btn" href="/track/download/' + encodeURIComponent(t.name) + '/csv" title="Scarica CSV">CSV↓</a>'
+            : '<button disabled style="opacity:.4">CSV</button>';
+          var delBtn = '<button class="btn btn-danger" onclick="deleteTrack(' + JSON.stringify(t.name) + ')" title="Elimina">🗑</button>';
+          return '<tr>'
+            + '<td>' + t.name + '</td>'
+            + '<td>' + fmtSize(t.size_bytes) + '</td>'
+            + '<td class="tbl-actions">' + gpxBtn + csvBtn + delBtn + '</td>'
+            + '</tr>';
+        });
+        wrap.innerHTML = '<table>'
+          + '<thead><tr><th>Nome</th><th>Dimensione</th><th>Azioni</th></tr></thead>'
+          + '<tbody>' + rows.join('') + '</tbody>'
+          + '</table>';
+      })
+      .catch(function(){ document.getElementById('track-table-wrap').innerHTML = '<p class="empty-msg">Errore caricamento lista.</p>'; });
+  };
+
+  window.deleteTrack = function(name) {
+    if (!confirm('Eliminare la traccia "' + name + '"?')) return;
+    fetch('/track/delete/' + encodeURIComponent(name), {method: 'POST'})
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (data.ok) { loadTrackList(); }
+        else { showError('Errore eliminazione: ' + (data.error || 'sconosciuto')); }
+      })
+      .catch(function(){ showError('Errore di rete. Verifica la connessione e riprova.'); });
+  };
+
+  // Init
+  pollStatus();
+  loadTrackList();
+
+  // Auto-refresh list every 10s when not recording
+  listTimer = setInterval(function(){
+    fetch('/track/status')
+      .then(function(r){ return r.json(); })
+      .then(function(data){ if (!data.recording) loadTrackList(); })
+      .catch(function(){});
+  }, 10000);
+})();
+</script>
+{% endblock %}
