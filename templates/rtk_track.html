@@ -129,6 +129,12 @@ tr:hover td { background: #f0f4f8; }
 {% block scripts %}
 <script>
 (function(){
+  var STATUS_POLL_INTERVAL = 2000;
+  var LIST_REFRESH_INTERVAL = 10000;
+  var ERROR_DISPLAY_DURATION = 6000;
+  var BYTES_PER_MB = 1024 * 1024;
+  var BYTES_PER_KB = 1024;
+
   var pollTimer = null;
   var listTimer = null;
 
@@ -140,8 +146,8 @@ tr:hover td { background: #f0f4f8; }
   }
 
   function fmtSize(bytes) {
-    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
-    if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes >= BYTES_PER_MB) return (bytes / BYTES_PER_MB).toFixed(1) + ' MB';
+    if (bytes >= BYTES_PER_KB) return (bytes / BYTES_PER_KB).toFixed(1) + ' KB';
     return bytes + ' B';
   }
 
@@ -149,7 +155,7 @@ tr:hover td { background: #f0f4f8; }
     var el = document.getElementById('err-banner');
     el.textContent = msg;
     el.style.display = 'block';
-    setTimeout(function(){ el.style.display = 'none'; }, 6000);
+    setTimeout(function(){ el.style.display = 'none'; }, ERROR_DISPLAY_DURATION);
   }
 
   function updateStatusUI(data) {
@@ -173,7 +179,7 @@ tr:hover td { background: #f0f4f8; }
       .then(function(r){ return r.json(); })
       .then(function(data){ updateStatusUI(data); })
       .catch(function(){});
-    pollTimer = setTimeout(pollStatus, 2000);
+    pollTimer = setTimeout(pollStatus, STATUS_POLL_INTERVAL);
   }
 
   window.startRecording = function() {
@@ -258,7 +264,7 @@ tr:hover td { background: #f0f4f8; }
       .then(function(r){ return r.json(); })
       .then(function(data){ if (!data.recording) loadTrackList(); })
       .catch(function(){});
-  }, 10000);
+  }, LIST_REFRESH_INTERVAL);
 })();
 </script>
 {% endblock %}
