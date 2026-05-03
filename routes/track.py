@@ -4,6 +4,7 @@ Endpoints Flask per il track recorder.
 """
 
 import os
+import re
 
 from flask import Blueprint, jsonify, request, send_file, render_template, abort
 
@@ -11,13 +12,25 @@ from modules.track_recorder import TRACK_RECORDER, TRACKS_DIR
 
 track_bp = Blueprint("track", __name__)
 
+# Characters allowed in track names
+_SAFE_NAME_RE = re.compile(r'^[\w\-]+$')
 
-def _safe_track_path(name, fmt):
-    """Return the resolved path for a track file, or None if outside TRACKS_DIR."""
-    name = os.path.basename(name)
-    path = os.path.realpath(os.path.join(TRACKS_DIR, f"{name}.{fmt}"))
+
+def _resolve_track_path(name, fmt):
+    """
+    Return a safe, resolved path for a track file within TRACKS_DIR.
+    Returns None if the name is invalid or the path escapes TRACKS_DIR.
+    """
+    # Strip any directory components and restrict to safe characters
+    safe_name = os.path.basename(name)
+    if not safe_name or not _SAFE_NAME_RE.match(safe_name):
+        return None
+    # Build path using only the sanitized basename
+    path = os.path.join(TRACKS_DIR, safe_name + "." + fmt)
+    # Verify the resolved path stays within TRACKS_DIR (guards against symlinks)
+    real_path = os.path.realpath(path)
     real_dir = os.path.realpath(TRACKS_DIR)
-    if not (path == real_dir or path.startswith(real_dir + os.sep)):
+    if not (real_path == real_dir or real_path.startswith(real_dir + os.sep)):
         return None
     return path
 
@@ -34,7 +47,7 @@ def track_start():
     interval = float(data.get("interval", 1.0))
     min_fix = int(data.get("min_fix", 3))
     max_hacc_raw = data.get("max_hacc")
-    max_hacc = float(max_hacc_raw) if max_hacc_raw not in (None, "", "null") else None
+    max_hacc = float(max_hacc_raw) if max_hacc_raw not in (None, "") else None
     result = TRACK_RECORDER.start(
         name=name, interval=interval, min_fix=min_fix, max_hacc=max_hacc
     )
@@ -81,22 +94,22 @@ def track_list():
 def track_download(name, fmt):
     if fmt not in ("gpx", "csv"):
         abort(400, "format must be gpx or csv")
-    path = _safe_track_path(name, fmt)
+    path = _resolve_track_path(name, fmt)
     if path is None:
         abort(400, "invalid track name")
     if not os.path.isfile(path):
         abort(404)
-    base = os.path.splitext(os.path.basename(path))[0]
+    safe_name = os.path.basename(name)
     mime = "application/gpx+xml" if fmt == "gpx" else "text/csv"
     return send_file(path, mimetype=mime, as_attachment=True,
-                     download_name=f"{base}.{fmt}")
+                     download_name=f"{safe_name}.{fmt}")
 
 
 @track_bp.route("/track/delete/<name>", methods=["POST"])
 def track_delete(name):
     deleted = []
     for fmt in ("gpx", "csv"):
-        p = _safe_track_path(name, fmt)
+        p = _resolve_track_path(name, fmt)
         if p is None:
             return jsonify({"ok": False, "error": "invalid track name"}), 400
         if os.path.isfile(p):

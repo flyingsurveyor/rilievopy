@@ -6,6 +6,7 @@ e salva su file GPX incrementale (sempre valido) e CSV.
 
 import csv
 import os
+import re
 import threading
 from datetime import datetime, timezone
 from typing import Optional
@@ -16,9 +17,19 @@ TRACKS_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "tracks")
 
 _GPX_FOOTER = b"  </trkseg></trk>\n</gpx>"
 
+# Only alphanumeric, dash, underscore — no dots to avoid extension confusion
+_SAFE_NAME_RE = re.compile(r"[^\w\-]")
+
 
 def _ensure_dir():
     os.makedirs(TRACKS_DIR, exist_ok=True)
+
+
+def _sanitize_name(name: str) -> str:
+    """Return a filesystem-safe track name with no path separators."""
+    name = os.path.basename(name)
+    name = _SAFE_NAME_RE.sub("_", name)
+    return name or "track"
 
 
 class TrackRecorder:
@@ -45,24 +56,6 @@ class TrackRecorder:
 
     # ── public API ──────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _sanitize_name(name: str) -> str:
-        """Sanitize track name: keep only safe characters, no path separators."""
-        import re
-        # Strip to basename, then allow only alphanumeric, dash, underscore, dot
-        name = os.path.basename(name)
-        name = re.sub(r"[^\w\-.]", "_", name)
-        return name or "track"
-
-    @staticmethod
-    def _safe_track_path(name: str, ext: str) -> str:
-        """Return resolved path, raising ValueError if outside TRACKS_DIR."""
-        path = os.path.realpath(os.path.join(TRACKS_DIR, f"{name}.{ext}"))
-        real_dir = os.path.realpath(TRACKS_DIR)
-        if not (path == real_dir or path.startswith(real_dir + os.sep)):
-            raise ValueError(f"Unsafe path: {path}")
-        return path
-
     def start(self, name: str = None, interval: float = 1.0,
               min_fix: int = 3, max_hacc: Optional[float] = None) -> dict:
         with self._lock:
@@ -71,25 +64,28 @@ class TrackRecorder:
             _ensure_dir()
             ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             raw_name = (name or f"track_{ts}").strip() or f"track_{ts}"
-            self.track_name = self._sanitize_name(raw_name)
+            # Sanitize: basename then replace unsafe chars
+            safe_name = _sanitize_name(raw_name)
+            self.track_name = safe_name
             self.interval = max(0.2, float(interval))
             self.min_fix = int(min_fix)
             self.max_hacc = float(max_hacc) if max_hacc is not None else None
             self.point_count = 0
             self.start_time = datetime.now(timezone.utc)
-            try:
-                self._gpx_path = self._safe_track_path(self.track_name, "gpx")
-                self._csv_path = self._safe_track_path(self.track_name, "csv")
-            except ValueError as exc:
-                return {"ok": False, "error": str(exc)}
+
+            # Build paths from sanitized name only — no user input passes directly to open()
+            gpx_path = os.path.join(TRACKS_DIR, safe_name + ".gpx")
+            csv_path = os.path.join(TRACKS_DIR, safe_name + ".csv")
+            self._gpx_path = gpx_path
+            self._csv_path = csv_path
 
             # Open GPX in binary mode for reliable seek
-            self._gpx_file = open(self._gpx_path, "wb")
+            self._gpx_file = open(gpx_path, "wb")
             header = (
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<gpx version="1.1" creator="rilievopy"\n'
                 '  xmlns="http://www.topografix.com/GPX/1/1">\n'
-                f'  <trk><name>{self.track_name}</name><trkseg>\n'
+                f'  <trk><name>{safe_name}</name><trkseg>\n'
             ).encode("utf-8")
             self._gpx_file.write(header)
             self._gpx_file.write(_GPX_FOOTER)
@@ -97,7 +93,7 @@ class TrackRecorder:
             os.fsync(self._gpx_file.fileno())
 
             # Open CSV
-            self._csv_file = open(self._csv_path, "w", newline="", encoding="utf-8")
+            self._csv_file = open(csv_path, "w", newline="", encoding="utf-8")
             self._csv_writer = csv.writer(self._csv_file)
             self._csv_writer.writerow(
                 ["time", "lat", "lon", "altMSL", "hAcc", "vAcc", "fixType", "rtk", "numSV"]
