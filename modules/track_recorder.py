@@ -5,6 +5,7 @@ e salva su file GPX incrementale (sempre valido) e CSV.
 """
 
 import csv
+import logging
 import os
 import threading
 from datetime import datetime, timezone
@@ -13,6 +14,8 @@ from typing import Optional
 from werkzeug.utils import secure_filename
 
 from .state import STATE
+
+logger = logging.getLogger(__name__)
 
 TRACKS_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "tracks")
 
@@ -87,7 +90,6 @@ class TrackRecorder:
             self._gpx_file.write(header)
             self._gpx_file.write(_GPX_FOOTER)
             self._gpx_file.flush()
-            os.fsync(self._gpx_file.fileno())
 
             # Open CSV
             self._csv_file = open(csv_path, "w", newline="", encoding="utf-8")
@@ -153,7 +155,10 @@ class TrackRecorder:
 
     def _run(self):
         while not self._stop_evt.is_set():
-            self._sample()
+            try:
+                self._sample()
+            except Exception as exc:
+                logger.warning("[track_recorder] _sample error (skipping): %s", exc)
             self._stop_evt.wait(self.interval)
 
     def _sample(self):
@@ -187,7 +192,10 @@ class TrackRecorder:
                 return
             # GPX incremental write
             if self._gpx_file:
-                self._append_trkpt(lat, lon, alt, ts, hacc, rtk, nsat)
+                try:
+                    self._append_trkpt(lat, lon, alt, ts, hacc, rtk, nsat)
+                except Exception as exc:
+                    logger.warning("[track_recorder] GPX write error: %s", exc)
             # CSV row
             if self._csv_writer:
                 self._csv_writer.writerow([
@@ -221,7 +229,6 @@ class TrackRecorder:
         self._gpx_file.write(trkpt)
         self._gpx_file.write(_GPX_FOOTER)
         self._gpx_file.flush()
-        os.fsync(self._gpx_file.fileno())
 
 
 # ── singleton globale ─────────────────────────────────────────────────────────
