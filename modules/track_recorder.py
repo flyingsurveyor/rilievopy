@@ -6,10 +6,11 @@ e salva su file GPX incrementale (sempre valido) e CSV.
 
 import csv
 import os
-import re
 import threading
 from datetime import datetime, timezone
 from typing import Optional
+
+from werkzeug.utils import secure_filename
 
 from .state import STATE
 
@@ -17,19 +18,15 @@ TRACKS_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "tracks")
 
 _GPX_FOOTER = b"  </trkseg></trk>\n</gpx>"
 
-# Only alphanumeric, dash, underscore — no dots to avoid extension confusion
-_SAFE_NAME_RE = re.compile(r"[^\w\-]")
-
 
 def _ensure_dir():
     os.makedirs(TRACKS_DIR, exist_ok=True)
 
 
-def _sanitize_name(name: str) -> str:
-    """Return a filesystem-safe track name with no path separators."""
-    name = os.path.basename(name)
-    name = _SAFE_NAME_RE.sub("_", name)
-    return name or "track"
+def _sanitize_name(name: str, fallback: str) -> str:
+    """Return a filesystem-safe track name using werkzeug's secure_filename."""
+    safe = secure_filename(name)
+    return safe or fallback
 
 
 class TrackRecorder:
@@ -64,8 +61,8 @@ class TrackRecorder:
             _ensure_dir()
             ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             raw_name = (name or f"track_{ts}").strip() or f"track_{ts}"
-            # Sanitize: basename then replace unsafe chars
-            safe_name = _sanitize_name(raw_name)
+            # secure_filename strips path separators and unsafe characters
+            safe_name = _sanitize_name(raw_name, f"track_{ts}")
             self.track_name = safe_name
             self.interval = max(0.2, float(interval))
             self.min_fix = int(min_fix)
