@@ -12,6 +12,16 @@ from modules.track_recorder import TRACK_RECORDER, TRACKS_DIR
 track_bp = Blueprint("track", __name__)
 
 
+def _safe_track_path(name, fmt):
+    """Return the resolved path for a track file, or None if outside TRACKS_DIR."""
+    name = os.path.basename(name)
+    path = os.path.realpath(os.path.join(TRACKS_DIR, f"{name}.{fmt}"))
+    real_dir = os.path.realpath(TRACKS_DIR)
+    if not (path == real_dir or path.startswith(real_dir + os.sep)):
+        return None
+    return path
+
+
 @track_bp.route("/track")
 def track_page():
     return render_template("rtk_track.html", active="track")
@@ -71,21 +81,24 @@ def track_list():
 def track_download(name, fmt):
     if fmt not in ("gpx", "csv"):
         abort(400, "format must be gpx or csv")
-    name = os.path.basename(name)
-    path = os.path.join(TRACKS_DIR, f"{name}.{fmt}")
+    path = _safe_track_path(name, fmt)
+    if path is None:
+        abort(400, "invalid track name")
     if not os.path.isfile(path):
         abort(404)
+    base = os.path.splitext(os.path.basename(path))[0]
     mime = "application/gpx+xml" if fmt == "gpx" else "text/csv"
     return send_file(path, mimetype=mime, as_attachment=True,
-                     download_name=f"{name}.{fmt}")
+                     download_name=f"{base}.{fmt}")
 
 
 @track_bp.route("/track/delete/<name>", methods=["POST"])
 def track_delete(name):
-    name = os.path.basename(name)
     deleted = []
     for fmt in ("gpx", "csv"):
-        p = os.path.join(TRACKS_DIR, f"{name}.{fmt}")
+        p = _safe_track_path(name, fmt)
+        if p is None:
+            return jsonify({"ok": False, "error": "invalid track name"}), 400
         if os.path.isfile(p):
             os.remove(p)
             deleted.append(fmt)
