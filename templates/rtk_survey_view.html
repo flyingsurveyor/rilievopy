@@ -11,12 +11,26 @@ body{background:var(--bg)}
 .hero{display:grid;grid-template-columns:1.2fr .9fr;gap:12px;align-items:stretch}.hero-main{display:flex;flex-direction:column;justify-content:space-between}.hero-title{font-size:24px;font-weight:900;color:var(--text);margin:0}.muted{color:var(--muted);font-size:13px}.toolbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.btn{background:#3498db;color:#fff;border:none;padding:12px 14px;border-radius:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:800;gap:8px}.btn:hover{background:#2980b9}.btn-danger{background:var(--danger)}.btn-soft{background:var(--soft);color:var(--accent)}
 textarea,input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:15px;box-sizing:border-box}
 .gnss-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.gnss-box{border:1px solid #e3eaf0;border-radius:14px;padding:12px;background:#f7fafc}.gnss-box .k{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase}.gnss-box .v{font-size:24px;font-weight:900;color:var(--text);margin-top:6px}
-.table-wrap{overflow:auto}.points-table{border-collapse:collapse;width:100%;margin-top:10px}th,td{border:1px solid #dde5ea;padding:8px}th{background:#eef3f6;text-align:left}tr:nth-child(even){background:#fafcfd}
-.mobile-points{display:none;gap:10px}.point-card{border:1px solid #dbe4ea;border-radius:14px;padding:12px;background:#fbfdff}.point-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}.point-name{font-size:18px;font-weight:900;color:var(--text)}.point-code{display:inline-block;background:var(--soft);color:var(--accent);padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}.point-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.point-grid .cell{border:1px solid #e6edf2;border-radius:10px;padding:8px;background:#fff}.point-grid .cell .k{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase}.point-grid .cell .v{font-size:14px;font-weight:800;color:var(--text);margin-top:4px}.point-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+.points-grid{display:grid;gap:10px}
+.point-card{border:1px solid #dbe4ea;border-radius:14px;padding:12px;background:#fbfdff}
+.point-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}
+.point-name{font-size:18px;font-weight:900;color:var(--text)}
+.point-code{display:inline-block;background:var(--soft);color:var(--accent);padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800}
+.rtk-chip{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;background:#e8edf1;color:#62727e}
+.rtk-chip[data-rtk="RTK fixed"],.rtk-chip[data-rtk="likely fixed"]{background:#d4f5e2;color:#1a7a45}
+.rtk-chip[data-rtk="RTK float"]{background:#fef3dc;color:#9a5d00}
+.point-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.cell{border:1px solid #e6edf2;border-radius:10px;padding:7px 8px;background:#fff}
+.cell .k{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.cell .v{font-size:13px;font-weight:800;color:var(--text);margin-top:3px}
+.desk-section{display:none;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #edf2f5}
+.section-label{font-size:10px;font-weight:900;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;grid-column:1/-1;margin-bottom:2px}
+.point-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+@media(min-width:900px){.points-grid{grid-template-columns:1fr 1fr}.desk-section{display:grid}}
 .btn-delete-point{background:none;border:none;cursor:pointer;font-size:18px;color:var(--danger)}.danger-zone{border:2px solid #efc0bc;background:#fff1f0}.note-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.note-card{border:1px solid #dbe4ea;border-radius:12px;padding:12px;background:#fbfdff}.note-card audio{width:100%;margin:8px 0}.note-meta{font-size:12px;color:#62727e;margin-bottom:8px}.note-actions{display:flex;gap:8px;flex-wrap:wrap}.section-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .voice-rec-box{border:1px solid #dbe4ea;border-radius:14px;background:#f8fbfd;padding:12px;margin-top:12px}.voice-rec-actions{display:flex;gap:8px;flex-wrap:wrap}.voice-rec-status{display:none;margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff4df;color:#7a4d00;font-weight:800}.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:10000}.confirm-box{background:#fff;border-radius:16px;padding:18px;max-width:420px;width:92%;box-shadow:0 8px 24px rgba(0,0,0,.18)}.confirm-actions{display:flex;gap:10px;margin-top:14px}.confirm-title{font-size:18px;font-weight:900;color:var(--text)}
 @media (max-width:900px){.toolbar{grid-template-columns:repeat(3,minmax(0,1fr))}.hero{grid-template-columns:1fr}.gnss-strip{grid-template-columns:1fr 1fr 1fr}}
-@media (max-width:768px){.container{padding:0 6px}.card{padding:12px;border-radius:18px}.toolbar{grid-template-columns:1fr 1fr}.table-wrap{display:none}.mobile-points{display:grid}.gnss-strip{grid-template-columns:1fr 1fr 1fr}}
+@media (max-width:768px){.container{padding:0 6px}.card{padding:12px;border-radius:18px}.toolbar{grid-template-columns:1fr 1fr}.gnss-strip{grid-template-columns:1fr 1fr 1fr}}
 </style>
 {% endblock %}
 
@@ -64,40 +78,97 @@ textarea,input,select{width:100%;padding:12px;border:1px solid var(--line);borde
   </div>
 
   <div class="card">
-    <div class="section-head"><h3 style="margin:0">Punti</h3><div class="muted">Vista compatta mobile + tabella completa desktop</div></div>
+    <div class="section-head"><h3 style="margin:0">Punti</h3><div class="muted">{{ num_points }} punti — dettaglio completo su desktop</div></div>
 
-    <div class="mobile-points">
+    <div class="points-grid">
       {% for p in point_cards %}
       <div class="point-card">
+
         <div class="point-head">
           <div>
             <div class="point-name">{{ p.name or p.id }}</div>
             <div class="muted">ID {{ p.id }}</div>
           </div>
-          <div class="point-code">{{ p.codice or '—' }}</div>
+          <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+            {% if p.codice %}<span class="point-code">{{ p.codice }}</span>{% endif %}
+            <span class="rtk-chip" data-rtk="{{ p.rtk }}">{{ p.rtk|upper }}</span>
+          </div>
         </div>
+
+        <!-- Compact grid — mobile + desktop -->
         <div class="point-grid">
           <div class="cell"><div class="k">Lat</div><div class="v">{{ p.lat }}</div></div>
           <div class="cell"><div class="k">Lon</div><div class="v">{{ p.lon }}</div></div>
-          <div class="cell"><div class="k">HAE</div><div class="v">{{ p.hae }}</div></div>
+          <div class="cell"><div class="k">HAE (m)</div><div class="v">{{ p.hae }}</div></div>
+          <div class="cell"><div class="k">hAcc</div><div class="v">{{ p.h_acc_cm }}</div></div>
           <div class="cell"><div class="k">PDOP</div><div class="v">{{ p.pdop }}</div></div>
+          <div class="cell"><div class="k">nSV</div><div class="v">{{ p.num_sv }}</div></div>
           <div class="cell"><div class="k">σN</div><div class="v">{{ p.sigma_n }}</div></div>
           <div class="cell"><div class="k">σE</div><div class="v">{{ p.sigma_e }}</div></div>
         </div>
+
+        <!-- Posizione estesa — desktop only -->
+        <div class="desk-section">
+          <div class="section-label">Posizione estesa</div>
+          <div class="cell"><div class="k">altMSL (m)</div><div class="v">{{ p.alt_msl }}</div></div>
+          <div class="cell"><div class="k">vAcc (m)</div><div class="v">{{ p.v_acc }}</div></div>
+          <div class="cell"><div class="k">pAcc (m)</div><div class="v">{{ p.p_acc }}</div></div>
+          <div class="cell"><div class="k">Modo GNSS</div><div class="v">{{ p.gnss_mode }}</div></div>
+        </div>
+
+        <!-- DOP completo — desktop only -->
+        <div class="desk-section">
+          <div class="section-label">DOP</div>
+          <div class="cell"><div class="k">GDOP</div><div class="v">{{ p.gdop }}</div></div>
+          <div class="cell"><div class="k">HDOP</div><div class="v">{{ p.hdop }}</div></div>
+          <div class="cell"><div class="k">VDOP</div><div class="v">{{ p.vdop }}</div></div>
+          <div class="cell"><div class="k">NDOP</div><div class="v">{{ p.ndop }}</div></div>
+          <div class="cell"><div class="k">EDOP</div><div class="v">{{ p.edop }}</div></div>
+          <div class="cell"><div class="k">TDOP</div><div class="v">{{ p.tdop }}</div></div>
+        </div>
+
+        <!-- Sigma & RELPOS — desktop only -->
+        <div class="desk-section">
+          <div class="section-label">Sigma & RELPOS</div>
+          <div class="cell"><div class="k">σN</div><div class="v">{{ p.sigma_n }}</div></div>
+          <div class="cell"><div class="k">σE</div><div class="v">{{ p.sigma_e }}</div></div>
+          <div class="cell"><div class="k">σU</div><div class="v">{{ p.sigma_u }}</div></div>
+          <div class="cell"><div class="k">relN (m)</div><div class="v">{{ p.rel_n }}</div></div>
+          <div class="cell"><div class="k">relE (m)</div><div class="v">{{ p.rel_e }}</div></div>
+          <div class="cell"><div class="k">relD (m)</div><div class="v">{{ p.rel_d }}</div></div>
+          <div class="cell"><div class="k">Baseline (m)</div><div class="v">{{ p.baseline }}</div></div>
+          <div class="cell"><div class="k">Bearing (°)</div><div class="v">{{ p.bearing_deg }}</div></div>
+          <div class="cell"><div class="k">Slope (°)</div><div class="v">{{ p.slope_deg }}</div></div>
+        </div>
+
+        <!-- ECEF — desktop only -->
+        <div class="desk-section" style="grid-template-columns:1fr">
+          <div class="section-label">ECEF (m)</div>
+          <div class="cell"><div class="k">X</div><div class="v">{{ p.ecef_x }}</div></div>
+          <div class="cell"><div class="k">Y</div><div class="v">{{ p.ecef_y }}</div></div>
+          <div class="cell"><div class="k">Z</div><div class="v">{{ p.ecef_z }}</div></div>
+        </div>
+
+        <!-- Campionamento — desktop only -->
+        <div class="desk-section">
+          <div class="section-label">Campionamento</div>
+          <div class="cell"><div class="k">Campioni (totale)</div><div class="v">{{ p.n_kept }} / {{ p.n_samples }}</div></div>
+          <div class="cell"><div class="k">Durata (s)</div><div class="v">{{ p.duration_s }}</div></div>
+          <div class="cell"><div class="k">Intervallo (s)</div><div class="v">{{ p.interval_s }}</div></div>
+          <div class="cell"><div class="k">IMU tilt max (°)</div><div class="v">{{ p.imu_tilt_max }}</div></div>
+          <div class="cell"><div class="k">IMU instabile</div><div class="v">{{ p.imu_unstable }}</div></div>
+          <div class="cell"><div class="k">Inizio</div><div class="v">{{ p.start_time }}</div></div>
+          <div class="cell"><div class="k">Fine</div><div class="v">{{ p.end_time }}</div></div>
+        </div>
+
         <div class="point-actions">
           <a class="btn btn-soft" href="/survey/{{ sid }}/point/{{ p.id }}.txt">TXT</a>
           <button class="btn-delete-point" onclick="confirmDeletePoint('{{ sid }}', {{ p.idx }}, '{{ p.name|replace("'", "\\'") }}')">🗑️</button>
         </div>
       </div>
       {% else %}
-      <div class="muted">Nessun punto nel rilievo.</div>
+      <div class="muted" style="padding:12px">Nessun punto nel rilievo.</div>
       {% endfor %}
-    </div>
-
-    <div class="table-wrap">
-      <table class="points-table"><thead>
-        <tr><th>Sel</th><th>ID</th><th>Nome</th><th>Codice</th><th>Lat</th><th>Lon</th><th>HAE</th><th>PDOP</th><th>HDOP</th><th>VDOP</th><th>N</th><th>E</th><th>D</th><th>|baseline|</th><th>σN</th><th>σE</th><th>σU</th><th>TXT</th><th>🗑️</th></tr>
-      </thead><tbody>{{ rows|safe }}</tbody></table>
     </div>
   </div>
 
@@ -246,7 +317,8 @@ document.getElementById('note-filter')?.addEventListener('change', function() {
 });
 
 const recStatus = document.getElementById('rec-status');
-let mediaRecorder = null, chunks = [], recTick = null, recStarted = 0;
+let mediaRecorder = null, chunks = [], recTick = null, recStarted = 0, recMaxTimer = null;
+const REC_MAX_SECONDS = 60;
 function prependSessionNote(note) {
   const grid = document.getElementById('notes-session-grid');
   const empty = grid.querySelector('.muted'); if (empty) empty.remove();
@@ -295,6 +367,7 @@ document.getElementById('btn-record-session')?.addEventListener('click', async (
     mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
     mediaRecorder.onstop = async () => {
       clearInterval(recTick);
+      clearTimeout(recMaxTimer);
       recStatus.style.display = 'none';
       const blob = new Blob(chunks, {type: mediaRecorder.mimeType || 'audio/webm'});
       stream.getTracks().forEach(t => t.stop());
@@ -304,9 +377,21 @@ document.getElementById('btn-record-session')?.addEventListener('click', async (
     mediaRecorder.start();
     recStarted = Date.now();
     recStatus.style.display = 'block';
+    recMaxTimer = setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+    }, REC_MAX_SECONDS * 1000);
     recTick = setInterval(() => {
       const el = document.getElementById('rec-timer');
-      if (el) el.textContent = (((Date.now()-recStarted)/1000).toFixed(1)) + ' s';
+      if (!el) return;
+      const elapsed = (Date.now() - recStarted) / 1000;
+      const remaining = REC_MAX_SECONDS - elapsed;
+      if (remaining <= 10) {
+        el.textContent = '⚠ ' + Math.ceil(remaining) + 's rimasti';
+        el.style.color = '#c0392b';
+      } else {
+        el.textContent = elapsed.toFixed(1) + ' s';
+        el.style.color = '';
+      }
     }, 100);
   } catch (e) {
     alert('Microfono non disponibile: ' + e.message);

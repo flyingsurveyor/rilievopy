@@ -145,14 +145,8 @@ def ubx_parse_loop(pipe: BytePipe):
                             "altHAE": h, "altMSL": hmsl,
                             "hAcc": hAcc, "vAcc": vAcc
                         })
-                        tpv = STATE.snapshot().get("TPV", {})
-                        tpv.update({
-                            "lat": lat, "lon": lon,
-                            "altHAE": h, "altMSL": hmsl,
-                            "hAcc": hAcc, "vAcc": vAcc,
-                            "time": now_iso()
-                        })
-                        STATE.set("TPV", tpv)
+                        STATE.patch("TPV", lat=lat, lon=lon, altHAE=h, altMSL=hmsl,
+                                    hAcc=hAcc, vAcc=vAcc, time=now_iso())
 
                 except Exception as e:
                     print(f"# {now_iso()} [parser] msg error ({getattr(msg, 'identity', '?')}): {e}")
@@ -172,6 +166,7 @@ def upstream_loop(host: str, port: int, pipe: BytePipe,
             sock = socket.create_connection((host, port), timeout=15.0)
             sock.settimeout(10.0)
             print(f"# {now_iso()} [upstream] connected")
+            STATE.patch("TPV", _connected=True)
             while True:
                 chunk = sock.recv(4096)
                 if not chunk:
@@ -181,6 +176,7 @@ def upstream_loop(host: str, port: int, pipe: BytePipe,
                     relay.broadcast(chunk)
         except Exception as e:
             print(f"# {now_iso()} [upstream] disconnected: {e}. Retry in {retry}s")
+            STATE.patch("TPV", _connected=False)
             time.sleep(retry)
         finally:
             try:

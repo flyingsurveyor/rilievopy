@@ -375,6 +375,7 @@ textarea{min-height:46px;resize:vertical}
   });
 
   let progressTimer = null;
+  let _activeJobId = null;
   function setFormBusy(busy) {
     [...form.querySelectorAll('input,select,textarea,button')].forEach(el => { if (el.id !== 'force-field') el.disabled = busy; });
     const rmbtn = document.getElementById('btn-record-point-mobile');
@@ -431,24 +432,50 @@ textarea{min-height:46px;resize:vertical}
     codHidden.value = codSel.value;
     const fd = new FormData(form);
     setFormBusy(true);
-    startProgress(Number(durSel.value || 10));
     let resp;
     try { resp = await fetch(form.action, { method: 'POST', body: fd }); }
-    catch (e) { setFormBusy(false); stopProgress(); showError('Errore di rete: ' + e); return; }
+    catch (e) { setFormBusy(false); showError('Errore di rete: ' + e); return; }
 
     const ct = resp.headers.get('content-type') || '';
     if (ct.includes('application/json')) {
       const data = await resp.json();
-      if (data.error === 'no_gnss_data') { setFormBusy(false); stopProgress(); showError('❌ ' + (data.message || 'Nessun dato GNSS')); return; }
+      if (data.error === 'no_gnss_data') { setFormBusy(false); showError('❌ ' + (data.message || 'Nessun dato GNSS')); return; }
       if (data.quality_warning) {
         setFormBusy(false);
-        stopProgress();
         warningsList.innerHTML = '';
         (data.warnings || []).forEach(w => { const li = document.createElement('li'); li.textContent = w; warningsList.appendChild(li); });
         qualityModal.style.display = 'flex';
         return;
       }
-      if (!data.ok) { setFormBusy(false); stopProgress(); showError('❌ Errore'); return; }
+      if (data.async && data.job_id) {
+        _activeJobId = data.job_id;
+        showProgress();
+        progressLabel.textContent = 'Misura in corso…';
+        progressFill.style.width = '0%';
+        progressSeconds.textContent = '0%';
+        window._onSseTick = function(p) {
+          const job = p.JOB;
+          if (!job || job.id !== _activeJobId) return;
+          if (job.status === 'running' || job.status === 'starting') {
+            const pct = job.total > 0 ? Math.round((job.progress / job.total) * 100) : 0;
+            progressFill.style.width = pct + '%';
+            progressSeconds.textContent = pct + '%';
+          } else if (job.status === 'done') {
+            window._onSseTick = null;
+            showSavedMsg(job.pid || '?', job.name || null, job.codice || null);
+            setTimeout(function() { window.location.href = job.redirect; }, 600);
+          } else if (job.status === 'error') {
+            window._onSseTick = null;
+            const overlay = document.getElementById('imu-sampling-overlay');
+            if (overlay) overlay.style.display = 'none';
+            setFormBusy(false);
+            stopProgress();
+            showError('❌ ' + (job.error || 'Errore durante il campionamento'));
+          }
+        };
+        return;
+      }
+      if (!data.ok) { setFormBusy(false); showError('❌ Errore'); return; }
     }
     window.location.href = resp.redirected ? resp.url : (resp.url || form.action);
   }
@@ -457,7 +484,8 @@ textarea{min-height:46px;resize:vertical}
   document.getElementById('modal-cancel').addEventListener('click', () => { qualityModal.style.display = 'none'; forceField.value = '0'; });
   document.getElementById('modal-force').addEventListener('click', () => { qualityModal.style.display = 'none'; forceField.value = '1'; submitPoint(); });
 
-  let mediaRecorder = null, chunks = [], recKind = 'point', recStarted = 0, recTick = null;
+  let mediaRecorder = null, chunks = [], recKind = 'point', recStarted = 0, recTick = null, recMaxTimer = null;
+  const REC_MAX_SECONDS = 60;
   const btnRecMobile = document.getElementById('btn-record-point-mobile');
 
   let pendingDelete = null;
@@ -528,6 +556,7 @@ textarea{min-height:46px;resize:vertical}
       mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
       mediaRecorder.onstop = async () => {
         clearInterval(recTick);
+        clearTimeout(recMaxTimer);
         updateRecordingUI(false);
         const blob = new Blob(chunks, {type: mediaRecorder.mimeType || 'audio/webm'});
         stream.getTracks().forEach(t => t.stop());
@@ -537,9 +566,17 @@ textarea{min-height:46px;resize:vertical}
       mediaRecorder.start();
       recStarted = Date.now();
       updateRecordingUI(true);
+      recMaxTimer = setTimeout(() => stopRecording(), REC_MAX_SECONDS * 1000);
       recTick = setInterval(() => {
-        const secs = ((Date.now() - recStarted) / 1000).toFixed(1);
-        progressSeconds.textContent = secs + ' s';
+        const elapsed = (Date.now() - recStarted) / 1000;
+        const remaining = REC_MAX_SECONDS - elapsed;
+        if (remaining <= 10) {
+          progressSeconds.textContent = '⚠ ' + Math.ceil(remaining) + 's';
+          progressSeconds.style.color = 'var(--danger)';
+        } else {
+          progressSeconds.textContent = elapsed.toFixed(1) + ' s';
+          progressSeconds.style.color = '';
+        }
       }, 100);
     } catch (e) {
       showError('Microfono non disponibile: ' + e.message);

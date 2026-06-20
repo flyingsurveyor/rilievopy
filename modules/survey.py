@@ -42,6 +42,16 @@ os.makedirs(SURVEY_DIR, exist_ok=True)
 SURVEY_LOCK = threading.Lock()
 SURVEY_EXT = ".geojson"
 
+# ---------- All-points cache ----------
+_all_points_options_cache = None   # for COGO selects
+_all_points_features_cache = None  # for /api/all_points
+
+
+def invalidate_all_points_cache():
+    global _all_points_options_cache, _all_points_features_cache
+    _all_points_options_cache = None
+    _all_points_features_cache = None
+
 
 # ---------- Helpers ----------
 def sanitize_survey_id(s: str) -> str:
@@ -175,6 +185,7 @@ def save_survey(sid: str, obj: Dict[str, Any]):
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(obj, fh, ensure_ascii=False, indent=2)
         os.replace(tmp, path)
+    invalidate_all_points_cache()
 
 
 def create_survey(title: str, desc: str) -> str:
@@ -210,6 +221,7 @@ def delete_survey_file(sid: str) -> bool:
     if os.path.isdir(media_dir):
         shutil.rmtree(media_dir, ignore_errors=True)
         removed = True or removed
+    invalidate_all_points_cache()
     return removed
 
 
@@ -496,7 +508,10 @@ def point_from_feature(f: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def list_all_points_options() -> List[Tuple[str, str]]:
-    """List all points across all surveys as (label, value) tuples."""
+    """List all points across all surveys as (label, value) tuples. Cached."""
+    global _all_points_options_cache
+    if _all_points_options_cache is not None:
+        return _all_points_options_cache
     opts = []
     for sid in list_survey_ids():
         try:
@@ -507,4 +522,28 @@ def list_all_points_options() -> List[Tuple[str, str]]:
                 opts.append((label, val))
         except Exception:
             pass
+    _all_points_options_cache = opts
     return opts
+
+
+def get_all_points_features() -> List[Dict[str, Any]]:
+    """Return all survey features annotated with _survey_id/_survey_title. Cached."""
+    global _all_points_features_cache
+    if _all_points_features_cache is not None:
+        return _all_points_features_cache
+    features = []
+    for sid in list_survey_ids():
+        try:
+            svy = load_survey(sid)
+            survey_title = svy.get("properties", {}).get("title", sid)
+            for f in svy.get("features", []):
+                feat = dict(f)
+                props = dict(feat.get("properties", {}))
+                props["_survey_id"] = sid
+                props["_survey_title"] = survey_title
+                feat["properties"] = props
+                features.append(feat)
+        except Exception:
+            pass
+    _all_points_features_cache = features
+    return features

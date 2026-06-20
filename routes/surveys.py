@@ -6,7 +6,9 @@ import io
 import json
 import math
 import os
+import threading
 import time
+import uuid
 from datetime import datetime
 
 from flask import Blueprint, abort, make_response, render_template, request, send_from_directory, jsonify
@@ -188,8 +190,6 @@ def survey_view(sid):
         abort(404)
     props = svy.get("properties", {})
     active_sid = get_active_survey_id()
-    rows = []
-    points_for_json = []
     point_cards = []
     for idx, f in enumerate(svy.get("features", [])):
         p = f.get("properties", {})
@@ -197,66 +197,67 @@ def survey_view(sid):
         def fnum(x, fmt):
             return "-" if x is None else fmt.format(x)
 
-        point_id = f.get('id', '')
-        point_name = p.get('name', '')
-        codice = p.get('codice', '')
-        points_for_json.append({"id": point_id, "name": point_name})
-
-        sigma_N = p.get("sigma_n")
-        sigma_E = p.get("sigma_e")
-        sigma_U = p.get("sigma_u")
-
         def fsig(x):
             return f"±{x:.3f} m" if x is not None else "-"
 
-        rows.append(
-            "<tr>"
-            f"<td><input type='checkbox' class='area-cb' value='{point_id}'/></td>"
-            f"<td>{point_id}</td>"
-            f"<td>{point_name}</td>"
-            f"<td>{codice}</td>"
-            f"<td>{fnum(p.get('lat'), '{:.9f}')}</td>"
-            f"<td>{fnum(p.get('lon'), '{:.9f}')}</td>"
-            f"<td>{fnum(p.get('alt_hae'), '{:.3f}')}</td>"
-            f"<td>{fnum(p.get('pdop'), '{:.2f}')}</td>"
-            f"<td>{fnum(p.get('hdop'), '{:.2f}')}</td>"
-            f"<td>{fnum(p.get('vdop'), '{:.2f}')}</td>"
-            f"<td>{fnum(p.get('rel_n'), '{:.4f}')}</td>"
-            f"<td>{fnum(p.get('rel_e'), '{:.4f}')}</td>"
-            f"<td>{fnum(p.get('rel_d'), '{:.4f}')}</td>"
-            f"<td>{fnum(p.get('baseline'), '{:.4f}')}</td>"
-            f"<td>{fsig(sigma_N)}</td>"
-            f"<td>{fsig(sigma_E)}</td>"
-            f"<td>{fsig(sigma_U)}</td>"
-            f"<td><a class='btn' href='/survey/{sid}/point/{point_id}.txt'>TXT</a></td>"
-            f"<td><button class='btn-delete-point' onclick=\"confirmDeletePoint('{sid}', {idx}, '{point_name}')\">🗑️</button></td>"
-            "</tr>"
-        )
+        point_id = f.get('id', '')
+        point_name = p.get('name', '')
+        h_acc = p.get('h_acc')
         point_cards.append({
-            "idx": idx,
-            "id": point_id,
-            "name": point_name,
-            "codice": codice,
-            "lat": fnum(p.get('lat'), '{:.9f}'),
-            "lon": fnum(p.get('lon'), '{:.9f}'),
-            "hae": fnum(p.get('alt_hae'), '{:.3f}'),
-            "pdop": fnum(p.get('pdop'), '{:.2f}'),
-            "hdop": fnum(p.get('hdop'), '{:.2f}'),
-            "vdop": fnum(p.get('vdop'), '{:.2f}'),
-            "sigma_n": fsig(sigma_N),
-            "sigma_e": fsig(sigma_E),
-            "sigma_u": fsig(sigma_U),
+            "idx":          idx,
+            "id":           point_id,
+            "name":         point_name,
+            "codice":       p.get('codice', ''),
+            "rtk":          p.get('rtk') or '-',
+            # compact
+            "lat":          fnum(p.get('lat'), '{:.9f}'),
+            "lon":          fnum(p.get('lon'), '{:.9f}'),
+            "hae":          fnum(p.get('alt_hae'), '{:.4f}'),
+            "h_acc_cm":     f"{h_acc*100:.1f} cm" if h_acc is not None else "-",
+            "pdop":         fnum(p.get('pdop'), '{:.2f}'),
+            "sigma_n":      fsig(p.get('sigma_n')),
+            "sigma_e":      fsig(p.get('sigma_e')),
+            "num_sv":       str(p.get('num_sv')) if p.get('num_sv') is not None else "-",
+            # extended position
+            "alt_msl":      fnum(p.get('alt_msl'), '{:.4f}'),
+            "v_acc":        fnum(p.get('v_acc'), '{:.4f}'),
+            "p_acc":        fnum(p.get('p_acc'), '{:.4f}'),
+            "gnss_mode":    str(p.get('gnss_mode')) if p.get('gnss_mode') is not None else "-",
+            # full DOP
+            "hdop":         fnum(p.get('hdop'), '{:.2f}'),
+            "vdop":         fnum(p.get('vdop'), '{:.2f}'),
+            "gdop":         fnum(p.get('gdop'), '{:.2f}'),
+            "ndop":         fnum(p.get('ndop'), '{:.2f}'),
+            "edop":         fnum(p.get('edop'), '{:.2f}'),
+            "tdop":         fnum(p.get('tdop'), '{:.2f}'),
+            # sigma & relpos
+            "sigma_u":      fsig(p.get('sigma_u')),
+            "rel_n":        fnum(p.get('rel_n'), '{:.4f}'),
+            "rel_e":        fnum(p.get('rel_e'), '{:.4f}'),
+            "rel_d":        fnum(p.get('rel_d'), '{:.4f}'),
+            "baseline":     fnum(p.get('baseline'), '{:.4f}'),
+            "bearing_deg":  fnum(p.get('bearing_deg'), '{:.2f}'),
+            "slope_deg":    fnum(p.get('slope_deg'), '{:.2f}'),
+            # ECEF
+            "ecef_x":       fnum(p.get('ecef_x'), '{:.4f}'),
+            "ecef_y":       fnum(p.get('ecef_y'), '{:.4f}'),
+            "ecef_z":       fnum(p.get('ecef_z'), '{:.4f}'),
+            # sampling
+            "n_samples":    str(p.get('n_samples')) if p.get('n_samples') is not None else "-",
+            "n_kept":       str(p.get('n_kept')) if p.get('n_kept') is not None else "-",
+            "duration_s":   fnum(p.get('duration_s'), '{:.1f}'),
+            "interval_s":   fnum(p.get('interval_s'), '{:.2f}'),
+            "imu_tilt_max": fnum(p.get('imu_tilt_max_deg'), '{:.1f}'),
+            "imu_unstable": "Sì" if p.get('imu_unstable') else "No",
+            "start_time":   (p.get('start_time') or '-')[:19].replace('T', ' '),
+            "end_time":     (p.get('end_time') or '-')[:19].replace('T', ' '),
         })
-    num_points = len(rows)
-    num_columns = 19
     voice_notes = build_voice_notes_index(sid, svy)
     return render_template('rtk_survey_view.html',
                            sid=props.get("id", sid),
                            title=props.get("title", sid),
                            notes=props.get("desc", ""),
-                           rows="\n".join(rows) or f"<tr><td colspan='{num_columns}'>(nessun punto)</td></tr>",
-                           points_json=json.dumps(points_for_json),
-                           num_points=str(num_points),
+                           num_points=str(len(point_cards)),
                            active_sid=active_sid,
                            voice_notes=voice_notes,
                            point_cards=point_cards,
@@ -287,6 +288,10 @@ def survey_voice_note_create(sid):
     filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{int(time.time()*1000)%1000:03d}_{kind}{ext}"
     path = os.path.join(survey_audio_dir(sid), filename)
     file.save(path)
+    _MAX_AUDIO_BYTES = 5 * 1024 * 1024  # 5 MB (~60s webm)
+    if os.path.getsize(path) > _MAX_AUDIO_BYTES:
+        os.remove(path)
+        return _json_err("File audio troppo grande (max ~60 s / 5 MB)")
     note = _new_note_payload(
         sid=sid,
         kind=kind,
@@ -349,6 +354,135 @@ def survey_update_notes(sid):
     svy.setdefault("properties", {})["desc"] = notes
     save_survey(sid, svy)
     return _redirect(f"/survey/{sid}")
+
+
+# ---------- Sampling background job ----------
+def _do_sample_and_save(job_id, sid, name, desc, codice, duration, interval,
+                         imu_unstable, imu_tilt_max_deg):
+    """Background thread: sample GNSS, compute stats, save point, update STATE.JOB."""
+    try:
+        n_iters = max(1, int(duration / interval))
+        start_ts = datetime.now()
+        samples = []
+
+        for i in range(n_iters):
+            samples.append(STATE.snapshot())
+            STATE.set("JOB", {"id": job_id, "status": "running",
+                               "progress": i + 1, "total": n_iters})
+            time.sleep(interval)
+
+        end_ts = datetime.now()
+
+        def collect_key(group, key):
+            vals = [s.get(group, {}).get(key) for s in samples]
+            return robust_avg([v for v in vals if isinstance(v, (int, float))])
+
+        def collect_vals(group, key):
+            return [v for s in samples
+                    for v in [s.get(group, {}).get(key)]
+                    if isinstance(v, (int, float))]
+
+        mode = int(round(collect_key("TPV", "mode") or 0))
+        rtk = samples[-1].get("TPV", {}).get("rtk", "-")
+        numSV = int(round(collect_key("TPV", "numSV") or 0))
+
+        lat = collect_key("HPPOSLLH", "lat") or collect_key("TPV", "lat")
+        lon = collect_key("HPPOSLLH", "lon") or collect_key("TPV", "lon")
+        altHAE = collect_key("HPPOSLLH", "altHAE")
+        altMSL = collect_key("HPPOSLLH", "altMSL") or collect_key("TPV", "altMSL")
+        hAcc = collect_key("HPPOSLLH", "hAcc") or collect_key("TPV", "hAcc")
+        vAcc = collect_key("HPPOSLLH", "vAcc") or collect_key("TPV", "vAcc")
+
+        X = collect_key("HPPOSECEF", "X")
+        Y = collect_key("HPPOSECEF", "Y")
+        Z = collect_key("HPPOSECEF", "Z")
+        pAcc = collect_key("HPPOSECEF", "pAcc")
+
+        gdop = collect_key("DOP", "gdop"); pdop = collect_key("DOP", "pdop")
+        hdop = collect_key("DOP", "hdop"); vdop = collect_key("DOP", "vdop")
+        ndop = collect_key("DOP", "ndop"); edop = collect_key("DOP", "edop")
+        tdop = collect_key("DOP", "tdop")
+
+        covNN = collect_key("COV", "covNN"); covEE = collect_key("COV", "covEE")
+        covDD = collect_key("COV", "covDD"); covNE = collect_key("COV", "covNE")
+        covND = collect_key("COV", "covND"); covED = collect_key("COV", "covED")
+
+        relN = collect_key("RELPOS", "N"); relE = collect_key("RELPOS", "E")
+        relD = collect_key("RELPOS", "D")
+        relsN = collect_key("RELPOS", "sN"); relsE = collect_key("RELPOS", "sE")
+        relsD = collect_key("RELPOS", "sD")
+        horiz = baseline = bearing = slope = None
+        if relN is not None and relE is not None and relD is not None:
+            horiz = math.hypot(relN, relE)
+            baseline = math.sqrt(horiz * horiz + relD * relD)
+            bearing = math.degrees(math.atan2(relE, relN))
+            bearing = bearing + 360 if bearing < 0 else bearing
+            slope = math.degrees(math.atan2(-relD, horiz)) if horiz else 0.0
+
+        _lat_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lat"))
+        _lon_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lon"))
+        _alt_stats = robust_avg_stats(collect_vals("HPPOSLLH", "altHAE"))
+        _mean_lat_rad = math.radians(lat or 0.0)
+        sigma_N = sigma_E = sigma_U = None
+        n_kept = _alt_stats.get("n_kept", 0)
+        if _lat_stats.get("sigma") is not None:
+            sigma_N = _lat_stats["sigma"] * math.radians(1.0) * WGS84_A
+        if _lon_stats.get("sigma") is not None:
+            sigma_E = _lon_stats["sigma"] * math.radians(1.0) * WGS84_A * math.cos(_mean_lat_rad)
+        if _alt_stats.get("sigma") is not None:
+            sigma_U = _alt_stats["sigma"]
+
+        stats = {
+            "mode": mode, "rtk": rtk, "numSV": numSV,
+            "hAcc": hAcc, "vAcc": vAcc, "pAcc": pAcc,
+            "gdop": gdop, "pdop": pdop, "hdop": hdop, "vdop": vdop,
+            "ndop": ndop, "edop": edop, "tdop": tdop,
+            "covNN": covNN, "covEE": covEE, "covDD": covDD,
+            "covNE": covNE, "covND": covND, "covED": covED,
+            "relN": relN, "relE": relE, "relD": relD,
+            "relsN": relsN, "relsE": relsE, "relsD": relsD,
+            "baseline": baseline, "horiz": horiz, "bearing": bearing, "slope": slope,
+            "sigma_N": sigma_N, "sigma_E": sigma_E, "sigma_U": sigma_U, "n_kept": n_kept,
+        }
+
+        try:
+            svy = load_survey(sid)
+        except FileNotFoundError:
+            STATE.set("JOB", {"id": job_id, "status": "error", "error": "Rilievo non trovato"})
+            return
+
+        pid = next_point_id(svy)
+        feat = point_feature(
+            pid, lat, lon, altHAE, altMSL, X, Y, Z, stats,
+            {"name": name, "codice": codice, "desc": desc, "duration": duration,
+             "interval": interval, "n_samples": len(samples),
+             "start": start_ts.isoformat(timespec='seconds'),
+             "end": end_ts.isoformat(timespec='seconds'),
+             "imu_unstable": imu_unstable, "imu_tilt_max_deg": imu_tilt_max_deg}
+        )
+        move_pending_notes_to_feature(svy, feat, name, codice)
+        svy.setdefault("features", []).append(feat)
+        backup_survey(sid)
+        save_survey(sid, svy)
+
+        try:
+            log_event("point_saved", sid, {"pid": pid, "codice": codice, "rtk": rtk})
+        except Exception:
+            pass
+        try:
+            from modules.alert_monitor import ALERTS
+            ALERTS.notify_point_measured(name, hacc_mm=hAcc * 1000 if hAcc is not None else None)
+        except Exception:
+            pass
+
+        STATE.set("JOB", {
+            "id": job_id, "status": "done",
+            "pid": pid, "name": name, "codice": codice,
+            "redirect": f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}"
+        })
+
+    except Exception as e:
+        STATE.set("JOB", {"id": job_id, "status": "error", "error": str(e)})
 
 
 # ---------- Add point ----------
@@ -456,16 +590,7 @@ def survey_point(sid):
                         "warnings": warnings
                     }), 200, {"Content-Type": "application/json"})
 
-    start_ts = datetime.now()
-    samples = []
-    n_iters = max(1, int(duration / interval))
-
-    for _ in range(n_iters):
-        samples.append(STATE.snapshot())
-        time.sleep(interval)
-    end_ts = datetime.now()
-
-    # Read IMU stability data submitted by the browser (DeviceOrientation API)
+    # Read IMU fields from request BEFORE starting thread (request context is thread-local)
     imu_unstable = request.form.get("imu_unstable", "false").lower() == "true"
     imu_tilt_max_form = request.form.get("imu_tilt_max_deg")
     imu_tilt_max_deg = None
@@ -475,125 +600,19 @@ def survey_point(sid):
         except (ValueError, TypeError):
             pass
 
-    def collect_key(group, key):
-        vals = []
-        for s in samples:
-            g = s.get(group, {})
-            v = g.get(key, None)
-            if isinstance(v, (int, float)):
-                vals.append(v)
-        return robust_avg(vals)
+    job_id = uuid.uuid4().hex[:8]
+    n_iters = max(1, int(duration / interval))
+    STATE.set("JOB", {"id": job_id, "status": "starting", "progress": 0, "total": n_iters})
 
-    mode = int(round(collect_key("TPV", "mode") or 0))
-    rtk = samples[-1].get("TPV", {}).get("rtk", "-")
-    numSV = int(round(collect_key("TPV", "numSV") or 0))
+    threading.Thread(
+        target=_do_sample_and_save,
+        args=(job_id, sid, name, desc, codice, duration, interval, imu_unstable, imu_tilt_max_deg),
+        daemon=True
+    ).start()
 
-    lat = collect_key("HPPOSLLH", "lat") or collect_key("TPV", "lat")
-    lon = collect_key("HPPOSLLH", "lon") or collect_key("TPV", "lon")
-    altHAE = collect_key("HPPOSLLH", "altHAE")
-    altMSL = collect_key("HPPOSLLH", "altMSL") or collect_key("TPV", "altMSL")
-    hAcc = collect_key("HPPOSLLH", "hAcc") or collect_key("TPV", "hAcc")
-    vAcc = collect_key("HPPOSLLH", "vAcc") or collect_key("TPV", "vAcc")
-
-    X = collect_key("HPPOSECEF", "X")
-    Y = collect_key("HPPOSECEF", "Y")
-    Z = collect_key("HPPOSECEF", "Z")
-    pAcc = collect_key("HPPOSECEF", "pAcc")
-
-    gdop = collect_key("DOP", "gdop"); pdop = collect_key("DOP", "pdop")
-    hdop = collect_key("DOP", "hdop"); vdop = collect_key("DOP", "vdop")
-    ndop = collect_key("DOP", "ndop"); edop = collect_key("DOP", "edop")
-    tdop = collect_key("DOP", "tdop")
-
-    covNN = collect_key("COV", "covNN"); covEE = collect_key("COV", "covEE")
-    covDD = collect_key("COV", "covDD"); covNE = collect_key("COV", "covNE")
-    covND = collect_key("COV", "covND"); covED = collect_key("COV", "covED")
-
-    relN = collect_key("RELPOS", "N"); relE = collect_key("RELPOS", "E")
-    relD = collect_key("RELPOS", "D")
-    relsN = collect_key("RELPOS", "sN"); relsE = collect_key("RELPOS", "sE")
-    relsD = collect_key("RELPOS", "sD")
-    horiz = baseline = bearing = slope = None
-    if relN is not None and relE is not None and relD is not None:
-        horiz = math.hypot(relN, relE)
-        baseline = math.sqrt(horiz * horiz + relD * relD)
-        bearing = math.degrees(math.atan2(relE, relN))
-        bearing = bearing + 360 if bearing < 0 else bearing
-        slope = math.degrees(math.atan2(-relD, horiz)) if horiz else 0.0
-
-    # ---------- Sigma (std dev) of position samples ----------
-    def collect_vals(group, key):
-        vals = []
-        for s in samples:
-            g = s.get(group, {})
-            v = g.get(key, None)
-            if isinstance(v, (int, float)):
-                vals.append(v)
-        return vals
-
-    _lat_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lat"))
-    _lon_stats = robust_avg_stats(collect_vals("HPPOSLLH", "lon"))
-    _alt_stats = robust_avg_stats(collect_vals("HPPOSLLH", "altHAE"))
-
-    _mean_lat_rad = math.radians(lat or 0.0)
-    sigma_N = None
-    sigma_E = None
-    sigma_U = None
-    n_kept = _alt_stats.get("n_kept", 0)
-    if _lat_stats.get("sigma") is not None:
-        sigma_N = _lat_stats["sigma"] * math.radians(1.0) * WGS84_A
-    if _lon_stats.get("sigma") is not None:
-        sigma_E = _lon_stats["sigma"] * math.radians(1.0) * WGS84_A * math.cos(_mean_lat_rad)
-    if _alt_stats.get("sigma") is not None:
-        sigma_U = _alt_stats["sigma"]
-
-    stats = {
-        "mode": mode, "rtk": rtk, "numSV": numSV,
-        "hAcc": hAcc, "vAcc": vAcc, "pAcc": pAcc,
-        "gdop": gdop, "pdop": pdop, "hdop": hdop, "vdop": vdop,
-        "ndop": ndop, "edop": edop, "tdop": tdop,
-        "covNN": covNN, "covEE": covEE, "covDD": covDD,
-        "covNE": covNE, "covND": covND, "covED": covED,
-        "relN": relN, "relE": relE, "relD": relD,
-        "relsN": relsN, "relsE": relsE, "relsD": relsD,
-        "baseline": baseline, "horiz": horiz, "bearing": bearing, "slope": slope,
-        "sigma_N": sigma_N, "sigma_E": sigma_E, "sigma_U": sigma_U, "n_kept": n_kept,
-    }
-
-    try:
-        svy = load_survey(sid)
-    except FileNotFoundError:
-        abort(404)
-    pid = next_point_id(svy)
-    start_iso = start_ts.isoformat(timespec='seconds')
-    end_iso = end_ts.isoformat(timespec='seconds')
-
-    feat = point_feature(
-        pid, lat, lon, altHAE, altMSL, X, Y, Z, stats,
-        {"name": name, "codice": codice, "desc": desc, "duration": duration,
-         "interval": interval, "n_samples": len(samples),
-         "start": start_iso, "end": end_iso,
-         "imu_unstable": imu_unstable,
-         "imu_tilt_max_deg": imu_tilt_max_deg}
-    )
-    move_pending_notes_to_feature(svy, feat, name, codice)
-    svy.setdefault("features", []).append(feat)
-    backup_survey(sid)
-    save_survey(sid, svy)
-
-    try:
-        log_event("point_saved", sid, {"pid": pid, "codice": codice, "rtk": rtk})
-    except Exception:
-        pass
-
-    try:
-        from modules.alert_monitor import ALERTS
-        hacc_mm = hAcc * 1000 if hAcc is not None else None
-        ALERTS.notify_point_measured(name, hacc_mm=hacc_mm)
-    except Exception:
-        pass
-
-    return _redirect(f"/survey/{sid}/point?saved={pid}&savedname={name}&savedcodice={codice}")
+    return make_response(json.dumps({
+        "ok": True, "async": True, "job_id": job_id, "total": n_iters
+    }), 200, {"Content-Type": "application/json"})
 
 
 # ---------- Downloads ----------

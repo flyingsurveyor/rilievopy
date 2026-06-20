@@ -167,6 +167,22 @@
         min-height: calc(100vh - 44px);
         padding: 0;
     }
+
+    /* ═══ Connection banner ═══ */
+    .conn-banner {
+        position: fixed;
+        top: 44px; left: 0; right: 0;
+        z-index: 995;
+        padding: 7px 14px;
+        font-size: 12px; font-weight: 700;
+        text-align: center;
+        transform: translateY(-100%);
+        transition: transform .25s ease;
+        pointer-events: none;
+    }
+    .conn-banner.visible { transform: translateY(0); }
+    .conn-banner.rtk-down { background: rgba(230,126,34,.95); color: #fff; }
+    .conn-banner.sse-down { background: rgba(192,57,43,.92);  color: #fff; }
     </style>
     {% block head %}{% endblock %}
 </head>
@@ -191,6 +207,9 @@
             <span class="gnss-label" id="gnssLabel">—</span>
         </div>
     </nav>
+
+    <!-- ═══ Connection banner ═══ -->
+    <div class="conn-banner" id="connBanner"></div>
 
     <!-- ═══ Sidebar ═══ -->
     <aside class="sidebar" id="sidebar">
@@ -352,11 +371,22 @@
             var gnssDot = document.getElementById('gnssDot');
             var gnssLbl = document.getElementById('gnssLabel');
             var rtcmAge = document.getElementById('rtcmAge');
+            var connBanner = document.getElementById('connBanner');
 
             var es = null;
             var reconnectTimer = null;
             var reconnectDelay = 2000;
             var dataTimeout = null;
+
+            function showBanner(msg, cls) {
+                if (!connBanner) return;
+                connBanner.textContent = msg;
+                connBanner.className = 'conn-banner ' + cls + ' visible';
+            }
+            function hideBanner() {
+                if (!connBanner) return;
+                connBanner.className = 'conn-banner';
+            }
 
             function setNoData() {
                 if (gnssDot) { gnssDot.className = 'gnss-dot nodata'; }
@@ -412,6 +442,7 @@
                     es = new EventSource('/events');
                     es.onopen = function() {
                         reconnectDelay = 2000;
+                        hideBanner();
                         resetDataTimeout();
                     };
                     es.onmessage = function(e) {
@@ -419,16 +450,25 @@
                         try {
                             var p = JSON.parse(e.data);
                             var tpv = p.TPV || {};
-                            var rtk = tpv.rtk || null;
-                            if (rtk) { applyStatus(rtk); } else { setNoData(); }
-                            updateAgeBadge(tpv);
+                            if (tpv._connected === false) {
+                                showBanner('Ricevitore RTK non connesso — riconnessione in corso...', 'rtk-down');
+                                setNoData();
+                                updateAgeBadge(null);
+                            } else {
+                                hideBanner();
+                                var rtk = tpv.rtk || null;
+                                if (rtk) { applyStatus(rtk); } else { setNoData(); }
+                                updateAgeBadge(tpv);
+                            }
                             if (p.alerts && window.playAlertSound) {
                                 p.alerts.forEach(function(kind) { playAlertSound(kind); });
                             }
+                            if (window._onSseTick) { try { window._onSseTick(p); } catch(_) {} }
                         } catch(_) {}
                     };
                     es.onerror = function() {
                         setNoData();
+                        showBanner('Connessione all\'app persa — riconnessione...', 'sse-down');
                         if (es) { try { es.close(); } catch(_) {} es = null; }
                         clearTimeout(reconnectTimer);
                         reconnectTimer = setTimeout(function() {
